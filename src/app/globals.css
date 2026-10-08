@@ -1,0 +1,384 @@
+@import "tailwindcss";
+
+/* BHD shared identity (docs/BHD-UNIFIED-LOGIN-AND-APPS.md §0.1): ink, emerald, sand, #d7e2dc borders. */
+@theme {
+  --color-teal-50: #e6f1ec;
+  --color-teal-100: #cfe5dc;
+  --color-teal-200: #a9d2c2;
+  --color-teal-300: #7bb9a3;
+  --color-teal-400: #4a9b80;
+  --color-teal-500: #1f7d62;
+  --color-teal-600: #0b6b51;
+  --color-teal-700: #075c45;
+  --color-teal-800: #0a493b;
+  --color-teal-900: #092d24;
+  --color-teal-950: #061f19;
+  --color-slate-200: #d7e2dc;
+  --color-slate-900: #092d24;
+}
+
+:root {
+  --ink: #092d24;
+  --emerald: #075c45;
+  --sand: #fbfaf7;
+  --sand-deep: #f4f0e8;
+  --line: #d7e2dc;
+}
+
+body {
+  font-family: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  background: var(--sand);
+  color: var(--ink);
+}
+
+/* Official logo (mask so it can take the ink / light tone). */
+.official-logo {
+  --official-logo-source: url("/brand/bhd-logo.svg");
+  display: block;
+  flex: 0 0 auto;
+  background: currentColor;
+  -webkit-mask: var(--official-logo-source) center / contain no-repeat;
+  mask: var(--official-logo-source) center / contain no-repeat;
+}
+
+.official-logo-full {
+  width: 190px;
+  aspect-ratio: 1200 / 390;
+}
+
+.official-logo-mark {
+  --official-logo-source: url("/brand/bhd-mark.svg");
+  aspect-ratio: 548 / 171;
+}
+
+.official-logo-ink { background: #0a493b; }
+.official-logo-light { background: #fffdf8; }
+
+/* BHD app icons + switcher (docs/BHD-APP-SWITCHER.md). */
+.bhd-app-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.bhd-app-icon svg {
+  display: block;
+  width: 72%;
+  height: 72%;
+}
+
+.bhd-switcher-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.bhd-switcher-grid,
+.bhd-switcher-avatar {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #092d24;
+}
+
+.bhd-switcher-grid span {
+  display: grid;
+  grid-template-columns: repeat(3, 4px);
+  gap: 3px;
+}
+
+.bhd-switcher-grid i {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.bhd-switcher-avatar img,
+.bhd-switcher-avatar span,
+.bhd-switcher-account-row img,
+.bhd-switcher-account-initial {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.bhd-switcher-avatar span,
+.bhd-switcher-account-initial {
+  display: grid;
+  place-items: center;
+  background: #092d24;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bhd-switcher-card {
+  position: absolute;
+  top: calc(100% + 10px);
+  inset-inline-end: 0;
+  inset-inline-start: auto;
+  z-index: 90;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(360px, calc(100svh - 96px));
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #d7e2dc;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(9, 45, 36, 0.12);
+  color: #092d24;
+}
+
+.bhd-switcher-card-head p {
+  margin: 0 4px 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bhd-switcher-grid-apps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bhd-switcher-app {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bhd-switcher-app span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bhd-switcher-app:hover,
+.bhd-switcher-app:focus-visible {
+  background: #f5f7f6;
+}
+
+.bhd-switcher-app.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bhd-switcher-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.bhd-switcher-mark.is-current {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
+}
+
+.bhd-switcher-account-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bhd-switcher-account-row > div {
+  min-width: 0;
+}
+
+.bhd-switcher-account-row strong,
+.bhd-switcher-account-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bhd-switcher-account-row small {
+  color: #5d7169;
+  font-size: 12px;
+}
+
+.bhd-switcher-account-link,
+.bhd-switcher-signout {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #f4f7f5;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bhd-switcher-signout {
+  margin-top: 8px;
+  background: var(--ink);
+  color: #fff;
+}
+
+@media (max-width: 600px) {
+  .bhd-switcher-card {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px) + 64px);
+    inset-inline: 12px;
+    width: auto;
+    max-width: none;
+    max-height: min(70svh, calc(100svh - 88px));
+    z-index: 120;
+  }
+}
+
+/* Footer (docs/BHD-UNIFIED-LOGIN-AND-APPS.md §0.5). */
+.site-footer {
+  background: #061f19;
+  color: #fff;
+}
+
+.footer-wrap {
+  padding-inline: clamp(16px, 4vw, 32px);
+}
+
+.footer-programs {
+  padding-top: 32px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.footer-programs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.footer-programs-head p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.footer-programs-head a {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.footer-programs-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.footer-program {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.footer-program span:not(.bhd-app-icon) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  gap: 24px;
+  min-height: 150px;
+}
+
+.footer-official-logo { width: 180px; }
+.footer-top > p { margin: 0; color: rgba(255, 255, 255, 0.55); font-size: 12px; text-align: center; }
+.footer-links { display: flex; justify-content: end; flex-wrap: wrap; gap: 10px 20px; color: rgba(255, 255, 255, 0.7); font-size: 12px; }
+.footer-links a:hover,
+.footer-programs-head a:hover { color: #fff; }
+
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 64px;
+  padding-block: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .footer-programs-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 18px; }
+  .footer-top { grid-template-columns: 1fr; justify-items: center; padding-block: 28px; text-align: center; }
+  .footer-links { justify-content: center; }
+}
+
+@media print {
+  .app-shell {
+    display: block !important;
+  }
+
+  .app-sidebar,
+  .app-header,
+  .site-footer,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .sheet {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}

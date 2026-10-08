@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id               String     @id @default(cuid())
+  name             String
+  nameEn           String?
+  crNumber         String?
+  phone            String?
+  email            String?
+  address          String?
+  logoUrl          String?
+  currency         String     @default("ر.ع")
+  salaryDays       Int        @default(30)
+  alertUrgentDays  Int        @default(7)
+  alertWarningDays Int        @default(30)
+  alertEarlyDays   Int        @default(60)
+  payDay           Int        @default(0)
+  leaveWarningDays Int        @default(5)
+  employees        Employee[]
+  employers        Employer[]
+  users            User[]
+  reminders        Reminder[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model User {
+  id                   String     @id @default(cuid())
+  name                 String
+  email                String     @unique
+  password             String
+  role                 String     @default("ADMIN")
+  mustChangePassword   Boolean    @default(true)
+  bhdSub               String?    @unique
+  picture              String?
+  lastLoginAt          DateTime?
+  companyId            String
+  company              Company    @relation(fields: [companyId], references: [id])
+  auditLogs            AuditLog[]
+  createdAt            DateTime   @default(now())
+}
+
+model Employer {
+  id        String     @id @default(cuid())
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id])
+  kind      String     @default("COMPANY")
+  name      String
+  nameEn    String?
+  idNumber  String?
+  phone     String?
+  email     String?
+  address   String?
+  logoUrl   String?
+  notes     String?
+  employees Employee[]
+  salaries  Salary[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Employee {
+  id                 String             @id @default(cuid())
+  employeeNumber     String             @unique
+  fullName           String
+  nameEn             String?
+  nationality        String?
+  gender             String?
+  dateOfBirth        DateTime?
+  phone              String?
+  email              String?
+  address            String?
+  idNumber           String?
+  idExpiry           DateTime?
+  passportNumber     String?
+  passportExpiry     DateTime?
+  residenceNumber    String?
+  residenceExpiry    DateTime?
+  jobTitle           String?
+  department         String?
+  joiningDate        DateTime?
+  contractEnd        DateTime?
+  status             String             @default("ACTIVE")
+  annualLeaveDays    Float              @default(30)
+  sickLeaveDays      Float              @default(0)
+  otherLeaveDays     Float              @default(0)
+  basicSalary        Float              @default(0)
+  housingAllowance   Float              @default(0)
+  transportAllowance Float              @default(0)
+  otherAllowance     Float              @default(0)
+  notes              String?
+  companyId          String
+  company            Company            @relation(fields: [companyId], references: [id])
+  employerId         String?
+  employer           Employer?          @relation(fields: [employerId], references: [id])
+  documents          EmployeeDocument[]
+  attendance         Attendance[]
+  leaveCredits       LeaveCredit[]
+  salaries           Salary[]
+  auditLogs          AuditLog[]
+  reminders          Reminder[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model Reminder {
+  id         String    @id @default(cuid())
+  companyId  String
+  company    Company   @relation(fields: [companyId], references: [id])
+  title      String
+  date       DateTime
+  repeat     String    @default("NONE")
+  notes      String?
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  done       Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model EmployeeDocument {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       String
+  documentNo String?
+  expiryDate DateTime?
+  fileUrl    String?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date          DateTime
+  type          String
+  notes         String?
+  deductsSalary Boolean  @default(false)
+  balanceKey    String?
+  groupId       String?
+  createdAt     DateTime @default(now())
+
+  @@unique([employeeId, date])
+}
+
+model LeaveCredit {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  balanceKey String
+  days       Float
+  reason     String?
+  createdAt  DateTime @default(now())
+}
+
+model Salary {
+  id                 String    @id @default(cuid())
+  employeeId         String
+  employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  year               Int
+  month              Int
+  employerId         String?
+  employer           Employer? @relation(fields: [employerId], references: [id])
+  employerName       String?
+  employerNameEn     String?
+  employeeName       String
+  employeeNameEn     String?
+  employeeNumber     String
+  jobTitle           String?
+  department         String?
+  basicSalary        Float     @default(0)
+  housingAllowance   Float     @default(0)
+  transportAllowance Float     @default(0)
+  otherAllowance     Float     @default(0)
+  absenceDays        Float     @default(0)
+  absenceDeduction   Float     @default(0)
+  otherDeduction     Float     @default(0)
+  netSalary          Float     @default(0)
+  notes              String?
+  paid               Boolean   @default(false)
+  paidAt             DateTime?
+  paymentMethod      String?
+  paymentReference   String?
+  paidByName         String?
+  receiptNo          String?   @unique
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([employeeId, year, month])
+}
+
+model AuditLog {
+  id         String    @id @default(cuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id])
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  action     String
+  message    String
+  createdAt  DateTime  @default(now())
+}
