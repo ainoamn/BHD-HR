@@ -24,6 +24,15 @@ function failure(origin: string, code: string) {
   return response;
 }
 
+/** Product-local admin list (docs/BHD-UNIFIED-LOGIN-AND-APPS.md §2: admin rights stay per product). */
+function isBootstrapAdmin(email: string) {
+  return (process.env.BHD_ADMIN_EMAILS ?? "")
+    .split(/[\s,;]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email);
+}
+
 async function upsertUser(profile: IdentityProfile) {
   const bySub = await prisma.user.findUnique({ where: { bhdSub: profile.sub } });
   if (bySub) {
@@ -49,7 +58,7 @@ async function upsertUser(profile: IdentityProfile) {
       name: profile.name,
       email: profile.email,
       password: "",
-      role: "PENDING",
+      role: isBootstrapAdmin(profile.email) ? "ADMIN" : "PENDING",
       mustChangePassword: false,
       bhdSub: profile.sub,
       picture: profile.picture,
@@ -57,7 +66,11 @@ async function upsertUser(profile: IdentityProfile) {
       companyId: company.id,
     },
   });
-  await writeAudit({ userId: created.id, action: "USER_SSO_CREATE", message: `مستخدم جديد من حساب BHD بانتظار التفعيل: ${created.email}` });
+  await writeAudit({
+    userId: created.id,
+    action: "USER_SSO_CREATE",
+    message: created.role === "ADMIN" ? `مسؤول جديد من حساب BHD (BHD_ADMIN_EMAILS): ${created.email}` : `مستخدم جديد من حساب BHD بانتظار التفعيل: ${created.email}`,
+  });
   return created;
 }
 
