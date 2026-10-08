@@ -28,7 +28,7 @@ export async function loadContacts(options: {
             ...(employerId ? { id: employerId } : {}),
             ...(kind === "COMPANY" || kind === "PERSON" ? { kind } : {}),
             ...(q
-              ? { OR: [{ name: { contains: q } }, { nameEn: { contains: q } }, { idNumber: { contains: q } }, { phone: { contains: q } }, { email: { contains: q } }] }
+              ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { nameEn: { contains: q, mode: "insensitive" } }, { idNumber: { contains: q, mode: "insensitive" } }, { phone: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] }
               : {}),
           },
           include: { _count: { select: { employees: { where: statusFilter } } } },
@@ -44,11 +44,11 @@ export async function loadContacts(options: {
             ...(q
               ? {
                   OR: [
-                    { fullName: { contains: q } },
-                    { nameEn: { contains: q } },
-                    { employeeNumber: { contains: q } },
-                    { phone: { contains: q } },
-                    { email: { contains: q } },
+                    { fullName: { contains: q, mode: "insensitive" } },
+                    { nameEn: { contains: q, mode: "insensitive" } },
+                    { employeeNumber: { contains: q, mode: "insensitive" } },
+                    { phone: { contains: q, mode: "insensitive" } },
+                    { email: { contains: q, mode: "insensitive" } },
                   ],
                 }
               : {}),

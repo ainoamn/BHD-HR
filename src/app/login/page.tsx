@@ -22,7 +22,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   }
 
   const { t } = await getI18n();
-  const firstRun = await prisma.user.findFirst({ where: { email: "admin@bhd.local", mustChangePassword: true }, select: { id: true } });
+  const firstRun =
+    process.env.NODE_ENV !== "production" &&
+    (await prisma.user.findFirst({ where: { email: "admin@bhd.local", mustChangePassword: true }, select: { id: true } }));
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10">

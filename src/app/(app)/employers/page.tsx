@@ -40,7 +40,7 @@ export default async function EmployersPage({
             companyId: user.companyId,
             ...(sponsorKind ? { kind: sponsorKind } : {}),
             ...(q
-              ? { OR: [{ name: { contains: q } }, { nameEn: { contains: q } }, { idNumber: { contains: q } }, { phone: { contains: q } }, { email: { contains: q } }] }
+              ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { nameEn: { contains: q, mode: "insensitive" } }, { idNumber: { contains: q, mode: "insensitive" } }, { phone: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] }
               : {}),
           },
           include: {

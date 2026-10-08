@@ -25,6 +25,14 @@ export async function login(formData: FormData) {
     }
     go(back, { error: t("البريد أو كلمة المرور غير صحيحة", "Wrong email or password") });
   }
+  if (process.env.NODE_ENV === "production" && user!.mustChangePassword) {
+    go(back, {
+      error: t(
+        "كلمة المرور الافتراضية لا تعمل على النسخة المنشورة. ادخل بحساب BHD، أو غيّر كلمة المرور من نسخة التشغيل المحلية.",
+        "The default password is disabled on the published site. Sign in with your BHD account, or change the password from a local run.",
+      ),
+    });
+  }
   await prisma.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date() } });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, signSession(user!.id), sessionCookieOptions());

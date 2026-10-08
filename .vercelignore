@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+*.backup*.db
+storage/uploads
+tmp-*
+.next
+node_modules

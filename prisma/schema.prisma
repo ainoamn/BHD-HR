@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model Company {
@@ -197,6 +198,16 @@ model Salary {
   updatedAt          DateTime  @updatedAt
 
   @@unique([employeeId, year, month])
+}
+
+/// Uploaded documents and logos. Kept in the database because serverless hosting has no persistent disk.
+model StoredFile {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  mime      String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
 }
 
 model AuditLog {

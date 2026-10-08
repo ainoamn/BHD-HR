@@ -36,13 +36,13 @@ export default async function EmployeesPage({
         ...(q
           ? {
               OR: [
-                { fullName: { contains: q } },
-                { nameEn: { contains: q } },
-                { employeeNumber: { contains: q } },
-                { phone: { contains: q } },
-                { nationality: { contains: q } },
-                { jobTitle: { contains: q } },
-                { idNumber: { contains: q } },
+                { fullName: { contains: q, mode: "insensitive" } },
+                { nameEn: { contains: q, mode: "insensitive" } },
+                { employeeNumber: { contains: q, mode: "insensitive" } },
+                { phone: { contains: q, mode: "insensitive" } },
+                { nationality: { contains: q, mode: "insensitive" } },
+                { jobTitle: { contains: q, mode: "insensitive" } },
+                { idNumber: { contains: q, mode: "insensitive" } },
               ],
             }
           : {}),

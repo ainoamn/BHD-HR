@@ -11,12 +11,13 @@
 | الإطار | Next.js 15 (App Router، Server Components، Server Actions) |
 | الواجهة | React 19، TypeScript 5، Tailwind CSS v4، أيقونات `lucide-react` |
 | الخط والهوية | IBM Plex Sans Arabic، ألوان BHD (`#092d24` حبر، `#075c45` زمردي، `#fbfaf7` رملي، حدود `#d7e2dc`) |
-| قاعدة البيانات | SQLite عبر Prisma 6 — ملف `prisma/dev.db` |
-| الملفات | `storage/uploads` تُخدَم عبر `/files/[name]` بعد التحقق من الجلسة |
+| قاعدة البيانات | PostgreSQL على Neon عبر Prisma 6 — قاعدة مستقلة باسم `bhd_hr` على خادم Neon نفسه الذي تستخدمه ONE-BHD (قاعدة ONE-BHD اسمها `neondb` ولا يلمسها هذا النظام) |
+| الملفات | تُخزَّن داخل قاعدة البيانات في جدول `StoredFile` (لأن الاستضافة بلا قرص دائم)، وتُخدَم عبر `/files/[name]` بعد التحقق من الجلسة. الحد 4 ميغابايت للملف |
 | الهوية | OIDC مع `https://id.bhd-om.com` (PKCE S256)، مكتبة `jose` |
-| التشغيل | Node.js ≥ 20، `npm run dev` أو `npm run build && npm start` |
+| الاستضافة | Vercel — المشروع `bhd-hr`، الرابط `https://bhd-hr.vercel.app`، ومربوط بمستودع GitHub فيُنشر تلقائياً عند كل دفع إلى `main` |
+| التشغيل المحلي | Node.js ≥ 20، `npm run dev` (يتصل بقاعدة Neon نفسها) |
 
-لا توجد خدمات خارجية أخرى: لا طوابير، لا مدفوعات، لا بريد. كل شيء يعمل على جهاز واحد.
+لا توجد خدمات خارجية أخرى: لا طوابير، لا مدفوعات، لا بريد.
 
 ---
 
@@ -27,7 +28,6 @@ prisma/
   schema.prisma          نموذج البيانات
   seed.ts                إنشاء المنشأة والمسؤول الأول (admin@bhd.local / admin123)
 public/brand/            شعار BHD الرسمي (svg)
-storage/uploads/         ملفات المستندات والشعارات (لا تُرفع إلى Git)
 docs/                    هذا التوثيق + مستندات ONE-BHD المرجعية
 src/
   app/
@@ -69,6 +69,7 @@ src/
 | `Salary` | راتب شهر لموظف | لقطة كاملة للراتب والأسماء وقت الإنشاء، الخصومات، الصافي، حالة الصرف، `receiptNo` (فريد) |
 | `Reminder` | تذكيرات التقويم | العنوان، التاريخ، التكرار (NONE / MONTHLY / YEARLY)، موظف اختياري، `done` |
 | `AuditLog` | سجل العمليات | المستخدم، الموظف، الإجراء، الرسالة |
+| `StoredFile` | الملفات المرفوعة (مستندات وشعارات) | `name` (فريد، يظهر في الرابط `/files/<name>`)، `mime`، `size`، `data` (البايتات) |
 
 **التواريخ** تُخزّن عند الظهر بتوقيت UTC وتُقرأ بدوال `getUTC*` حتى لا ينزاح اليوم بسبب فرق التوقيت.
 
@@ -108,6 +109,7 @@ src/
 - الكوكي `hr_session` = `userId.HMAC-SHA256(AUTH_SECRET)`، وهي HttpOnly وSameSite=Lax وHost-only، وSecure على الإنتاج.
 - **سياسة BHD:** مدتها 400 يوم، ولا تنتهي بالخمول، ولا تُجدَّد عند القراءة؛ تُكتب فقط عند الدخول وتُمسح عند الخروج. لا KeepAlive، ولا `router.refresh()` عند عودة التبويب، ولا جوجل داخل المنتج.
 - على الإنتاج يرفض النظام العمل بدون `AUTH_SECRET`.
+- على الإنتاج (`NODE_ENV=production`) لا تعمل كلمة المرور الافتراضية: أي حساب محلي ما زال `mustChangePassword` يُرفض. الدخول الطبيعي على النسخة المنشورة يكون عبر حساب BHD الموحّد.
 
 ### الدخول الموحّد (OIDC)
 
@@ -162,9 +164,10 @@ sequenceDiagram
 
 | المتغير | إلزامي | الوصف |
 |---|---|---|
-| `DATABASE_URL` | نعم | `file:./dev.db` |
-| `AUTH_SECRET` | على الإنتاج | سر توقيع جلسة المنتج (نص عشوائي طويل) |
-| `APP_ORIGIN` | لا | الأصل العام خلف بروكسي، مثل `https://hr.bhd-om.com` |
+| `DATABASE_URL` | نعم | رابط Postgres عبر مجمّع الاتصالات (مضيف `...-pooler...neon.tech`، قاعدة `bhd_hr`) |
+| `DATABASE_URL_UNPOOLED` | نعم | رابط Postgres المباشر (المضيف نفسه بدون `-pooler`)، يستخدمه `prisma db push` |
+| `AUTH_SECRET` | على الإنتاج | سر توقيع جلسة المنتج (نص عشوائي طويل). سر Vercel مختلف عن السر المحلي |
+| `APP_ORIGIN` | على الإنتاج | الأصل العام، حالياً `https://bhd-hr.vercel.app` |
 | `BHD_IDENTITY_ISSUER` | لا | افتراضياً `https://id.bhd-om.com` |
 | `BHD_OAUTH_CLIENT_ID` | للدخول الموحّد | `bhd-hr`. فارغ = دخول محلي فقط |
 | `BHD_OAUTH_CLIENT_SECRET` | لا | يُرسل إن وُجد؛ الهوية تقبل PKCE وحده لعملاء المنظومة |
@@ -178,20 +181,28 @@ sequenceDiagram
 
 ```bash
 npm install          # يشغّل prisma generate تلقائياً
-npm run db:setup     # أول مرة فقط: إنشاء القاعدة والمسؤول
+npm run db:setup     # لقاعدة جديدة فارغة فقط: إنشاء الجداول والمسؤول الأول
 npm run dev          # http://localhost:3000
 ```
 
-**الإنتاج:** `npm run build` ثم `npm start`، مع `AUTH_SECRET` و`APP_ORIGIN`. SQLite تحتاج قرصاً دائماً، فلا تناسب استضافة بلا خادم مثل Vercel دون نقل القاعدة إلى Postgres.
+> التشغيل المحلي يتصل بقاعدة Neon نفسها التي يستخدمها الموقع المنشور، فأي تعديل محلي يظهر على الإنتاج فوراً.
 
-**تعديل نموذج البيانات (على Windows):**
-1. أوقف الخادم (عملية node).
-2. خذ نسخة: `copy prisma\dev.db prisma\dev.backup-YYYYMMDD.db`.
-3. `npx prisma db push` ثم `npx prisma generate`.
+### النشر على Vercel
 
-**النسخ الاحتياطي:** انسخ `prisma/dev.db` و`storage/uploads/`. الملفات `prisma/*.db` و`*.backup*.db` و`storage/uploads/*` مستثناة من Git عمداً لأنها بيانات شخصية.
+- المشروع `bhd-hr` مربوط بمستودع `ainoamn/BHD-HR`. **كل `git push` إلى `main` يبني وينشر على الإنتاج تلقائياً.** سكربت البناء `prisma generate && next build`.
+- متغيرات البيئة مضبوطة في Vercel (Settings → Environment Variables) للبيئات الثلاث: `DATABASE_URL`، `DATABASE_URL_UNPOOLED`، `AUTH_SECRET`، `APP_ORIGIN`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_REDIRECT_URI`، `BHD_ADMIN_EMAILS`. غياب `DATABASE_URL` أو `AUTH_SECRET` يُظهر «Application error: a server-side exception».
+- لا تنشر من سطر الأوامر (`vercel deploy`) إلا عند الضرورة؛ الملف `.vercelignore` يمنع رفع `.env` وملفات القواعد والنسخ الاحتياطية، لكن النشر عبر Git هو الطريق المعتمد.
+- Vercel يحدّ جسم الطلب بـ 4.5 ميغابايت، لذلك حد رفع الملف 4 ميغابايت (`MAX_UPLOAD_BYTES`) و`serverActions.bodySizeLimit` = `4.5mb`.
+- عند إضافة نطاق جديد (مثل `hr.bhd-om.com`): أضفه في Vercel، وحدّث `APP_ORIGIN` و`BHD_OAUTH_REDIRECT_URI`، وتأكد أن رابطي `callback` والخروج مسجّلان للعميل `bhd-hr` في `app/lib/identity/clients.ts` في ONE-BHD.
 
-**Dropbox:** المجلد داخل Dropbox، فلا تشغّل النظام على جهازين معاً.
+**تعديل نموذج البيانات:**
+1. أوقف الخادم المحلي (عملية node) على Windows.
+2. خذ نسخة احتياطية (انظر أدناه).
+3. `npx prisma db push` ثم `npx prisma generate`، ثم ادفع الكود.
+
+**النسخ الاحتياطي:** Neon يحتفظ بسجل استرجاع زمني (Point-in-time restore) من لوحته. للنسخة اليدوية: `pg_dump "<DATABASE_URL_UNPOOLED>" > bhd_hr-YYYYMMDD.sql`. لا ترفع أي نسخة إلى Git. نسخ SQLite القديمة (`prisma/*.db`) باقية محلياً للرجوع فقط، ومستثناة من Git لأنها بيانات شخصية.
+
+**الأسرار:** `.env` و`.env.*` (عدا `.env.example`) مستثناة من Git ومن رفع Vercel.
 
 **الفحص قبل أي دمج:**
 
@@ -220,6 +231,7 @@ npx tsc --noEmit
 
 | التاريخ | التغيير |
 |---|---|
+| 2026-10-08 | النشر على Vercel: الانتقال من SQLite إلى PostgreSQL (Neon، قاعدة `bhd_hr`)، تخزين الملفات في `StoredFile`، بحث غير حساس لحالة الأحرف، متغيرات البيئة على Vercel، `.vercelignore`، تسجيل `bhd-hr.vercel.app` في ONE-BHD. نُقلت كل البيانات الحقيقية من SQLite |
 | 2026-10-08 | الدخول الموحّد BHD، سياسة الجلسة، المشغّل، الفوتر، الهوية البصرية، إدارة المستخدمين، توثيق شامل. تسجيل العميل `bhd-hr` في ONE-BHD |
 | 2026-10-08 | طرق عرض دفتر العناوين، طباعة جهات الاتصال، التقويم والتذكيرات، تنبيهات تجاوز الإجازات |
 | قبل ذلك | النظام ثنائي اللغة، دفتر العناوين، الصرف الجماعي، القسيمة والإيصال، الصفحات المتجاوبة |

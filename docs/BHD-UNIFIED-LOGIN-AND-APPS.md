@@ -705,13 +705,13 @@ authorize وtoken دائماً على https://id.bhd-om.com وليس أصل ال
 | اسم المنتج ومسـتودعه | نظام الموظفين والرواتب (BHD-HR) — [ainoamn/BHD-HR](https://github.com/ainoamn/BHD-HR) |
 | تاريخ التثبيت | 2026-10-08 |
 | `client_id` (يُسجَّل أولاً في ONE-BHD) | `bhd-hr` — في `app/lib/identity/clients.ts`؛ سر اختياري `BHD_OAUTH_CLIENT_SECRET_HR` (PKCE وحده مقبول حتى يُضبط) |
-| الأصل و`redirect_uri` | `https://hr.bhd-om.com/api/auth/bhd/callback` (لم يُنشر بعد)، `http://localhost:3000/api/auth/bhd/callback`، `http://127.0.0.1:3000/api/auth/bhd/callback` |
+| الأصل و`redirect_uri` | `https://bhd-hr.vercel.app/api/auth/bhd/callback` (الإنتاج الحالي على Vercel)، `https://hr.bhd-om.com/api/auth/bhd/callback` (نطاق مستقبلي)، `http://localhost:3000/api/auth/bhd/callback`، `http://127.0.0.1:3000/api/auth/bhd/callback` |
 | ملفات `start` / `callback` | `src/app/api/auth/bhd/{start,callback,logout}/route.ts`، `src/app/api/auth/admin-entry/route.ts`، المنطق `src/lib/bhd/identity.ts` |
-| عمود `bhd_sub` في أي جدول | `User.bhdSub` (فريد) — Prisma/SQLite |
+| عمود `bhd_sub` في أي جدول | `User.bhdSub` (فريد) — Prisma/PostgreSQL (Neon) |
 | كيف يعمل الدخول والتنقل الصامت هنا | `/login` غلاف إلى `start` (طوارئ `?local=1`). `callback`: `state` ← تبديل الرمز من الخادم ← JWKS ثم `userinfo` مع فحص `iss/aud/exp/nonce` و`email_verified`. الربط `bhdSub` ← البريد الموثّق ← مستخدم جديد `PENDING` (أو `ADMIN` إن كان في `BHD_ADMIN_EMAILS`). جلسة `hr_session` 400 يوم بلا خمول ولا `Set-Cookie` عند القراءة. تحقق: `/login` ← 307 `start` ← 302 `authorize` ← شاشة الهوية؛ الخروج ← `end-session` ← العودة إلى المنتج |
 | أين رُكِّب المشغّل | رأس `src/app/(app)/layout.tsx`؛ `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher` منسوخة حرفياً؛ فوتر §0.5 في `src/components/bhd/site-footer.tsx` |
 | تاريخ قلب `mode` إلى `sso` في ONE-BHD | — المنتج ليس في الكتالوج المجمّد بعد؛ يُضاف بعد النشر على أصل إنتاجي |
-| أسرار البيئة (أسماء فقط) | `AUTH_SECRET`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_CLIENT_SECRET`، `BHD_OAUTH_REDIRECT_URI`، `BHD_ADMIN_EMAILS`، `APP_ORIGIN`، `DATABASE_URL` |
-| **التقنيات الكاملة لبناء هذا الموقع وكيف يعمل** | Next.js 15 App Router + Server Actions، React 19، TypeScript، Tailwind v4، Prisma 6 + SQLite، ملفات محلية في `storage/uploads` تُخدَم بعد التحقق، `jose`؛ لا طوابير ولا مدفوعات؛ تشغيل `next start`؛ المراقبة عبر `AuditLog` داخل النظام. التفاصيل: `docs/BHD-HR-TECHNICAL.md` في المستودع |
+| أسرار البيئة (أسماء فقط) | `AUTH_SECRET`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_CLIENT_SECRET`، `BHD_OAUTH_REDIRECT_URI`، `BHD_ADMIN_EMAILS`، `APP_ORIGIN`، `DATABASE_URL`، `DATABASE_URL_UNPOOLED` |
+| **التقنيات الكاملة لبناء هذا الموقع وكيف يعمل** | Next.js 15 App Router + Server Actions، React 19، TypeScript، Tailwind v4، Prisma 6 + PostgreSQL على Neon (قاعدة مستقلة `bhd_hr`)، الملفات المرفوعة مخزّنة في جدول `StoredFile` وتُخدَم عبر `/files/[name]` بعد التحقق، `jose`؛ لا طوابير ولا مدفوعات؛ منشور على Vercel (`bhd-hr.vercel.app`، النشر تلقائي عند الدفع إلى `main`)؛ المراقبة عبر `AuditLog` داخل النظام. التفاصيل: `docs/BHD-HR-TECHNICAL.md` في المستودع |
 | ما بقي محلياً ولم يُوحَّد | دخول طوارئ `?local=1` للمسؤول؛ أدوار المنتج `ADMIN` / `VIEWER` / `PENDING` محلية لأن بيانات الرواتب سرية |
 | فريق الصيانة | فريق BHD |
