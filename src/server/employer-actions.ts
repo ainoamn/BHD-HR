@@ -1,7 +1,7 @@
 "use server";
 
 import { writeAudit } from "@/lib/audit";
-import { requireWriter } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -39,7 +39,7 @@ async function uploadLogo(formData: FormData, companyId: string, current: string
 }
 
 export async function createEmployer(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("employers.create", "/employers");
   const { t } = await getI18n();
   const data = readEmployer(formData);
   if (data.name.length < 2) go("/employers", { error: t("اسم الكفيل مطلوب", "Sponsor name is required") });
@@ -51,7 +51,7 @@ export async function createEmployer(formData: FormData) {
 }
 
 export async function updateEmployer(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("employers.edit", "/employers");
   const { t } = await getI18n();
   const id = req(formData, "id");
   const existing = await prisma.employer.findFirst({ where: { id, companyId: user.companyId } });
@@ -67,7 +67,7 @@ export async function updateEmployer(formData: FormData) {
 }
 
 export async function deleteEmployer(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("employers.delete", "/employers");
   const { t } = await getI18n();
   const id = req(formData, "id");
   const existing = await prisma.employer.findFirst({

@@ -51,14 +51,20 @@ model User {
 
 /// Access to one company (workspace). userId stays empty for an invitation until that email signs in.
 model Membership {
-  id        String   @id @default(cuid())
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  email     String
-  role      String   @default("VIEWER")
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email       String
+  role        String    @default("VIEWER")
+  /// Permission list used when role = CUSTOM (see src/lib/permissions.ts).
+  permissions Json?
+  inviteToken String?   @unique
+  invitedById String?
+  invitedAt   DateTime?
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
 
   @@unique([companyId, email])
   @@index([userId])

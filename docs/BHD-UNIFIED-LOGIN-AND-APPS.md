@@ -713,5 +713,5 @@ authorize وtoken دائماً على https://id.bhd-om.com وليس أصل ال
 | تاريخ قلب `mode` إلى `sso` في ONE-BHD | — المنتج ليس في الكتالوج المجمّد بعد؛ يُضاف بعد النشر على أصل إنتاجي |
 | أسرار البيئة (أسماء فقط) | `AUTH_SECRET`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_CLIENT_SECRET`، `BHD_OAUTH_REDIRECT_URI`، `BHD_ADMIN_EMAILS`، `APP_ORIGIN`، `DATABASE_URL`، `DATABASE_URL_UNPOOLED` |
 | **التقنيات الكاملة لبناء هذا الموقع وكيف يعمل** | Next.js 15 App Router + Server Actions، React 19، TypeScript، Tailwind v4، Prisma 6 + PostgreSQL على Neon (مشروع مستقل «BHD HR»)، الملفات المرفوعة مخزّنة في جدول `StoredFile` وتُخدَم عبر `/files/[name]` بعد التحقق، `jose`؛ لا طوابير ولا مدفوعات؛ منشور على Vercel (`bhd-hr.vercel.app`، النشر تلقائي عند الدفع إلى `main`)؛ المراقبة عبر `AuditLog` داخل النظام. التفاصيل: `docs/BHD-HR-TECHNICAL.md` في المستودع |
-| ما بقي محلياً ولم يُوحَّد | دخول طوارئ `?local=1` للمسؤول؛ العضوية والأدوار `ADMIN` / `MANAGER` / `VIEWER` محلية لكل منشأة (`Membership` مربوط بالحساب)؛ الهوية لا تمنح صلاحية |
+| ما بقي محلياً ولم يُوحَّد | دخول طوارئ `?local=1` للمسؤول؛ العضوية والأدوار `ADMIN` / `MANAGER` / `VIEWER` / `CUSTOM` (صلاحيات لكل قسم، ودعوة برابط `/invite/<token>`) محلية لكل منشأة (`Membership` مربوط بالحساب)؛ الهوية لا تمنح صلاحية |
 | فريق الصيانة | فريق BHD |

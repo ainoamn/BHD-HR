@@ -3,7 +3,7 @@ import { Building2, Contact, FileText, LayoutGrid, List, Mail, MapPin, Phone, Pl
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
 import { Card, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, localizeTerm } from "@/lib/constants";
 import { type ContactKind, loadContacts, readContactKind } from "@/lib/contacts";
 import { pick } from "@/lib/i18n";
@@ -22,7 +22,8 @@ export default async function EmployersPage({
   searchParams: Promise<{ q?: string; kind?: string; view?: string; employerId?: string; new?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("employers.view");
+  const showPay = can(user, "salaries.view");
   const { lang, t } = await getI18n();
   const q = sp.q?.trim() || "";
   const view: View = sp.view === "list" || sp.view === "contacts" ? sp.view : "cards";
@@ -120,10 +121,12 @@ export default async function EmployersPage({
             <Printer size={16} />
             {t("طباعة جهات الاتصال", "Print contacts")}
           </Link>
-          <Link href="/employers?new=1#new" className={primaryBtn}>
-            <Plus size={16} />
-            {t("كفيل جديد", "New sponsor")}
-          </Link>
+          {can(user, "employers.create") ? (
+            <Link href="/employers?new=1#new" className={primaryBtn}>
+              <Plus size={16} />
+              {t("كفيل جديد", "New sponsor")}
+            </Link>
+          ) : null}
         </div>
       </PageHeader>
 
@@ -150,6 +153,7 @@ export default async function EmployersPage({
         </Link>
       </div>
 
+      {can(user, "employers.create") ? (
       <details id="new" open={openForm} className="group scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
           <span className="flex items-center gap-2 font-bold text-slate-900">
@@ -167,6 +171,7 @@ export default async function EmployersPage({
           <EmployerForm action={createEmployer} submitLabel={t("حفظ الكفيل", "Save sponsor")} />
         </div>
       </details>
+      ) : null}
 
       <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -346,7 +351,7 @@ export default async function EmployersPage({
                   </div>
                   <div className="min-w-0 px-2">
                     <p className="text-xs text-slate-500">{t("الرواتب الشهرية", "Monthly payroll")}</p>
-                    <p className="truncate font-bold text-slate-900">{money(monthly, currency)}</p>
+                    <p className="truncate font-bold text-slate-900">{showPay ? money(monthly, currency) : "—"}</p>
                   </div>
                 </div>
 
@@ -380,15 +385,21 @@ export default async function EmployersPage({
                   <Link href={`/employers/${employer.id}`} className={`${primaryBtn} px-3 py-2`}>
                     {t("فتح الملف", "Open")}
                   </Link>
-                  <Link href={`/employees/new?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`}>
-                    {t("إضافة موظف", "Add employee")}
-                  </Link>
-                  <Link href={`/salaries?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`}>
-                    {t("الرواتب", "Payroll")}
-                  </Link>
-                  <Link href={`/salaries/sheet?from=${period}&to=${period}&employerId=${employer.id}`} target="_blank" className={`${secondaryBtn} px-3 py-2`}>
-                    {t("كشف الشهر", "Month sheet")}
-                  </Link>
+                  {can(user, "employees.create") ? (
+                    <Link href={`/employees/new?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`}>
+                      {t("إضافة موظف", "Add employee")}
+                    </Link>
+                  ) : null}
+                  {showPay ? (
+                    <>
+                      <Link href={`/salaries?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`}>
+                        {t("الرواتب", "Payroll")}
+                      </Link>
+                      <Link href={`/salaries/sheet?from=${period}&to=${period}&employerId=${employer.id}`} target="_blank" className={`${secondaryBtn} px-3 py-2`}>
+                        {t("كشف الشهر", "Month sheet")}
+                      </Link>
+                    </>
+                  ) : null}
                   <Link href={`/address-book/print?employerId=${employer.id}`} target="_blank" className={`${secondaryBtn} col-span-2 px-3 py-2`}>
                     <Printer size={15} />
                     {t("طباعة جهات الاتصال", "Print contacts")}
@@ -485,7 +496,7 @@ export default async function EmployersPage({
                         <span className="font-semibold">{activeList.length}</span>
                         {employer.employees.length > activeList.length ? <span className="text-xs text-slate-500"> / {employer.employees.length}</span> : null}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">{money(activeList.reduce((sum, employee) => sum + packageGross(employee), 0), currency)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{showPay ? money(activeList.reduce((sum, employee) => sum + packageGross(employee), 0), currency) : "—"}</td>
                       <td className="px-4 py-3 text-end whitespace-nowrap">
                         <Link href={`/address-book/print?employerId=${employer.id}`} target="_blank" className="me-3 text-xs font-semibold text-slate-600 hover:text-teal-800">
                           {t("طباعة", "Print")}

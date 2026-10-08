@@ -18,7 +18,7 @@
 | تاريخ قلب `mode` إلى `sso` في ONE-BHD | — (بعد التسجيل والتحقق) |
 | أسرار البيئة (أسماء فقط) | `AUTH_SECRET`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_CLIENT_SECRET`، `BHD_OAUTH_REDIRECT_URI`، `APP_ORIGIN`، `DATABASE_URL`، `DATABASE_URL_UNPOOLED`، اختياري `BHD_IDENTITY_TOKEN_SECRET` |
 | **التقنيات الكاملة لبناء هذا الموقع وكيف يعمل** | Next.js 15 (App Router، Server Actions) + React 19 + TypeScript، Tailwind CSS v4، Prisma 6 + PostgreSQL على Neon (مشروع مستقل «BHD HR»)، الملفات المرفوعة في جدول `StoredFile` وتُخدَم عبر `/files/[name]` بعد التحقق من الجلسة، `jose` للتحقق من `id_token`، لا طوابير ولا مدفوعات، منشور على Vercel (`bhd-hr.vercel.app`) بنشر تلقائي من `main`، المراقبة عبر سجل النشاط داخل النظام (`AuditLog`) |
-| ما بقي محلياً ولم يُوحَّد | دخول الطوارئ المحلي بكلمة مرور (`/login?local=1`) — مسموح بالدليل. العضوية والأدوار (`ADMIN` / `MANAGER` / `VIEWER`) محلية لكل منشأة في جدول `Membership` مربوط بالحساب (`bhdSub`)؛ الهوية لا تمنح صلاحية |
+| ما بقي محلياً ولم يُوحَّد | دخول الطوارئ المحلي بكلمة مرور (`/login?local=1`) — مسموح بالدليل. العضوية والأدوار (`ADMIN` / `MANAGER` / `VIEWER` / `CUSTOM` بصلاحيات لكل قسم) محلية لكل منشأة في جدول `Membership` مربوط بالحساب (`bhdSub`)؛ الهوية لا تمنح صلاحية |
 | فريق الصيانة | فريق BHD |
 
 ## الحالة والخطوات

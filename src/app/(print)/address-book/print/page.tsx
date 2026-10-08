@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PrintButton } from "@/components/print-button";
 import { Bi, HeaderBar, headerFor, sheetClass } from "@/components/salary-docs";
 import { fieldClass, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, bothTerm } from "@/lib/constants";
 import { loadContacts, readContactKind } from "@/lib/contacts";
 import { both } from "@/lib/i18n";
@@ -35,7 +35,7 @@ export default async function ContactsPrintPage({
   searchParams: Promise<{ employerId?: string; kind?: string; q?: string; layout?: string; terminated?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("employers.view");
   const { t } = await getI18n();
   const employerId = sp.employerId || "";
   const kind = readContactKind(sp.kind);

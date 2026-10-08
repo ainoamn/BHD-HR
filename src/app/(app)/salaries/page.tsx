@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { Flash } from "@/components/flash";
 import { PeriodFilter } from "@/components/period-filter";
+import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, PageHeader, ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { daysLabel, money, readPeriod, round3, todayInputValue } from "@/lib/utils";
-import { generatePayroll, payAll } from "@/server/salary-actions";
+import { createSalary, deleteUnpaidSalary, generatePayroll, payAll } from "@/server/salary-actions";
 
 export default async function SalariesPage({
   searchParams,
@@ -18,7 +19,7 @@ export default async function SalariesPage({
   searchParams: Promise<{ year?: string; month?: string; employerId?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("salaries.view");
   const { lang, t } = await getI18n();
   const { year, month } = readPeriod(sp);
   const currency = user.company.currency;
@@ -37,6 +38,22 @@ export default async function SalariesPage({
     }),
     prisma.employee.count({ where: { companyId: user.companyId, status: { in: ["ACTIVE", "VACATION"] }, ...employerFilter } }),
   ]);
+  const allow = {
+    create: can(user, "salaries.create"),
+    edit: can(user, "salaries.edit"),
+    remove: can(user, "salaries.delete"),
+    pay: can(user, "salaries.pay"),
+  };
+  const withRecord = new Set(salaries.map((salary) => salary.employeeId));
+  const missing = allow.create
+    ? (
+        await prisma.employee.findMany({
+          where: { companyId: user.companyId, status: { not: "TERMINATED" } },
+          select: { id: true, fullName: true, nameEn: true, employeeNumber: true },
+          orderBy: { fullName: "asc" },
+        })
+      ).filter((employee) => !withRecord.has(employee.id))
+    : [];
   const liveDays = new Map<string, number>();
   await Promise.all(
     salaries.map(async (salary) => {
@@ -95,12 +112,35 @@ export default async function SalariesPage({
               `Active employees (${scope}): ${activeCount}. With a record: ${salaries.length}.`,
             )}
           </p>
-          <form action={generatePayroll}>
-            <input type="hidden" name="year" value={year} />
-            <input type="hidden" name="month" value={month} />
-            <input type="hidden" name="employerId" value={employerId} />
-            <SubmitButton>{t(`إنشاء رواتب ${scope}`, `Generate for ${scope}`)}</SubmitButton>
-          </form>
+          {allow.create ? (
+            <>
+              <form action={generatePayroll}>
+                <input type="hidden" name="year" value={year} />
+                <input type="hidden" name="month" value={month} />
+                <input type="hidden" name="employerId" value={employerId} />
+                <SubmitButton>{t(`إنشاء رواتب ${scope}`, `Generate for ${scope}`)}</SubmitButton>
+              </form>
+              {missing.length ? (
+                <form action={createSalary} className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
+                  <input type="hidden" name="year" value={year} />
+                  <input type="hidden" name="month" value={month} />
+                  <label className="min-w-0 flex-1 space-y-1 text-xs text-slate-500">
+                    {t("أو أضف راتب موظف واحد", "Or add one employee")}
+                    <select name="employeeId" className={`${fieldClass} w-full`} required>
+                      {missing.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName} — {employee.employeeNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <SubmitButton variant="secondary">{t("إضافة", "Add")}</SubmitButton>
+                </form>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-xs text-slate-400">{t("لا تملك صلاحية إنشاء الرواتب.", "You cannot create salaries.")}</p>
+          )}
         </Card>
 
         <Card className="space-y-3">
@@ -111,7 +151,7 @@ export default async function SalariesPage({
               `Unpaid: ${unpaid.length}, total ${money(unpaidTotal, currency)}. Receipts open for printing after payment.`,
             )}
           </p>
-          {unpaid.length ? (
+          {unpaid.length && allow.pay ? (
             <form action={payAll} className="space-y-2">
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
@@ -216,7 +256,7 @@ export default async function SalariesPage({
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <Link className="font-semibold text-teal-800" href={`/salaries/${salary.id}`}>
-                      {salary.paid ? t("عرض", "View") : t("صرف", "Pay")}
+                      {salary.paid || !(allow.pay || allow.edit) ? t("عرض", "View") : allow.pay ? t("صرف", "Pay") : t("تعديل", "Edit")}
                     </Link>
                     <Link className="ms-3 font-semibold text-slate-700" href={`/salaries/${salary.id}/print?doc=slip`}>
                       {t("القسيمة", "Payslip")}
@@ -225,6 +265,15 @@ export default async function SalariesPage({
                       <Link className="ms-3 font-semibold text-slate-700" href={`/salaries/${salary.id}/print?doc=receipt`}>
                         {t("إيصال", "Receipt")}
                       </Link>
+                    ) : null}
+                    {!salary.paid && allow.remove ? (
+                      <span className="ms-3 inline-block">
+                        <DeleteButton
+                          action={deleteUnpaidSalary}
+                          fields={{ id: salary.id }}
+                          confirm={t(`حذف مسير ${name} غير المصروف؟`, `Delete the unpaid record of ${name}?`)}
+                        />
+                      </span>
                     ) : null}
                   </td>
                 </tr>

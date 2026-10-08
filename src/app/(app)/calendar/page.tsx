@@ -3,11 +3,12 @@ import { BellPlus, Check, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from "l
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { EVENT_KINDS, type EventKind, REMINDER_REPEAT, getCalendarEvents, lastDayOf } from "@/lib/calendar";
 import { monthName } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import type { Permission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { cn, readPeriod, todayInputValue } from "@/lib/utils";
 import { createReminder, deleteReminder, toggleReminder } from "@/server/reminder-actions";
@@ -22,7 +23,7 @@ export default async function CalendarPage({
   searchParams: Promise<{ year?: string; month?: string; show?: string; new?: string; date?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("calendar.view");
   const { lang, t } = await getI18n();
   const { year, month } = readPeriod(sp);
   const allKinds = EVENT_KINDS.map((item) => item.id);
@@ -36,7 +37,15 @@ export default async function CalendarPage({
       orderBy: { fullName: "asc" },
     }),
   ]);
-  const events = allEvents.filter((event) => shown.has(event.kind));
+  const kindPermission: Record<EventKind, Permission> = {
+    salary: "salaries.view",
+    document: "documents.view",
+    birthday: "employees.view",
+    leave: "attendance.view",
+    reminder: "calendar.view",
+  };
+  const allow = { create: can(user, "calendar.create"), edit: can(user, "calendar.edit"), remove: can(user, "calendar.delete") };
+  const events = allEvents.filter((event) => shown.has(event.kind) && can(user, kindPermission[event.kind]));
   const byDay = new Map<number, typeof events>();
   for (const event of events) byDay.set(event.day, [...(byDay.get(event.day) || []), event]);
 
@@ -205,6 +214,7 @@ export default async function CalendarPage({
         </Card>
 
         <div className="space-y-4">
+          {allow.create ? (
           <details id="reminder" open={openForm} className="group scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5">
               <span className="flex items-center gap-2 font-bold text-slate-900">
@@ -253,6 +263,7 @@ export default async function CalendarPage({
               <SubmitButton>{t("حفظ التذكير", "Save reminder")}</SubmitButton>
             </form>
           </details>
+          ) : null}
 
           <Card>
             <h2 className="mb-3 font-bold text-slate-900">{t(`أحداث ${monthName(month, "ar")}`, `${monthName(month, "en")} events`)}</h2>
@@ -265,12 +276,14 @@ export default async function CalendarPage({
                       {dayTitle(day)}
                       {day === todayDay ? <span className="ms-1.5 text-xs font-semibold">({t("اليوم", "today")})</span> : null}
                     </h3>
-                    <Link
-                      href={`${link({ extra: { new: "1", date: `${year}-${pad(month)}-${pad(day)}` } })}#reminder`}
-                      className="text-xs font-semibold text-teal-800"
-                    >
-                      + {t("تذكير", "Reminder")}
-                    </Link>
+                    {allow.create ? (
+                      <Link
+                        href={`${link({ extra: { new: "1", date: `${year}-${pad(month)}-${pad(day)}` } })}#reminder`}
+                        className="text-xs font-semibold text-teal-800"
+                      >
+                        + {t("تذكير", "Reminder")}
+                      </Link>
+                    ) : null}
                   </div>
                   <ul className="space-y-1.5">
                     {list.map((event) => (
@@ -293,9 +306,9 @@ export default async function CalendarPage({
                         </div>
                         {event.urgent && !event.done ? <ToneBadge tone="red">{t("عاجل", "Urgent")}</ToneBadge> : null}
                         {event.done && event.kind === "salary" ? <ToneBadge tone="green">{t("تم", "Done")}</ToneBadge> : null}
-                        {event.reminderId ? (
+                        {event.reminderId && (allow.edit || allow.remove) ? (
                           <div className="flex shrink-0 items-center gap-1">
-                            {event.repeat === "NONE" ? (
+                            {event.repeat === "NONE" && allow.edit ? (
                               <form action={toggleReminder}>
                                 <input type="hidden" name="id" value={event.reminderId} />
                                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -308,13 +321,15 @@ export default async function CalendarPage({
                                 </button>
                               </form>
                             ) : null}
-                            <form action={deleteReminder}>
-                              <input type="hidden" name="id" value={event.reminderId} />
-                              <input type="hidden" name="returnTo" value={returnTo} />
-                              <button className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-700" title={t("حذف", "Delete")} aria-label={t("حذف", "Delete")}>
-                                <Trash2 size={15} />
-                              </button>
-                            </form>
+                            {allow.remove ? (
+                              <form action={deleteReminder}>
+                                <input type="hidden" name="id" value={event.reminderId} />
+                                <input type="hidden" name="returnTo" value={returnTo} />
+                                <button className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-700" title={t("حذف", "Delete")} aria-label={t("حذف", "Delete")}>
+                                  <Trash2 size={15} />
+                                </button>
+                              </form>
+                            ) : null}
                           </div>
                         ) : null}
                       </li>

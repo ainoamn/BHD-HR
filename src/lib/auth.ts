@@ -2,14 +2,18 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { type Permission, permissionsFor } from "./permissions";
 import { prisma } from "./prisma";
 
 export const SESSION_COOKIE = "hr_session";
 /** The company (workspace) the user is working in when they belong to more than one. */
 export const COMPANY_COOKIE = "hr_company";
 
-/** ADMIN: everything incl. members and company settings. MANAGER: all HR operations. VIEWER: read and print only. */
-export const ROLES = ["ADMIN", "MANAGER", "VIEWER"] as const;
+/**
+ * ADMIN: everything incl. members and company settings. MANAGER: all HR operations. VIEWER: read, print and export.
+ * CUSTOM: exactly the permissions stored on the membership.
+ */
+export const ROLES = ["ADMIN", "MANAGER", "VIEWER", "CUSTOM"] as const;
 export type Role = (typeof ROLES)[number];
 
 export function isRole(value: string): value is Role {
@@ -71,13 +75,15 @@ export const getSessionUser = cache(async () => {
   const wanted = jar.get(COMPANY_COOKIE)?.value;
   const active = memberships.find((item) => item.companyId === wanted) ?? memberships[0];
   if (!active) return null;
+  const role = active.role as Role;
   return {
     ...user,
     memberships,
     membershipId: active.id,
     companyId: active.companyId,
     company: active.company,
-    role: active.role as Role,
+    role,
+    permissions: permissionsFor(role, active.permissions),
   };
 });
 
@@ -89,13 +95,16 @@ export async function requireUser() {
   return user;
 }
 
-export function canWrite(role: Role) {
-  return role === "ADMIN" || role === "MANAGER";
+export function can(user: { permissions: readonly string[] }, permission: Permission) {
+  return user.permissions.includes(permission);
 }
 
-export async function requireWriter() {
+const DENIED = "ليست لديك صلاحية لهذا الإجراء / You do not have permission for this action";
+
+/** For server actions and pages: stops unless the active membership grants `permission`. */
+export async function requirePermission(permission: Permission, back = "/") {
   const user = await requireUser();
-  if (!canWrite(user.role)) redirect("/?error=" + encodeURIComponent("هذه الصلاحية للعرض فقط / View-only access"));
+  if (!can(user, permission)) redirect(`${back}${back.includes("?") ? "&" : "?"}error=${encodeURIComponent(DENIED)}`);
   return user;
 }
 

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Flash } from "@/components/flash";
+import { DeleteButton } from "@/components/row-forms";
 import { EmptyState, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { BALANCE_LABEL, STATUS_LABEL, STATUS_TONE, localizeTerm } from "@/lib/constants";
 import { worstExpiry } from "@/lib/expiry";
 import { pick } from "@/lib/i18n";
@@ -10,6 +11,7 @@ import { computeLeaveBalances, leaveWarningText, leaveWarnings } from "@/lib/lea
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { money, text } from "@/lib/utils";
+import { deleteEmployee } from "@/server/employee-actions";
 
 export default async function EmployeesPage({
   searchParams,
@@ -17,8 +19,16 @@ export default async function EmployeesPage({
   searchParams: Promise<{ q?: string; status?: string; employerId?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("employees.view");
   const { lang, t } = await getI18n();
+  const allow = {
+    create: can(user, "employees.create"),
+    edit: can(user, "employees.edit"),
+    remove: can(user, "employees.delete"),
+    salaries: can(user, "salaries.view"),
+    docs: can(user, "documents.view"),
+    attendance: can(user, "attendance.view"),
+  };
   const q = sp.q?.trim() || "";
   const status = sp.status && STATUS_LABEL[sp.status] ? sp.status : "ALL";
   const employerId = sp.employerId || "";
@@ -63,9 +73,11 @@ export default async function EmployeesPage({
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader title={t("الموظفون", "Employees")} description={t("سجل العمال وبيانات الراتب وحالة الوثائق.", "Staff records, salaries and document status.")}>
-        <Link href="/employees/new" className={primaryBtn}>
-          {t("إضافة موظف", "Add employee")}
-        </Link>
+        {allow.create ? (
+          <Link href="/employees/new" className={primaryBtn}>
+            {t("إضافة موظف", "Add employee")}
+          </Link>
+        ) : null}
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
       <form className="mb-4 flex flex-wrap gap-2" method="get">
@@ -103,9 +115,10 @@ export default async function EmployeesPage({
                 <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
                 <th className="px-4 py-3 text-start">{t("الكفيل", "Sponsor")}</th>
                 <th className="px-4 py-3 text-start">{t("الوظيفة", "Job")}</th>
-                <th className="px-4 py-3 text-start">{t("الراتب", "Salary")}</th>
+                {allow.salaries ? <th className="px-4 py-3 text-start">{t("الراتب", "Salary")}</th> : null}
                 <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
-                <th className="px-4 py-3 text-start">{t("المستندات", "Documents")}</th>
+                {allow.docs ? <th className="px-4 py-3 text-start">{t("المستندات", "Documents")}</th> : null}
+                {allow.edit || allow.remove ? <th className="px-4 py-3 text-start">{t("إجراءات", "Actions")}</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -140,20 +153,40 @@ export default async function EmployeesPage({
                       )}
                     </td>
                     <td className="px-4 py-3">{text(localizeTerm(employee.jobTitle, lang))}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{money(packageGross(employee), user.company.currency)}</td>
+                    {allow.salaries ? <td className="px-4 py-3 whitespace-nowrap">{money(packageGross(employee), user.company.currency)}</td> : null}
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
                         <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
-                        {leave.length ? (
+                        {allow.attendance && leave.length ? (
                           <Link href={`/employees/${employee.id}?tab=attendance`} title={leave.map((item) => leaveWarningText(item, pick(BALANCE_LABEL[item.key], lang), lang)).join(" · ")}>
                             <ToneBadge tone="red">{leaveText}</ToneBadge>
                           </Link>
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <ToneBadge tone={docs.tone}>{docs.label}</ToneBadge>
-                    </td>
+                    {allow.docs ? (
+                      <td className="px-4 py-3">
+                        <ToneBadge tone={docs.tone}>{docs.label}</ToneBadge>
+                      </td>
+                    ) : null}
+                    {allow.edit || allow.remove ? (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 whitespace-nowrap">
+                          {allow.edit ? (
+                            <Link href={`/employees/${employee.id}/edit`} className="text-xs font-semibold text-teal-800 hover:underline">
+                              {t("تعديل", "Edit")}
+                            </Link>
+                          ) : null}
+                          {allow.remove ? (
+                            <DeleteButton
+                              action={deleteEmployee}
+                              fields={{ id: employee.id }}
+                              confirm={t(`حذف ${employee.fullName} نهائياً؟ لا يمكن التراجع.`, `Permanently delete ${employee.fullName}? This cannot be undone.`)}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}

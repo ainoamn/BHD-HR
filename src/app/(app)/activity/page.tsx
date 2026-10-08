@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function ActivityPage() {
-  const user = await requireUser();
+  const user = await requirePermission("activity.view");
   const { t } = await getI18n();
   const logs = await prisma.auditLog.findMany({
     where: { companyId: user.companyId },

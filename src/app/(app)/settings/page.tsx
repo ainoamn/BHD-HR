@@ -1,13 +1,19 @@
 import Link from "next/link";
+import { AccessEditor } from "@/components/access-editor";
 import { Flash } from "@/components/flash";
+import { InviteLink } from "@/components/invite-link";
+import { Modal } from "@/components/modal";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, Field, PageHeader, fieldClass } from "@/components/ui";
-import { ROLES, requireUser } from "@/lib/auth";
+import { Card, Field, PageHeader, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
+import { normalizePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { inviteMember, removeMember, updateCompanySettings, updateMemberRole, updateProfile } from "@/server/settings-actions";
+import { requestOrigin } from "@/lib/request-origin";
+import { formatDate } from "@/lib/utils";
+import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateMemberAccess, updateProfile } from "@/server/settings-actions";
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string; invite?: string }> }) {
   const sp = await searchParams;
   const user = await requireUser();
   const { t } = await getI18n();
@@ -16,13 +22,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const members = isAdmin
     ? await prisma.membership.findMany({ where: { companyId: user.companyId }, include: { user: true }, orderBy: { createdAt: "asc" } })
     : [];
-  const roleLabel = (role: string) =>
-    role === "ADMIN"
-      ? t("مسؤول — كل الصلاحيات والأعضاء والإعدادات", "Admin — everything incl. members and settings")
-      : role === "MANAGER"
-        ? t("مدير — كل عمليات الموظفين والرواتب", "Manager — all HR and payroll operations")
-        : t("مستخدم — عرض وطباعة فقط", "User — view and print only");
-  const roleShort = (role: string) => (role === "ADMIN" ? t("مسؤول", "Admin") : role === "MANAGER" ? t("مدير", "Manager") : t("مستخدم", "User"));
+  const origin = await requestOrigin();
+  const justInvited = sp.invite ? members.find((member) => member.id === sp.invite) : undefined;
+  const roleShort = (role: string) =>
+    role === "ADMIN" ? t("مسؤول", "Admin") : role === "MANAGER" ? t("مدير", "Manager") : role === "CUSTOM" ? t("مخصص", "Custom") : t("مستخدم", "User");
+  const roleText = (role: string, stored: string[]) =>
+    role === "CUSTOM" ? t(`مخصص — ${normalizePermissions(stored).length} صلاحية`, `Custom — ${normalizePermissions(stored).length} permissions`) : roleShort(role);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -151,39 +156,46 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </form>
 
       {isAdmin ? (
-        <Card className="mt-6">
-          <h2 className="font-bold">{t("أعضاء المنشأة", "Company members")}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">
-            {t(
-              "كل حساب BHD يدخل لأول مرة تُنشأ له منشأته الخاصة فوراً، ولا يرى بيانات أي منشأة أخرى. ليصل شخص إلى بيانات هذه المنشأة أضف بريد حسابه في BHD هنا بالصلاحية المناسبة؛ يُربط تلقائياً عند دخوله.",
-              "Every BHD account gets its own company the first time it signs in and never sees another company's data. To give someone access to this company, add their BHD email here with a role; they are linked automatically when they sign in.",
-            )}
-          </p>
-          <form action={inviteMember} className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-            <Field label={t("بريد حساب BHD", "BHD account email")}>
-              <input className={`${fieldClass} w-full`} type="email" name="email" dir="ltr" required placeholder="name@example.com" />
-            </Field>
-            <Field label={t("الصلاحية", "Role")}>
-              <select name="role" defaultValue="VIEWER" className={`${fieldClass} w-full`}>
-                {ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {roleShort(role)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <SubmitButton>{t("إضافة عضو", "Add member")}</SubmitButton>
-          </form>
-          <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-500">
-            {ROLES.map((role) => (
-              <li key={role}>
-                <span className="font-semibold text-slate-700">{roleShort(role)}:</span> {roleLabel(role).split("—")[1]?.trim()}
-              </li>
-            ))}
-          </ul>
+        <Card className="mt-6 scroll-mt-20">
+          <div id="members" className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-bold">{t("المستخدمون والصلاحيات", "Users & permissions")}</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+                {t(
+                  "ادعُ مستخدماً ببريد حسابه في BHD وحدد ما يراه وما يستطيع فعله. يصله رابط دعوة؛ عند فتحه والدخول بنفس البريد تُفتح له بيانات هذه المنشأة بحسب صلاحياته فقط.",
+                  "Invite a user by their BHD account email and choose what they can see and do. They get an invitation link; after opening it and signing in with that email, this company opens for them with exactly those permissions.",
+                )}
+              </p>
+            </div>
+            <Modal label={t("+ دعوة مستخدم", "+ Invite user")} title={t("دعوة مستخدم جديد", "Invite a new user")} triggerClassName={primaryBtn}>
+              <form action={inviteMember} className="space-y-4">
+                <Field label={t("بريد حساب BHD للمستخدم", "User's BHD account email")} hint={t("يجب أن يدخل المستخدم بهذا البريد نفسه لقبول الدعوة.", "The user must sign in with this same email to accept.")}>
+                  <input className={`${fieldClass} w-full`} type="email" name="email" dir="ltr" required placeholder="name@example.com" />
+                </Field>
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700">{t("الصلاحيات", "Permissions")}</p>
+                  <AccessEditor defaultRole="VIEWER" />
+                </div>
+                <SubmitButton pendingLabel={t("جارٍ إنشاء الدعوة...", "Creating invitation...")}>{t("إنشاء الدعوة", "Create invitation")}</SubmitButton>
+              </form>
+            </Modal>
+          </div>
+
+          {justInvited?.inviteToken ? (
+            <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
+              <p className="mb-2 text-sm font-semibold text-teal-900">
+                {t("رابط دعوة", "Invitation link for")} <span dir="ltr">{justInvited.email}</span>
+              </p>
+              <InviteLink url={`${origin}/invite/${justInvited.inviteToken}`} email={justInvited.email} company={company.name} />
+            </div>
+          ) : null}
+
           <ul className="mt-4 divide-y divide-slate-100">
             {members.map((member) => {
               const self = member.id === user.membershipId;
+              const stored = Array.isArray(member.permissions) ? (member.permissions as string[]) : [];
+              const pending = !member.userId;
+              const linkUrl = member.inviteToken ? `${origin}/invite/${member.inviteToken}` : null;
               return (
                 <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
@@ -195,35 +207,48 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       {member.email}
                     </p>
                     <p className="mt-1 flex flex-wrap gap-1.5 text-xs">
-                      {member.user ? (
-                        <span className={`rounded-full px-2 py-0.5 ${member.user.bhdSub ? "bg-teal-50 text-teal-800" : "bg-slate-100 text-slate-600"}`}>
-                          {member.user.bhdSub ? t("مرتبط بحساب BHD", "BHD account linked") : t("دخول محلي فقط", "Local sign-in only")}
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{roleText(member.role, stored)}</span>
+                      {pending ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">
+                          {t("دعوة معلّقة", "Invitation pending")}
+                          {member.invitedAt ? ` — ${formatDate(member.invitedAt)}` : ""}
                         </span>
+                      ) : member.user?.bhdSub ? (
+                        <span className="rounded-full bg-teal-50 px-2 py-0.5 text-teal-800">{t("مرتبط بحساب BHD", "BHD account linked")}</span>
                       ) : (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">{t("لم يدخل بعد — يُربط عند أول دخول", "Not signed in yet — linked on first sign-in")}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{t("دخول محلي فقط", "Local sign-in only")}</span>
                       )}
                     </p>
                   </div>
-                  {self ? (
-                    <span className="text-sm text-slate-500">{roleShort(member.role)}</span>
-                  ) : (
+                  {self ? null : (
                     <div className="flex flex-wrap items-center gap-2">
-                      <form action={updateMemberRole} className="flex items-center gap-2">
-                        <input type="hidden" name="membershipId" value={member.id} />
-                        <select name="role" defaultValue={member.role} className={fieldClass} aria-label={t("الصلاحية", "Role")}>
-                          {ROLES.map((role) => (
-                            <option key={role} value={role}>
-                              {roleShort(role)}
-                            </option>
-                          ))}
-                        </select>
-                        <SubmitButton>{t("حفظ", "Save")}</SubmitButton>
-                      </form>
+                      <Modal label={t("الصلاحيات", "Permissions")} title={t(`صلاحيات ${member.user?.name || member.email}`, `Permissions — ${member.user?.name || member.email}`)} triggerClassName={secondaryBtn}>
+                        <form action={updateMemberAccess} className="space-y-4">
+                          <input type="hidden" name="membershipId" value={member.id} />
+                          <AccessEditor defaultRole={member.role} defaultPermissions={stored} />
+                          <SubmitButton>{t("حفظ الصلاحيات", "Save permissions")}</SubmitButton>
+                        </form>
+                      </Modal>
+                      {pending ? (
+                        <Modal label={t("رابط الدعوة", "Invite link")} title={t("رابط الدعوة", "Invitation link")} triggerClassName={secondaryBtn}>
+                          <div className="space-y-4">
+                            {linkUrl ? (
+                              <InviteLink url={linkUrl} email={member.email} company={company.name} />
+                            ) : (
+                              <p className="text-sm text-slate-500">{t("لا يوجد رابط لهذه الدعوة بعد. أنشئ رابطاً.", "No link for this invitation yet. Create one.")}</p>
+                            )}
+                            <form action={renewInviteLink}>
+                              <input type="hidden" name="membershipId" value={member.id} />
+                              <SubmitButton variant="secondary">{linkUrl ? t("إنشاء رابط جديد (يُلغي السابق)", "New link (cancels the old one)") : t("إنشاء رابط", "Create link")}</SubmitButton>
+                            </form>
+                          </div>
+                        </Modal>
+                      ) : null}
                       <form action={removeMember}>
                         <input type="hidden" name="membershipId" value={member.id} />
-                        <button className="min-h-10 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-                          {t("إزالة", "Remove")}
-                        </button>
+                        <SubmitButton variant="danger" confirm={pending ? t("إلغاء هذه الدعوة؟", "Cancel this invitation?") : t(`إزالة ${member.email} من المنشأة؟`, `Remove ${member.email} from the company?`)}>
+                          {pending ? t("إلغاء الدعوة", "Cancel invite") : t("إزالة", "Remove")}
+                        </SubmitButton>
                       </form>
                     </div>
                   )}

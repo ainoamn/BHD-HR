@@ -1,6 +1,6 @@
 import path from "path";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { can, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -11,6 +11,10 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
   const safeName = path.basename(name);
   const file = await prisma.storedFile.findFirst({ where: { name: safeName, companyId: user.companyId } });
   if (!file) return new NextResponse("Not found", { status: 404 });
+  if (!can(user, "documents.view")) {
+    const isDocument = await prisma.employeeDocument.count({ where: { fileUrl: `/files/${safeName}`, employee: { companyId: user.companyId } } });
+    if (isDocument) return new NextResponse("Forbidden", { status: 403 });
+  }
   return new NextResponse(new Uint8Array(file.data), {
     headers: {
       "Content-Type": file.mime,

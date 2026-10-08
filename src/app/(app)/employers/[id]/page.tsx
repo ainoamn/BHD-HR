@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { FileText, Mail, MapPin, Phone } from "lucide-react";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
-import { SubmitButton } from "@/components/submit-button";
+import { DeleteButton } from "@/components/row-forms";
 import { Card, ToneBadge, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, localizeTerm } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -23,7 +23,8 @@ export default async function EmployerPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("employers.view");
+  const showPay = can(user, "salaries.view");
   const { lang, t } = await getI18n();
   const employer = await prisma.employer.findFirst({
     where: { id, companyId: user.companyId },
@@ -94,15 +95,21 @@ export default async function EmployerPage({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
-            <Link href={`/employees/new?employerId=${employer.id}`} className={primaryBtn}>
-              {t("إضافة موظف", "Add employee")}
-            </Link>
-            <Link href={`/salaries?employerId=${employer.id}`} className={secondaryBtn}>
-              {t("الرواتب", "Payroll")}
-            </Link>
-            <Link href={`/salaries/sheet?from=${period}&to=${period}&employerId=${employer.id}`} target="_blank" className={secondaryBtn}>
-              {t("كشف رواتب الشهر", "This month's sheet")}
-            </Link>
+            {can(user, "employees.create") ? (
+              <Link href={`/employees/new?employerId=${employer.id}`} className={primaryBtn}>
+                {t("إضافة موظف", "Add employee")}
+              </Link>
+            ) : null}
+            {can(user, "salaries.view") ? (
+              <>
+                <Link href={`/salaries?employerId=${employer.id}`} className={secondaryBtn}>
+                  {t("الرواتب", "Payroll")}
+                </Link>
+                <Link href={`/salaries/sheet?from=${period}&to=${period}&employerId=${employer.id}`} target="_blank" className={secondaryBtn}>
+                  {t("كشف رواتب الشهر", "This month's sheet")}
+                </Link>
+              </>
+            ) : null}
             <Link href={`/address-book/print?employerId=${employer.id}`} target="_blank" className={secondaryBtn}>
               {t("طباعة جهات الاتصال", "Print contacts")}
             </Link>
@@ -119,7 +126,7 @@ export default async function EmployerPage({
           </div>
           <div className="min-w-0 px-2 py-3">
             <p className="text-xs text-slate-500">{t("الرواتب الشهرية", "Monthly payroll")}</p>
-            <p className="truncate font-bold text-slate-900">{money(monthly, currency)}</p>
+            <p className="truncate font-bold text-slate-900">{showPay ? money(monthly, currency) : "—"}</p>
           </div>
         </div>
       </Card>
@@ -145,7 +152,7 @@ export default async function EmployerPage({
                 </div>
                 <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
               </div>
-              <p className="mt-1 text-sm font-semibold text-slate-700">{money(packageGross(employee), currency)}</p>
+              {showPay ? <p className="mt-1 text-sm font-semibold text-slate-700">{money(packageGross(employee), currency)}</p> : null}
             </Link>
           ))}
         </div>
@@ -171,7 +178,7 @@ export default async function EmployerPage({
                       </Link>
                     </td>
                     <td className="py-2.5">{text(localizeTerm(employee.jobTitle, lang))}</td>
-                    <td className="whitespace-nowrap py-2.5">{money(packageGross(employee), currency)}</td>
+                    <td className="whitespace-nowrap py-2.5">{showPay ? money(packageGross(employee), currency) : "—"}</td>
                     <td className="py-2.5">
                       <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
                     </td>
@@ -183,12 +190,15 @@ export default async function EmployerPage({
         ) : null}
       </Card>
 
+      {can(user, "employers.edit") ? (
       <Card>
         <div id="details" className="scroll-mt-24" />
         <h2 className="mb-4 font-bold">{t("تعديل بيانات الكفيل", "Edit sponsor details")}</h2>
         <EmployerForm action={updateEmployer} employer={employer} submitLabel={t("حفظ التعديلات", "Save changes")} />
       </Card>
+      ) : null}
 
+      {can(user, "employers.delete") ? (
       <Card className="border-red-100">
         <h2 className="font-bold text-red-800">{t("حذف الكفيل", "Delete sponsor")}</h2>
         <p className="mb-3 mt-1 text-sm text-slate-500">
@@ -197,13 +207,15 @@ export default async function EmployerPage({
             "A sponsor can be deleted only when no employees are linked. Past salaries keep its name.",
           )}
         </p>
-        <form action={deleteEmployer}>
-          <input type="hidden" name="id" value={employer.id} />
-          <SubmitButton variant="danger" pendingLabel={t("جارٍ الحذف...", "Deleting...")}>
-            {t("حذف الكفيل", "Delete sponsor")}
-          </SubmitButton>
-        </form>
+        <DeleteButton
+          action={deleteEmployer}
+          fields={{ id: employer.id }}
+          variant="danger"
+          label={t("حذف الكفيل", "Delete sponsor")}
+          confirm={t(`حذف ${employer.name} من دفتر العناوين؟`, `Delete ${employer.name} from the address book?`)}
+        />
       </Card>
+      ) : null}
     </div>
   );
 }

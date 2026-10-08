@@ -1,7 +1,7 @@
 "use server";
 
 import { writeAudit } from "@/lib/audit";
-import { requireWriter } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { REMINDER_REPEAT } from "@/lib/calendar";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { clip, formatDate, parseDateInput, req, safeReturn, str } from "@/lib/utils";
 
 export async function createReminder(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("calendar.create", "/calendar");
   const { t } = await getI18n();
   const returnTo = safeReturn(formData.get("returnTo"), "/calendar");
   const title = clip(req(formData, "title"), 150) || "";
@@ -43,7 +43,7 @@ export async function createReminder(formData: FormData) {
 }
 
 export async function toggleReminder(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("calendar.edit", "/calendar");
   const { t } = await getI18n();
   const returnTo = safeReturn(formData.get("returnTo"), "/calendar");
   const reminder = await prisma.reminder.findFirst({ where: { id: req(formData, "id"), companyId: user.companyId } });
@@ -54,7 +54,7 @@ export async function toggleReminder(formData: FormData) {
 }
 
 export async function deleteReminder(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("calendar.delete", "/calendar");
   const { t } = await getI18n();
   const returnTo = safeReturn(formData.get("returnTo"), "/calendar");
   const reminder = await prisma.reminder.findFirst({ where: { id: req(formData, "id"), companyId: user.companyId } });

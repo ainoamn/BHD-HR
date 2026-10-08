@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { Payslip, SalaryReceipt, headerFor } from "@/components/salary-docs";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ export default async function SalaryPrintPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("salaries.view");
   const { t } = await getI18n();
   const salary = await prisma.salary.findFirst({
     where: { id, employee: { companyId: user.companyId } },

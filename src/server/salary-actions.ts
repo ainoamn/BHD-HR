@@ -2,13 +2,13 @@
 
 import type { Employee, Employer } from "@prisma/client";
 import { writeAudit } from "@/lib/audit";
-import { requireWriter } from "@/lib/auth";
+import { requirePermission, type SessionUser } from "@/lib/auth";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
-import { buildSalaryAmounts, packageGross } from "@/lib/salary";
+import { buildSalaryAmounts } from "@/lib/salary";
 import { clip, intValue, money, num, parseDateInput, req, round3, str, todayInputValue } from "@/lib/utils";
 
 function periodFrom(formData: FormData) {
@@ -63,8 +63,67 @@ async function unpaidSalary(id: string, companyId: string) {
   return salary!;
 }
 
+async function createSalaryRecord(user: SessionUser, employee: Employee & { employer: Employer | null }, year: number, month: number) {
+  const absenceDays = await countAbsenceDays(employee.id, year, month);
+  const amounts = buildSalaryAmounts({
+    basicSalary: employee.basicSalary,
+    housingAllowance: employee.housingAllowance,
+    transportAllowance: employee.transportAllowance,
+    otherAllowance: employee.otherAllowance,
+    absenceDays,
+    otherDeduction: 0,
+    salaryDays: user.company.salaryDays,
+  });
+  return prisma.salary.create({
+    data: {
+      companyId: user.companyId,
+      employeeId: employee.id,
+      year,
+      month,
+      ...snapshot(employee),
+      basicSalary: employee.basicSalary,
+      housingAllowance: employee.housingAllowance,
+      transportAllowance: employee.transportAllowance,
+      otherAllowance: employee.otherAllowance,
+      absenceDays,
+      absenceDeduction: amounts.absenceDeduction,
+      otherDeduction: 0,
+      netSalary: amounts.netSalary,
+    },
+  });
+}
+
+/** One employee, one month: used when an employee joins mid-run or a record was deleted. */
+export async function createSalary(formData: FormData) {
+  const user = await requirePermission("salaries.create", "/salaries");
+  const { t } = await getI18n();
+  const period = periodFrom(formData);
+  if (!period) go("/salaries", { error: t("الشهر غير صحيح", "Invalid month") });
+  const { year, month } = period!;
+  const back = salariesPath(year, month);
+  const employee = await prisma.employee.findFirst({
+    where: { id: req(formData, "employeeId"), companyId: user.companyId },
+    include: { employer: true },
+  });
+  if (!employee) go(back, { error: t("اختر موظفاً", "Choose an employee") });
+  const exists = await prisma.salary.findUnique({ where: { employeeId_year_month: { employeeId: employee!.id, year, month } } });
+  if (exists) go(`/salaries/${exists.id}`, { error: t("لهذا الموظف مسير في هذا الشهر مسبقاً", "This employee already has a record for this month") });
+  const salary = await createSalaryRecord(user, employee!, year, month);
+  await writeAudit({
+    userId: user.id,
+    employeeId: employee!.id,
+    action: "SALARY_CREATE",
+    message: t(
+      `أضاف مسير ${employee!.fullName} لشهر ${monthName(month, "ar")} ${year}`,
+      `Added a salary record for ${employee!.fullName}, ${monthName(month, "en")} ${year}`,
+    ),
+  });
+  refreshAll();
+  go(`/salaries/${salary.id}`, { message: t("تمت إضافة المسير", "Salary record added") });
+}
+
 export async function generatePayroll(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("salaries.create", "/salaries");
   const { lang, t } = await getI18n();
   const period = periodFrom(formData);
   if (!period) go("/salaries", { error: t("الشهر غير صحيح", "Invalid month") });
@@ -84,33 +143,7 @@ export async function generatePayroll(formData: FormData) {
       where: { employeeId_year_month: { employeeId: employee.id, year, month } },
     });
     if (exists) continue;
-    const absenceDays = await countAbsenceDays(employee.id, year, month);
-    const amounts = buildSalaryAmounts({
-      basicSalary: employee.basicSalary,
-      housingAllowance: employee.housingAllowance,
-      transportAllowance: employee.transportAllowance,
-      otherAllowance: employee.otherAllowance,
-      absenceDays,
-      otherDeduction: 0,
-      salaryDays: user.company.salaryDays,
-    });
-    await prisma.salary.create({
-      data: {
-        companyId: user.companyId,
-        employeeId: employee.id,
-        year,
-        month,
-        ...snapshot(employee),
-        basicSalary: employee.basicSalary,
-        housingAllowance: employee.housingAllowance,
-        transportAllowance: employee.transportAllowance,
-        otherAllowance: employee.otherAllowance,
-        absenceDays,
-        absenceDeduction: amounts.absenceDeduction,
-        otherDeduction: 0,
-        netSalary: amounts.netSalary,
-      },
-    });
+    await createSalaryRecord(user, employee, year, month);
     created += 1;
   }
   const label = `${monthName(month, lang)} ${year}`;
@@ -130,7 +163,7 @@ export async function generatePayroll(formData: FormData) {
 }
 
 export async function payAll(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("salaries.pay", "/salaries");
   const { t } = await getI18n();
   const period = periodFrom(formData);
   if (!period) go("/salaries", { error: t("الشهر غير صحيح", "Invalid month") });
@@ -199,33 +232,66 @@ export async function payAll(formData: FormData) {
   go(`/salaries/sheet?${query.toString()}`);
 }
 
+/** Edits an unpaid record. Components left out of the form keep their saved value. */
 export async function updateSalaryAdjustments(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("salaries.edit", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
   const salary = await unpaidSalary(id, user.companyId);
-  const otherDeduction = Math.max(0, num(formData, "otherDeduction"));
-  const gross = packageGross(salary);
-  const netSalary = round3(gross - salary.absenceDeduction - otherDeduction);
+  const amount = (key: "basicSalary" | "housingAllowance" | "transportAllowance" | "otherAllowance") =>
+    formData.has(key) ? round3(Math.max(0, num(formData, key))) : salary[key];
+  const components = {
+    basicSalary: amount("basicSalary"),
+    housingAllowance: amount("housingAllowance"),
+    transportAllowance: amount("transportAllowance"),
+    otherAllowance: amount("otherAllowance"),
+  };
+  const otherDeduction = round3(Math.max(0, num(formData, "otherDeduction")));
+  const amounts = buildSalaryAmounts({ ...components, absenceDays: salary.absenceDays, otherDeduction, salaryDays: user.company.salaryDays });
   await prisma.salary.update({
     where: { id },
-    data: { otherDeduction, netSalary, notes: clip(str(formData, "notes"), 500) },
+    data: { ...components, otherDeduction, absenceDeduction: amounts.absenceDeduction, netSalary: amounts.netSalary, notes: clip(str(formData, "notes"), 500) },
   });
   await writeAudit({
     userId: user.id,
     employeeId: salary.employeeId,
     action: "SALARY_ADJUST",
     message: t(
-      `عدّل خصومات راتب ${salary.employeeName} لشهر ${monthName(salary.month, "ar")} ${salary.year}`,
-      `Changed deductions for ${salary.employeeName}, ${monthName(salary.month, "en")} ${salary.year}`,
+      `عدّل راتب ${salary.employeeName} لشهر ${monthName(salary.month, "ar")} ${salary.year}: الصافي ${money(amounts.netSalary, user.company.currency)}`,
+      `Edited salary of ${salary.employeeName}, ${monthName(salary.month, "en")} ${salary.year}: net ${money(amounts.netSalary, user.company.currency)}`,
     ),
   });
   refreshAll();
-  go(`/salaries/${id}`, { message: t("تم تحديث الخصومات", "Deductions updated") });
+  go(`/salaries/${id}`, { message: t("تم حفظ تعديلات الراتب", "Salary changes saved") });
+}
+
+/** Reopens a paid record (wrong amount or method). The receipt number is kept and reused when it is paid again. */
+export async function unpaySalary(formData: FormData) {
+  const user = await requirePermission("salaries.pay", "/salaries");
+  const { t } = await getI18n();
+  const id = req(formData, "id");
+  const salary = await prisma.salary.findFirst({ where: { id, companyId: user.companyId } });
+  if (!salary) go("/salaries", { error: t("مسير الراتب غير موجود", "Salary record not found") });
+  if (!salary!.paid) go(`/salaries/${id}`);
+  await prisma.salary.update({
+    where: { id },
+    data: { paid: false, paidAt: null, paymentMethod: null, paymentReference: null, paidByName: null },
+  });
+  await writeAudit({
+    userId: user.id,
+    employeeId: salary!.employeeId,
+    action: "SALARY_UNPAY",
+    message: t(
+      `ألغى صرف راتب ${salary!.employeeName} لشهر ${monthName(salary!.month, "ar")} ${salary!.year} (إيصال ${salary!.receiptNo || "—"})`,
+      `Cancelled payment of ${salary!.employeeName}, ${monthName(salary!.month, "en")} ${salary!.year} (receipt ${salary!.receiptNo || "—"})`,
+    ),
+  });
+  refreshAll();
+  go(`/salaries/${id}`, { message: t("تم إلغاء الصرف. المسير مفتوح للتعديل.", "Payment cancelled. The record can be edited again.") });
 }
 
 export async function recalculateSalary(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("salaries.edit", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
   const salary = await unpaidSalary(id, user.companyId);
@@ -257,7 +323,7 @@ export async function recalculateSalary(formData: FormData) {
 }
 
 export async function deleteUnpaidSalary(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("salaries.delete", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
   const salary = await unpaidSalary(id, user.companyId);
@@ -276,7 +342,7 @@ export async function deleteUnpaidSalary(formData: FormData) {
 }
 
 export async function paySalary(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("salaries.pay", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
   const salary = await prisma.salary.findFirst({

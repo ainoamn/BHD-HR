@@ -1,7 +1,7 @@
 "use server";
 
 import { writeAudit } from "@/lib/audit";
-import { requireWriter } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { BALANCE_LABEL, type BalanceKey } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { pick } from "@/lib/i18n";
@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { clip, daysLabel, num, req, safeReturn, str } from "@/lib/utils";
 
 export async function addLeaveCredit(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("attendance.edit", "/attendance");
   const { t } = await getI18n();
   const employeeId = req(formData, "employeeId");
   const returnTo = safeReturn(formData.get("returnTo"), `/employees/${employeeId}?tab=attendance`);

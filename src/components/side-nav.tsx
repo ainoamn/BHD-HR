@@ -21,10 +21,14 @@ const items = [
   { href: "/settings", ar: "الإعدادات", en: "Settings", icon: Settings },
 ];
 
-export function SideNav({ companyName, alertCount }: { companyName: string; alertCount: number }) {
+const ALWAYS = ["/", "/notifications", "/settings"];
+
+/** `allowed` lists the section paths the active membership can view; the server enforces the same rule. */
+export function SideNav({ companyName, alertCount, allowed }: { companyName: string; alertCount: number; allowed: string[] }) {
   const pathname = usePathname();
   const { t } = useLang();
   const [open, setOpen] = useState(false);
+  const visible = items.filter((item) => ALWAYS.includes(item.href) || allowed.includes(item.href));
 
   useEffect(() => {
     setOpen(false);
@@ -57,7 +61,7 @@ export function SideNav({ companyName, alertCount }: { companyName: string; aler
           open ? "grid grid-cols-2 sm:grid-cols-3" : "hidden",
         )}
       >
-        {items.map((item) => {
+        {visible.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (

@@ -2,15 +2,16 @@ import Link from "next/link";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { PeriodFilter } from "@/components/period-filter";
+import { AttendanceEditForm, DeleteButton } from "@/components/row-forms";
 import { Card, PageHeader } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { ATTENDANCE_LABEL, BALANCE_KEYS, BALANCE_LABEL, type BalanceKey } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings, salaryDayWeight } from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
 import { calendarDays, daysLabel, formatDate, monthRange, readPeriod, round3 } from "@/lib/utils";
-import { deleteAttendance, markAttendance } from "@/server/attendance-actions";
+import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
 
 export default async function AttendancePage({
   searchParams,
@@ -18,7 +19,7 @@ export default async function AttendancePage({
   searchParams: Promise<{ year?: string; month?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("attendance.view");
   const { lang, t } = await getI18n();
   const { year, month } = readPeriod(sp);
   const { start, end } = monthRange(year, month);
@@ -89,16 +90,18 @@ export default async function AttendancePage({
           </ul>
         </div>
       ) : null}
-      <Card className="mb-4">
-        <LeaveRangeForm
-          action={markAttendance}
-          employees={employees.map((employee) => ({ id: employee.id, fullName: displayName(employee) }))}
-          balances={balances}
-          returnTo={returnTo}
-          defaultType="ABSENT"
-          warnDays={warnDays}
-        />
-      </Card>
+      {can(user, "attendance.create") ? (
+        <Card className="mb-4">
+          <LeaveRangeForm
+            action={markAttendance}
+            employees={employees.map((employee) => ({ id: employee.id, fullName: displayName(employee) }))}
+            balances={balances}
+            returnTo={returnTo}
+            defaultType="ABSENT"
+            warnDays={warnDays}
+          />
+        </Card>
+      ) : null}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
         <table className="min-w-full text-sm">
@@ -149,11 +152,27 @@ export default async function AttendancePage({
                   {period.row.notes ? ` — ${period.row.notes}` : ""}
                 </span>
               </div>
-              <form action={deleteAttendance}>
-                <input type="hidden" name="id" value={period.deleteId} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <button className="text-xs font-semibold text-red-700">{t("حذف", "Delete")}</button>
-              </form>
+              <div className="flex flex-wrap items-start gap-3">
+                {can(user, "attendance.edit") ? (
+                  <AttendanceEditForm
+                    action={updateAttendance}
+                    id={period.deleteId}
+                    returnTo={returnTo}
+                    type={period.row.type}
+                    start={period.start}
+                    end={period.end}
+                    deductsSalary={period.row.deductsSalary}
+                    notes={period.row.notes}
+                  />
+                ) : null}
+                {can(user, "attendance.delete") ? (
+                  <DeleteButton
+                    action={deleteAttendance}
+                    fields={{ id: period.deleteId, returnTo }}
+                    confirm={t("حذف هذه الفترة وإرجاع أيامها إلى الرصيد؟", "Delete this period and return its days to the balance?")}
+                  />
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

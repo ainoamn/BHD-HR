@@ -1,10 +1,13 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
+import { randomBytes } from "crypto";
 import { writeAudit } from "@/lib/audit";
 import { isRole, requireAdmin, requireUser } from "@/lib/auth";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { normalizePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { removeLogoIfUnused, saveUpload } from "@/lib/uploads";
 import { clip, intValue, req, str } from "@/lib/utils";
@@ -100,54 +103,108 @@ export async function updateProfile(formData: FormData) {
   go("/settings", { message: t("تم حفظ بياناتك", "Your details were saved") });
 }
 
+const MEMBERS = "/settings#members";
+
+function newInviteToken() {
+  return randomBytes(24).toString("base64url");
+}
+
+/** Role and, for CUSTOM, the ticked permissions. Presets ignore the list. */
+async function readAccess(formData: FormData) {
+  const { t } = await getI18n();
+  const role = req(formData, "role");
+  if (!isRole(role)) go(MEMBERS, { error: t("صلاحية غير معروفة", "Unknown role") });
+  const permissions = role === "CUSTOM" ? normalizePermissions(formData.getAll("perm")) : null;
+  if (role === "CUSTOM" && !permissions!.length) go(MEMBERS, { error: t("اختر صلاحية واحدة على الأقل", "Choose at least one permission") });
+  return { role, permissions };
+}
+
+function accessLabel(role: string, permissions: string[] | null) {
+  return role === "CUSTOM" ? `CUSTOM (${permissions?.length ?? 0})` : role;
+}
+
+/**
+ * Creates the membership with a one-time link. Anyone already registered with that email gets access at once;
+ * otherwise it attaches on their first BHD sign-in or when they open the link.
+ */
 export async function inviteMember(formData: FormData) {
   const user = await requireAdmin();
   const { t } = await getI18n();
   const email = req(formData, "email").toLowerCase();
-  const role = req(formData, "role");
-  if (!EMAIL.test(email) || email.length > 120) go("/settings", { error: t("البريد غير صالح", "Invalid email") });
-  if (!isRole(role)) go("/settings", { error: t("صلاحية غير معروفة", "Unknown role") });
+  if (!EMAIL.test(email) || email.length > 120) go(MEMBERS, { error: t("البريد غير صالح", "Invalid email") });
+  const { role, permissions } = await readAccess(formData);
   if (await prisma.membership.findUnique({ where: { companyId_email: { companyId: user.companyId, email } } })) {
-    go("/settings", { error: t("هذا البريد عضو في المنشأة مسبقاً", "This email is already a member") });
+    go(MEMBERS, { error: t("هذا البريد عضو في المنشأة مسبقاً", "This email is already a member") });
   }
   const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  await prisma.membership.create({ data: { companyId: user.companyId, email, role, userId: existing?.id ?? null } });
-  await writeAudit({ userId: user.id, action: "MEMBER_INVITE", message: t(`أضاف ${email} بصلاحية ${role}`, `Added ${email} as ${role}`) });
+  const member = await prisma.membership.create({
+    data: {
+      companyId: user.companyId,
+      email,
+      role,
+      permissions: permissions ?? Prisma.DbNull,
+      userId: existing?.id ?? null,
+      inviteToken: newInviteToken(),
+      invitedById: user.id,
+      invitedAt: new Date(),
+    },
+  });
+  await writeAudit({
+    userId: user.id,
+    action: "MEMBER_INVITE",
+    message: t(`دعا ${email} بصلاحية ${accessLabel(role, permissions)}`, `Invited ${email} as ${accessLabel(role, permissions)}`),
+  });
   refreshAll();
-  go("/settings", {
-    message: existing
-      ? t("تمت الإضافة. يرى المنشأة الآن من قائمة المنشآت في الأعلى.", "Added. They can now open this company from the company menu.")
-      : t("تمت الإضافة. يُربط تلقائياً أول ما يدخل بحساب BHD بهذا البريد.", "Added. They are linked automatically the first time they sign in with this BHD email."),
+  go(`/settings?invite=${member.id}#members`, {
+    message: t("تم إنشاء الدعوة. انسخ الرابط وأرسله للمستخدم.", "Invitation created. Copy the link and send it to the user."),
   });
 }
 
 async function memberOfCompany(membershipId: string, companyId: string) {
   const { t } = await getI18n();
   const member = await prisma.membership.findFirst({ where: { id: membershipId, companyId } });
-  if (!member) go("/settings", { error: t("العضو غير موجود", "Member not found") });
+  if (!member) go(MEMBERS, { error: t("العضو غير موجود", "Member not found") });
   return member!;
 }
 
-export async function updateMemberRole(formData: FormData) {
+export async function updateMemberAccess(formData: FormData) {
   const user = await requireAdmin();
   const { t } = await getI18n();
-  const role = req(formData, "role");
-  if (!isRole(role)) go("/settings", { error: t("صلاحية غير معروفة", "Unknown role") });
   const member = await memberOfCompany(req(formData, "membershipId"), user.companyId);
-  if (member.id === user.membershipId) go("/settings", { error: t("لا يمكنك تغيير صلاحيتك بنفسك", "You cannot change your own role") });
-  await prisma.membership.update({ where: { id: member.id }, data: { role } });
-  await writeAudit({ userId: user.id, action: "MEMBER_ROLE", message: `${member.email}: ${member.role} → ${role}` });
+  if (member.id === user.membershipId) go(MEMBERS, { error: t("لا يمكنك تغيير صلاحيتك بنفسك", "You cannot change your own access") });
+  const { role, permissions } = await readAccess(formData);
+  await prisma.membership.update({ where: { id: member.id }, data: { role, permissions: permissions ?? Prisma.DbNull } });
+  const before = accessLabel(member.role, Array.isArray(member.permissions) ? (member.permissions as string[]) : null);
+  await writeAudit({ userId: user.id, action: "MEMBER_ROLE", message: `${member.email}: ${before} → ${accessLabel(role, permissions)}` });
   refreshAll();
-  go("/settings", { message: t("تم تحديث الصلاحية", "Role updated") });
+  go(MEMBERS, { message: t(`تم حفظ صلاحيات ${member.email}`, `Saved permissions for ${member.email}`) });
+}
+
+/** Issues a fresh link; the previous one stops working. */
+export async function renewInviteLink(formData: FormData) {
+  const user = await requireAdmin();
+  const { t } = await getI18n();
+  const member = await memberOfCompany(req(formData, "membershipId"), user.companyId);
+  if (member.acceptedAt) go(MEMBERS, { error: t("قَبِل هذا العضو الدعوة مسبقاً", "This member already accepted") });
+  await prisma.membership.update({ where: { id: member.id }, data: { inviteToken: newInviteToken(), invitedAt: new Date(), invitedById: user.id } });
+  await writeAudit({ userId: user.id, action: "MEMBER_INVITE", message: t(`جدّد رابط دعوة ${member.email}`, `Renewed the invitation link for ${member.email}`) });
+  refreshAll();
+  go(`/settings?invite=${member.id}#members`, { message: t("تم إنشاء رابط جديد وأُلغي الرابط السابق", "New link created; the old link no longer works") });
 }
 
 export async function removeMember(formData: FormData) {
   const user = await requireAdmin();
   const { t } = await getI18n();
   const member = await memberOfCompany(req(formData, "membershipId"), user.companyId);
-  if (member.id === user.membershipId) go("/settings", { error: t("لا يمكنك إزالة نفسك", "You cannot remove yourself") });
+  if (member.id === user.membershipId) go(MEMBERS, { error: t("لا يمكنك إزالة نفسك", "You cannot remove yourself") });
   await prisma.membership.delete({ where: { id: member.id } });
-  await writeAudit({ userId: user.id, action: "MEMBER_REMOVE", message: t(`أزال ${member.email} من المنشأة`, `Removed ${member.email} from the company`) });
+  await writeAudit({
+    userId: user.id,
+    action: "MEMBER_REMOVE",
+    message: member.userId
+      ? t(`أزال ${member.email} من المنشأة`, `Removed ${member.email} from the company`)
+      : t(`ألغى دعوة ${member.email}`, `Cancelled the invitation for ${member.email}`),
+  });
   refreshAll();
-  go("/settings", { message: t("تمت إزالة العضو", "Member removed") });
+  go(MEMBERS, { message: member.userId ? t("تمت إزالة العضو", "Member removed") : t("أُلغيت الدعوة", "Invitation cancelled") });
 }

@@ -5,8 +5,9 @@ import { SiteFooter } from "@/components/bhd/site-footer";
 import { LangToggle } from "@/components/lang-provider";
 import { SideNav } from "@/components/side-nav";
 import { getAlerts } from "@/lib/alerts";
-import { requireUser } from "@/lib/auth";
+import { can, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
+import { MODULES, MODULE_HREF } from "@/lib/permissions";
 import { formatLongDate } from "@/lib/utils";
 import { logout, switchCompany } from "@/server/auth-actions";
 
@@ -17,11 +18,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { lang, t } = await getI18n();
   const alerts = await getAlerts();
   const urgent = alerts.filter((item) => item.severity !== "info").length;
-  const roleName = user.role === "ADMIN" ? t("مسؤول", "Admin") : user.role === "MANAGER" ? t("مدير", "Manager") : t("مستخدم — عرض فقط", "User — view only");
+  const roleName =
+    user.role === "ADMIN"
+      ? t("مسؤول", "Admin")
+      : user.role === "MANAGER"
+        ? t("مدير", "Manager")
+        : user.role === "CUSTOM"
+          ? t("صلاحيات مخصصة", "Custom permissions")
+          : t("مستخدم — عرض فقط", "User — view only");
+  const allowed = MODULES.filter((module) => can(user, `${module}.view`)).map((module) => MODULE_HREF[module]);
 
   return (
     <div className="app-shell min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
-      <SideNav companyName={lang === "en" && user.company.nameEn ? user.company.nameEn : user.company.name} alertCount={alerts.length} />
+      <SideNav companyName={lang === "en" && user.company.nameEn ? user.company.nameEn : user.company.name} alertCount={alerts.length} allowed={allowed} />
       <div className="flex min-h-screen min-w-0 flex-col">
         {user.mustChangePassword ? (
           <div className="no-print bg-amber-50 px-4 py-2 text-center text-sm text-amber-950">

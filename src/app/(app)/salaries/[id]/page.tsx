@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Flash } from "@/components/flash";
+import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { can, requirePermission } from "@/lib/auth";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -11,7 +12,7 @@ import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { daysLabel, formatDate, money, round3, todayInputValue } from "@/lib/utils";
-import { deleteUnpaidSalary, paySalary, recalculateSalary, updateSalaryAdjustments } from "@/server/salary-actions";
+import { deleteUnpaidSalary, paySalary, recalculateSalary, unpaySalary, updateSalaryAdjustments } from "@/server/salary-actions";
 
 export default async function SalaryDetailPage({
   params,
@@ -22,13 +23,14 @@ export default async function SalaryDetailPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("salaries.view");
   const { lang, t } = await getI18n();
   const salary = await prisma.salary.findFirst({
     where: { id, employee: { companyId: user.companyId } },
     include: { employee: true },
   });
   if (!salary) notFound();
+  const allow = { edit: can(user, "salaries.edit"), remove: can(user, "salaries.delete"), pay: can(user, "salaries.pay") };
   const currency = user.company.currency;
   const gross = packageGross(salary);
   const daily = user.company.salaryDays > 0 ? gross / user.company.salaryDays : 0;
@@ -119,16 +121,29 @@ export default async function SalaryDetailPage({
               {t("ملاحظات", "Notes")}: {salary.notes}
             </p>
           ) : null}
-          <div className="pt-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             <Link href={`/salaries?year=${salary.year}&month=${salary.month}`} className={secondaryBtn}>
               {t("رجوع", "Back")}
             </Link>
+            {allow.pay ? (
+              <DeleteButton
+                action={unpaySalary}
+                fields={{ id: salary.id }}
+                variant="danger"
+                label={t("إلغاء الصرف", "Cancel payment")}
+                confirm={t(
+                  "إلغاء صرف هذا الراتب وإعادته غير مصروف؟ يبقى رقم الإيصال محفوظاً ويُسجّل الإلغاء في سجل العمليات.",
+                  "Cancel this payment and mark the salary unpaid? The receipt number is kept and the change is logged.",
+                )}
+              />
+            ) : null}
           </div>
         </Card>
       ) : (
         <div className="mt-4 space-y-4">
+          {allow.edit ? (
           <Card className="space-y-3">
-            <h2 className="font-bold">{t("الخصومات", "Deductions")}</h2>
+            <h2 className="font-bold">{t("تعديل الراتب والخصومات", "Edit salary and deductions")}</h2>
             <p className="text-sm text-slate-500">
               {t(
                 `الغياب المسجّل حالياً: ${daysLabel(liveDays)} يوم. المحفوظ في المسير: ${daysLabel(salary.absenceDays)} يوم.`,
@@ -140,20 +155,40 @@ export default async function SalaryDetailPage({
               <input type="hidden" name="id" value={salary.id} />
               <SubmitButton variant="secondary">{t("إعادة احتساب الغياب", "Recalculate absence")}</SubmitButton>
             </form>
-            <form action={updateSalaryAdjustments} className="grid gap-3">
+            <form action={updateSalaryAdjustments} className="grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="id" value={salary.id} />
-              <label className="text-sm">
-                {t("خصومات أخرى", "Other deductions")}
-                <input className={`${fieldClass} mt-1 w-full`} type="number" min="0" step="0.001" name="otherDeduction" defaultValue={salary.otherDeduction} />
-              </label>
+              {(
+                [
+                  ["basicSalary", t("الراتب الأساسي", "Basic salary"), salary.basicSalary],
+                  ["housingAllowance", t("بدل السكن", "Housing allowance"), salary.housingAllowance],
+                  ["transportAllowance", t("بدل النقل", "Transport allowance"), salary.transportAllowance],
+                  ["otherAllowance", t("بدلات أخرى", "Other allowances"), salary.otherAllowance],
+                  ["otherDeduction", t("خصومات أخرى", "Other deductions"), salary.otherDeduction],
+                ] as const
+              ).map(([name, label, value]) => (
+                <label key={name} className="text-sm">
+                  {label}
+                  <input className={`${fieldClass} mt-1 w-full`} type="number" min="0" step="0.001" name={name} defaultValue={value} />
+                </label>
+              ))}
               <label className="text-sm">
                 {t("ملاحظات", "Notes")}
                 <input className={`${fieldClass} mt-1 w-full`} name="notes" defaultValue={salary.notes || ""} />
               </label>
-              <SubmitButton variant="secondary">{t("حفظ الخصومات", "Save deductions")}</SubmitButton>
+              <p className="text-xs leading-5 text-slate-500 sm:col-span-2">
+                {t(
+                  "يُعاد حساب خصم الغياب والصافي تلقائياً. التعديل يخص هذا الشهر فقط ولا يغيّر راتب الموظف في ملفه.",
+                  "Absence deduction and net are recalculated. This changes this month only, not the employee's salary in their record.",
+                )}
+              </p>
+              <div className="sm:col-span-2">
+                <SubmitButton variant="secondary">{t("حفظ التعديلات", "Save changes")}</SubmitButton>
+              </div>
             </form>
           </Card>
+          ) : null}
 
+          {allow.pay ? (
           <Card>
             <h2 className="font-bold">{t("صرف الراتب", "Pay salary")}</h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -180,18 +215,22 @@ export default async function SalaryDetailPage({
               <SubmitButton pendingLabel={t("جارٍ الصرف...", "Paying...")}>{t("تأكيد صرف الراتب", "Confirm payment")}</SubmitButton>
             </form>
           </Card>
+          ) : null}
 
+          {allow.remove ? (
           <Card>
             <p className="mb-3 text-sm text-slate-500">
-              {t("إذا تغيّر راتب الموظف قبل الصرف، احذف هذا المسير ثم أنشئ الرواتب من جديد.", "If the employee's salary changed before payment, delete this record and generate again.")}
+              {t("لنسخ راتب الموظف الحالي من ملفه من جديد، احذف هذا المسير ثم أضفه أو أنشئ الرواتب مرة أخرى.", "To copy the employee's current salary again, delete this record and add it or generate again.")}
             </p>
-            <form action={deleteUnpaidSalary}>
-              <input type="hidden" name="id" value={salary.id} />
-              <SubmitButton variant="danger" pendingLabel={t("جارٍ الحذف...", "Deleting...")}>
-                {t("حذف المسير غير المصروف", "Delete unpaid record")}
-              </SubmitButton>
-            </form>
+            <DeleteButton
+              action={deleteUnpaidSalary}
+              fields={{ id: salary.id }}
+              variant="danger"
+              label={t("حذف المسير غير المصروف", "Delete unpaid record")}
+              confirm={t("حذف هذا المسير غير المصروف؟", "Delete this unpaid record?")}
+            />
           </Card>
+          ) : null}
         </div>
       )}
     </div>

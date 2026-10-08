@@ -15,12 +15,15 @@ export async function EmployeeForm({
   currency,
   employers,
   defaultEmployerId,
+  showSalary = true,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employee?: Employee;
   currency: string;
   employers: { id: string; name: string; nameEn: string | null }[];
   defaultEmployerId?: string | null;
+  /** Without `salaries.edit` the salary block is hidden and the server keeps the saved amounts. */
+  showSalary?: boolean;
 }) {
   const { lang, t } = await getI18n();
   return (
@@ -161,18 +164,20 @@ export async function EmployeeForm({
         </div>
       </Card>
 
-      <Card className="space-y-4">
-        <h2 className="text-base font-bold text-slate-900">{t("الراتب الشهري", "Monthly salary")}</h2>
-        <SalaryFields
-          currency={currency}
-          defaults={{
-            basicSalary: employee?.basicSalary || 0,
-            housingAllowance: employee?.housingAllowance || 0,
-            transportAllowance: employee?.transportAllowance || 0,
-            otherAllowance: employee?.otherAllowance || 0,
-          }}
-        />
-      </Card>
+      {showSalary ? (
+        <Card className="space-y-4">
+          <h2 className="text-base font-bold text-slate-900">{t("الراتب الشهري", "Monthly salary")}</h2>
+          <SalaryFields
+            currency={currency}
+            defaults={{
+              basicSalary: employee?.basicSalary || 0,
+              housingAllowance: employee?.housingAllowance || 0,
+              transportAllowance: employee?.transportAllowance || 0,
+              otherAllowance: employee?.otherAllowance || 0,
+            }}
+          />
+        </Card>
+      ) : null}
 
       <Card>
         <Field label={t("ملاحظات", "Notes")}>

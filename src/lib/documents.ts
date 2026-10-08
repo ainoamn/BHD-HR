@@ -12,6 +12,8 @@ export type DocView = {
   number: string | null;
   expiry: Date | null;
   fileUrl: string | null;
+  /** Set for uploaded documents; ID, passport and residence live on the employee record instead. */
+  document?: EmployeeDocument;
 };
 
 type EmployeeWithDocs = Employee & { documents: EmployeeDocument[] };
@@ -37,6 +39,7 @@ export function collectDocuments(employees: EmployeeWithDocs[], lang: Lang = "ar
         number: document.documentNo,
         expiry: document.expiryDate,
         fileUrl: document.fileUrl,
+        document,
       });
     }
   }

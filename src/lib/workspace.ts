@@ -8,7 +8,7 @@ export async function linkInvitations(user: { id: string; email: string }) {
     select: { id: true, companyId: true, role: true },
   });
   for (const invite of pending) {
-    await prisma.membership.update({ where: { id: invite.id }, data: { userId: user.id } });
+    await prisma.membership.update({ where: { id: invite.id }, data: { userId: user.id, acceptedAt: new Date() } });
     await writeAudit({
       companyId: invite.companyId,
       userId: user.id,

@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { writeAudit } from "@/lib/audit";
-import { requireWriter } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { ATTENDANCE_LABEL, BALANCE_LABEL, attendanceType } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { pick } from "@/lib/i18n";
@@ -12,10 +12,28 @@ import { prisma } from "@/lib/prisma";
 import { clip, daysLabel, formatDate, parseDateInput, req, safeReturn, str } from "@/lib/utils";
 
 export async function markAttendance(formData: FormData) {
-  const user = await requireWriter();
+  return saveAttendance(formData, null);
+}
+
+/** Replaces a whole period (all rows of its group) after the same balance and overlap checks as a new entry. */
+export async function updateAttendance(formData: FormData) {
+  return saveAttendance(formData, req(formData, "id"));
+}
+
+async function saveAttendance(formData: FormData, replaceId: string | null) {
+  const user = await requirePermission(replaceId ? "attendance.edit" : "attendance.create", "/attendance");
   const { lang, t } = await getI18n();
   const returnTo = safeReturn(formData.get("returnTo"), "/attendance");
-  const employeeId = req(formData, "employeeId");
+  let replacedIds: string[] = [];
+  let employeeId = req(formData, "employeeId");
+  if (replaceId) {
+    const old = await prisma.attendance.findFirst({ where: { id: replaceId, employee: { companyId: user.companyId } } });
+    if (!old) go(returnTo, { error: t("السجل غير موجود", "Record not found") });
+    employeeId = old!.employeeId;
+    replacedIds = old!.groupId
+      ? (await prisma.attendance.findMany({ where: { groupId: old!.groupId, employeeId }, select: { id: true } })).map((row) => row.id)
+      : [old!.id];
+  }
   const type = req(formData, "type");
   const meta = attendanceType(type);
   const from = parseDateInput(req(formData, "from")) || parseDateInput(req(formData, "date"));
@@ -35,7 +53,8 @@ export async function markAttendance(formData: FormData) {
   const balanceKey = meta!.balance;
   let overdraft = 0;
   if (balanceKey) {
-    const balances = computeLeaveBalances(employee!, employee!.attendance, employee!.leaveCredits);
+    const kept = employee!.attendance.filter((row) => !replacedIds.includes(row.id));
+    const balances = computeLeaveBalances(employee!, kept, employee!.leaveCredits);
     const remaining = balances[balanceKey].remaining;
     if (days > remaining) {
       if (req(formData, "allowOverdraft") !== "1") {
@@ -56,10 +75,11 @@ export async function markAttendance(formData: FormData) {
   try {
     await prisma.$transaction(async (tx) => {
       const existing = await tx.attendance.findMany({
-        where: { employeeId, date: { in: dates } },
+        where: { employeeId, date: { in: dates }, id: { notIn: replacedIds } },
         select: { date: true },
       });
       if (existing.length) throw new Error("CONFLICT");
+      if (replacedIds.length) await tx.attendance.deleteMany({ where: { id: { in: replacedIds } } });
       await tx.attendance.createMany({
         data: dates.map((date) => ({ employeeId, date, type, notes, deductsSalary, balanceKey, groupId })),
       });
@@ -79,10 +99,10 @@ export async function markAttendance(formData: FormData) {
   await writeAudit({
     userId: user.id,
     employeeId,
-    action: "ATTENDANCE",
+    action: replaceId ? "ATTENDANCE_UPDATE" : "ATTENDANCE",
     message: t(
-      `سجّل ${pick(ATTENDANCE_LABEL[type], "ar")} للموظف ${employee!.fullName} ${period} (${daysLabel(days)} يوم)${balanceText}${payText}${overText}`,
-      `Recorded ${pick(ATTENDANCE_LABEL[type], "en")} for ${employee!.fullName} ${period} (${daysLabel(days)} days)${balanceText}${payText}${overText}`,
+      `${replaceId ? "عدّل الفترة إلى" : "سجّل"} ${pick(ATTENDANCE_LABEL[type], "ar")} للموظف ${employee!.fullName} ${period} (${daysLabel(days)} يوم)${balanceText}${payText}${overText}`,
+      `${replaceId ? "Changed the period to" : "Recorded"} ${pick(ATTENDANCE_LABEL[type], "en")} for ${employee!.fullName} ${period} (${daysLabel(days)} days)${balanceText}${payText}${overText}`,
     ),
   });
   refreshAll();
@@ -98,7 +118,7 @@ export async function markAttendance(formData: FormData) {
 }
 
 export async function deleteAttendance(formData: FormData) {
-  const user = await requireWriter();
+  const user = await requirePermission("attendance.delete", "/attendance");
   const { t } = await getI18n();
   const returnTo = safeReturn(formData.get("returnTo"), "/attendance");
   const id = req(formData, "id");

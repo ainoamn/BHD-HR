@@ -7,7 +7,8 @@ export function go(path: string, flash?: { error?: string; message?: string }): 
   if (flash?.message) params.set("message", flash.message);
   const query = params.toString();
   if (!query) redirect(path);
-  redirect(`${path}${path.includes("?") ? "&" : "?"}${query}`);
+  const [base, hash] = path.split("#");
+  redirect(`${base}${base.includes("?") ? "&" : "?"}${query}${hash ? `#${hash}` : ""}`);
 }
 
 export function refreshAll() {

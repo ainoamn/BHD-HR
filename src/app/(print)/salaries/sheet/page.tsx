@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PrintButton } from "@/components/print-button";
 import { Bi, HeaderBar, SalaryDocsList, headerFor, readDocsMode, sheetClass } from "@/components/salary-docs";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { monthBoth } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
@@ -25,7 +25,7 @@ export default async function PayrollSheetPage({
   searchParams: Promise<{ from?: string; to?: string; employerId?: string; docs?: string; status?: string }>;
 }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("salaries.view");
   const { t } = await getI18n();
   const now = currentPeriod();
   const fallback = now.year * 12 + (now.month - 1);

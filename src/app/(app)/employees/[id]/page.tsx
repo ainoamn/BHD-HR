@@ -4,7 +4,8 @@ import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { AttendanceEditForm, DeleteButton, DocumentEditForm } from "@/components/row-forms";
+import { can, requirePermission } from "@/lib/auth";
 import {
   ATTENDANCE_LABEL,
   BALANCE_KEYS,
@@ -24,9 +25,11 @@ import { computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings 
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { cn, daysLabel, formatDate, money, text } from "@/lib/utils";
-import { deleteAttendance, markAttendance } from "@/server/attendance-actions";
-import { addDocument, deleteDocument } from "@/server/document-actions";
+import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
+import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
+import { deleteEmployee } from "@/server/employee-actions";
 import { addLeaveCredit } from "@/server/leave-actions";
+import { createSalary } from "@/server/salary-actions";
 
 function Info({ label, value, wide, dir }: { label: string; value: React.ReactNode; wide?: boolean; dir?: "ltr" }) {
   return (
@@ -57,7 +60,7 @@ export default async function EmployeePage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePermission("employees.view");
   const { lang, t } = await getI18n();
   const employee = await prisma.employee.findFirst({
     where: { id, companyId: user.companyId },
@@ -70,6 +73,19 @@ export default async function EmployeePage({
     },
   });
   if (!employee) notFound();
+  const allow = {
+    edit: can(user, "employees.edit"),
+    remove: can(user, "employees.delete"),
+    docs: can(user, "documents.view"),
+    docAdd: can(user, "documents.create"),
+    docEdit: can(user, "documents.edit"),
+    docDelete: can(user, "documents.delete"),
+    attendance: can(user, "attendance.view"),
+    attAdd: can(user, "attendance.create"),
+    attEdit: can(user, "attendance.edit"),
+    attDelete: can(user, "attendance.delete"),
+    salaries: can(user, "salaries.view"),
+  };
   const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits);
   const periods = groupAttendance(employee.attendance);
   const warnDays = user.company.leaveWarningDays;
@@ -83,7 +99,8 @@ export default async function EmployeePage({
       other: balances.other.remaining,
     },
   };
-  const tab = ["info", "docs", "attendance", "salaries"].includes(sp.tab || "") ? sp.tab || "info" : "info";
+  const tabAllowed: Record<string, boolean> = { info: true, docs: allow.docs, attendance: allow.attendance, salaries: allow.salaries };
+  const tab = tabAllowed[sp.tab || ""] ? sp.tab! : "info";
   const limits = {
     urgent: user.company.alertUrgentDays,
     warning: user.company.alertWarningDays,
@@ -107,7 +124,7 @@ export default async function EmployeePage({
     { id: "docs", label: t("الوثائق", "Documents"), count: primaryDocs.filter((doc) => doc.number || doc.expiry).length + employee.documents.length },
     { id: "attendance", label: t("الحضور والإجازات", "Attendance & leave"), count: periods.length },
     { id: "salaries", label: t("الرواتب", "Salaries"), count: employee.salaries.length },
-  ];
+  ].filter((item) => tabAllowed[item.id]);
   const employer = employee.employer;
   const employerName = employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : null;
   const displayName = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
@@ -115,6 +132,31 @@ export default async function EmployeePage({
   const secondName = otherName && otherName.trim().toLowerCase() !== displayName.trim().toLowerCase() ? otherName : null;
   const jobTitle = localizeTerm(employee.jobTitle, lang);
   const base = `/employees/${employee.id}`;
+
+  const periodActions = (period: (typeof periods)[number]) =>
+    allow.attEdit || allow.attDelete ? (
+      <div className="flex flex-wrap items-start justify-end gap-3">
+        {allow.attEdit ? (
+          <AttendanceEditForm
+            action={updateAttendance}
+            id={period.deleteId}
+            returnTo={`${base}?tab=attendance`}
+            type={period.row.type}
+            start={period.start}
+            end={period.end}
+            deductsSalary={period.row.deductsSalary}
+            notes={period.row.notes}
+          />
+        ) : null}
+        {allow.attDelete ? (
+          <DeleteButton
+            action={deleteAttendance}
+            fields={{ id: period.deleteId, returnTo: `${base}?tab=attendance` }}
+            confirm={t("حذف هذه الفترة وإرجاع أيامها إلى الرصيد؟", "Delete this period and return its days to the balance?")}
+          />
+        ) : null}
+      </div>
+    ) : null;
 
   const salaryActions = (salary: (typeof employee.salaries)[number]) => (
     <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
@@ -156,13 +198,29 @@ export default async function EmployeePage({
               ) : null}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-            <Link href={`${base}/edit`} className={primaryBtn}>
-              {t("تعديل البيانات", "Edit")}
-            </Link>
-            <Link href={`${base}?tab=salaries#statement`} className={secondaryBtn}>
-              {t("كشف الرواتب", "Statement")}
-            </Link>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:items-center">
+            {allow.edit ? (
+              <Link href={`${base}/edit`} className={primaryBtn}>
+                {t("تعديل البيانات", "Edit")}
+              </Link>
+            ) : null}
+            {allow.salaries ? (
+              <Link href={`${base}?tab=salaries#statement`} className={secondaryBtn}>
+                {t("كشف الرواتب", "Statement")}
+              </Link>
+            ) : null}
+            {allow.remove ? (
+              <DeleteButton
+                action={deleteEmployee}
+                fields={{ id: employee.id }}
+                variant="danger"
+                label={t("حذف الموظف", "Delete employee")}
+                confirm={t(
+                  `حذف ${employee.fullName} نهائياً مع وثائقه وسجل حضوره ورواتبه غير المصروفة؟ لا يمكن التراجع.`,
+                  `Permanently delete ${employee.fullName} with documents, attendance and unpaid salaries? This cannot be undone.`,
+                )}
+              />
+            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 text-xs sm:px-5">
@@ -189,7 +247,7 @@ export default async function EmployeePage({
         </div>
       </Card>
 
-      {warnings.length ? (
+      {allow.attendance && warnings.length ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
           <p className="font-bold">{t("تنبيه رصيد الإجازات", "Leave balance alert")}</p>
           <ul className="mt-1 list-disc space-y-0.5 ps-5 text-sm">
@@ -211,22 +269,29 @@ export default async function EmployeePage({
       <Flash error={sp.error} message={sp.message} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">{t("إجمالي الراتب", "Gross salary")}</p>
-          <p className="mt-1 truncate text-lg font-bold text-slate-900">{money(gross, currency)}</p>
-        </div>
-        <div className={cn("min-w-0 rounded-2xl border p-4 shadow-sm", warnedKeys.has("annual") ? "border-red-200 bg-red-50" : "border-slate-200 bg-white")}>
-          <p className={cn("text-xs", warnedKeys.has("annual") ? "text-red-700" : "text-slate-500")}>{t("رصيد السنوية", "Annual leave left")}</p>
-          <p className={cn("mt-1 text-lg font-bold", warnedKeys.has("annual") ? "text-red-700" : "text-slate-900")}>
-            {daysLabel(balances.annual.remaining)} <span className="text-sm font-normal text-slate-500">{t("يوم", "days")}</span>
-          </p>
-        </div>
-        <Link href={`${base}?tab=docs`} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-teal-200">
-          <p className="text-xs text-slate-500">{t("أقرب انتهاء وثيقة", "Nearest document expiry")}</p>
-          <div className="mt-1.5">
-            <ToneBadge tone={docsWorst.tone}>{docsWorst.label}</ToneBadge>
+        {allow.salaries ? (
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">{t("إجمالي الراتب", "Gross salary")}</p>
+            <p className="mt-1 truncate text-lg font-bold text-slate-900">{money(gross, currency)}</p>
           </div>
-        </Link>
+        ) : null}
+        {allow.attendance ? (
+          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-sm", warnedKeys.has("annual") ? "border-red-200 bg-red-50" : "border-slate-200 bg-white")}>
+            <p className={cn("text-xs", warnedKeys.has("annual") ? "text-red-700" : "text-slate-500")}>{t("رصيد السنوية", "Annual leave left")}</p>
+            <p className={cn("mt-1 text-lg font-bold", warnedKeys.has("annual") ? "text-red-700" : "text-slate-900")}>
+              {daysLabel(balances.annual.remaining)} <span className="text-sm font-normal text-slate-500">{t("يوم", "days")}</span>
+            </p>
+          </div>
+        ) : null}
+        {allow.docs ? (
+          <Link href={`${base}?tab=docs`} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-teal-200">
+            <p className="text-xs text-slate-500">{t("أقرب انتهاء وثيقة", "Nearest document expiry")}</p>
+            <div className="mt-1.5">
+              <ToneBadge tone={docsWorst.tone}>{docsWorst.label}</ToneBadge>
+            </div>
+          </Link>
+        ) : null}
+        {allow.salaries ? (
         <Link href={`${base}?tab=salaries`} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-teal-200">
           <p className="text-xs text-slate-500">{t("آخر راتب", "Last salary")}</p>
           {lastSalary ? (
@@ -240,6 +305,7 @@ export default async function EmployeePage({
             <p className="mt-1 text-sm text-slate-500">{t("لا يوجد بعد", "None yet")}</p>
           )}
         </Link>
+        ) : null}
       </div>
 
       <nav className="no-print">
@@ -301,6 +367,7 @@ export default async function EmployeePage({
                   <Info label={t("نهاية العقد", "Contract end")} value={formatDate(employee.contractEnd)} />
                 </dl>
               </Card>
+              {allow.docs ? (
               <Card>
                 <SectionTitle
                   action={
@@ -334,6 +401,7 @@ export default async function EmployeePage({
                   })}
                 </div>
               </Card>
+              ) : null}
               {employee.notes ? (
                 <Card>
                   <SectionTitle>{t("ملاحظات", "Notes")}</SectionTitle>
@@ -385,21 +453,23 @@ export default async function EmployeePage({
                           </p>
                           {document.notes ? <p className="mt-1 text-xs text-slate-500">{document.notes}</p> : null}
                         </div>
-                        <div className="flex items-center justify-between gap-2 sm:justify-end">
+                        <div className="flex flex-wrap items-start justify-between gap-3 sm:justify-end">
                           <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
-                          <form action={deleteDocument}>
-                            <input type="hidden" name="id" value={document.id} />
-                            <input type="hidden" name="returnTo" value={`${base}?tab=docs`} />
-                            <SubmitButton variant="danger" pendingLabel={t("جارٍ الحذف...", "Deleting...")}>
-                              {t("حذف", "Delete")}
-                            </SubmitButton>
-                          </form>
+                          {allow.docEdit ? <DocumentEditForm action={updateDocument} returnTo={`${base}?tab=docs`} document={document} /> : null}
+                          {allow.docDelete ? (
+                            <DeleteButton
+                              action={deleteDocument}
+                              fields={{ id: document.id, returnTo: `${base}?tab=docs` }}
+                              confirm={t("حذف هذا المستند وملفه المرفق؟", "Delete this document and its file?")}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </Card>
+              {allow.docAdd ? (
               <Card>
                 <SectionTitle>{t("إضافة مستند", "Add a document")}</SectionTitle>
                 <form action={addDocument} className="grid gap-3 sm:grid-cols-2">
@@ -436,22 +506,25 @@ export default async function EmployeePage({
                   </div>
                 </form>
               </Card>
+              ) : null}
             </>
           ) : null}
 
           {tab === "attendance" ? (
             <>
-              <Card>
-                <SectionTitle>{t("تسجيل غياب أو إجازة", "Record absence or leave")}</SectionTitle>
-                <LeaveRangeForm
-                  action={markAttendance}
-                  employees={[{ id: employee.id, fullName: displayName }]}
-                  balances={balanceMap}
-                  returnTo={`${base}?tab=attendance`}
-                  defaultType="ABSENT"
-                  warnDays={warnDays}
-                />
-              </Card>
+              {allow.attAdd ? (
+                <Card>
+                  <SectionTitle>{t("تسجيل غياب أو إجازة", "Record absence or leave")}</SectionTitle>
+                  <LeaveRangeForm
+                    action={markAttendance}
+                    employees={[{ id: employee.id, fullName: displayName }]}
+                    balances={balanceMap}
+                    returnTo={`${base}?tab=attendance`}
+                    defaultType="ABSENT"
+                    warnDays={warnDays}
+                  />
+                </Card>
+              ) : null}
               <Card>
                 <SectionTitle>{t("السجل", "History")}</SectionTitle>
                 {periods.length === 0 ? <p className="text-sm text-slate-500">{t("لا توجد سجلات.", "No records.")}</p> : null}
@@ -468,11 +541,7 @@ export default async function EmployeePage({
                         {formatDate(period.start)} — {formatDate(period.end)} · {daysLabel(period.days)} {t("يوم", "day(s)")}
                       </p>
                       {period.row.notes ? <p className="mt-1 text-xs text-slate-500">{period.row.notes}</p> : null}
-                      <form action={deleteAttendance} className="mt-2">
-                        <input type="hidden" name="id" value={period.deleteId} />
-                        <input type="hidden" name="returnTo" value={`${base}?tab=attendance`} />
-                        <button className="text-xs font-semibold text-red-700">{t("حذف", "Delete")}</button>
-                      </form>
+                      <div className="mt-2">{periodActions(period)}</div>
                     </div>
                   ))}
                 </div>
@@ -503,13 +572,7 @@ export default async function EmployeePage({
                               </ToneBadge>
                             </td>
                             <td className="max-w-48 truncate">{text(period.row.notes)}</td>
-                            <td className="text-end">
-                              <form action={deleteAttendance}>
-                                <input type="hidden" name="id" value={period.deleteId} />
-                                <input type="hidden" name="returnTo" value={`${base}?tab=attendance`} />
-                                <button className="text-xs font-semibold text-red-700">{t("حذف", "Delete")}</button>
-                              </form>
-                            </td>
+                            <td className="text-end">{periodActions(period)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -528,6 +591,26 @@ export default async function EmployeePage({
                   <p className="text-sm text-slate-500">
                     {t("لم يُنشأ أي راتب لهذا الموظف بعد. أنشئ رواتب الشهر من صفحة الرواتب.", "No salaries yet. Generate the month's payroll from the Payroll page.")}
                   </p>
+                ) : null}
+                {can(user, "salaries.create") ? (
+                  <form action={createSalary} className="mb-3 flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3">
+                    <input type="hidden" name="employeeId" value={employee.id} />
+                    <label className="space-y-1 text-xs">
+                      <span className="text-slate-600">{t("الشهر", "Month")}</span>
+                      <select className={`${fieldClass} block`} name="month" defaultValue={new Date().getMonth() + 1}>
+                        {Array.from({ length: 12 }, (_, index) => (
+                          <option key={index} value={index + 1}>
+                            {monthName(index + 1, lang)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-xs">
+                      <span className="text-slate-600">{t("السنة", "Year")}</span>
+                      <input className={`${fieldClass} block w-24`} type="number" name="year" min="2000" max="2100" defaultValue={new Date().getFullYear()} />
+                    </label>
+                    <SubmitButton variant="secondary">{t("+ إضافة راتب لهذا الشهر", "+ Add salary for this month")}</SubmitButton>
+                  </form>
                 ) : null}
                 <div className="space-y-2 md:hidden">
                   {employee.salaries.map((salary) => (
@@ -615,6 +698,7 @@ export default async function EmployeePage({
         </div>
 
         <aside className="min-w-0 space-y-4">
+          {allow.salaries ? (
           <Card>
             <SectionTitle>{t("الراتب الشهري", "Monthly salary")}</SectionTitle>
             <dl className="space-y-2 text-sm">
@@ -636,7 +720,9 @@ export default async function EmployeePage({
             </dl>
             <p className="mt-3 text-xs leading-5 text-slate-500">{t("راتب كل شهر يُحفظ وحده عند إنشاء المسير.", "Each month's salary is saved separately when payroll is generated.")}</p>
           </Card>
+          ) : null}
 
+          {allow.attendance ? (
           <Card>
             <SectionTitle>{t("أرصدة الإجازة", "Leave balances")}</SectionTitle>
             <div className="space-y-3">
@@ -667,6 +753,7 @@ export default async function EmployeePage({
                 );
               })}
             </div>
+            {allow.attEdit ? (
             <details className="group mt-4 border-t border-slate-100 pt-3">
               <summary className="cursor-pointer list-none text-sm font-bold text-teal-800">
                 <span className="group-open:hidden">+ </span>
@@ -688,7 +775,9 @@ export default async function EmployeePage({
                 <SubmitButton>{t("إضافة للرصيد", "Add to balance")}</SubmitButton>
               </form>
             </details>
+            ) : null}
           </Card>
+          ) : null}
         </aside>
       </div>
     </div>

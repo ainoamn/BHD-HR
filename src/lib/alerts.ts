@@ -1,5 +1,6 @@
 import { cache } from "react";
-import { getSessionUser } from "./auth";
+import { can, getSessionUser } from "./auth";
+import type { Permission } from "./permissions";
 import { reminderDayIn, payDayFor } from "./calendar";
 import { ATTENDANCE_LABEL, BALANCE_LABEL, DOC_LABEL, monthName } from "./constants";
 import { daysUntil, describeExpiry } from "./expiry";
@@ -225,5 +226,13 @@ export const getAlerts = cache(async () => {
     });
   }
 
-  return alerts.sort((a, b) => a.days - b.days);
+  return alerts.filter((alert) => can(user, alertPermission(alert.id))).sort((a, b) => a.days - b.days);
 });
+
+function alertPermission(id: string): Permission {
+  if (id.endsWith("-contract") || id.startsWith("birthday-")) return "employees.view";
+  if (id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
+  if (id.startsWith("leave-") || id.startsWith("att-")) return "attendance.view";
+  if (id.startsWith("reminder-")) return "calendar.view";
+  return "salaries.view";
+}
