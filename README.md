@@ -31,7 +31,8 @@
 
 ```bash
 npm install
-copy .env.example .env      # ثم عبّئ رابطي Neon و AUTH_SECRET وقيم BHD
+neon link --project-id billowing-hat-97652194 --branch production -y   # يكتب روابط القاعدة في .env.local
+copy .env.example .env      # ثم عبّئ AUTH_SECRET وقيم BHD (روابط القاعدة تأتي من .env.local)
 npm run dev
 ```
 
@@ -43,6 +44,6 @@ npm run dev
 
 ## البيانات والخصوصية
 
-- البيانات والملفات المرفوعة في قاعدة Neon (`bhd_hr`)، ولا شيء منها في GitHub.
+- البيانات والملفات المرفوعة في مشروع Neon المستقل «BHD HR» (`billowing-hat-97652194`)، ولا شيء منها في GitHub.
 - `.env` لا يُرفع إلى GitHub ولا إلى Vercel (`.gitignore` و`.vercelignore`)؛ `.env.example` يوضح أسماء المتغيرات فقط.
 - نسخ SQLite القديمة (`prisma/*.db`) باقية على الجهاز للرجوع فقط، ومستثناة من Git.

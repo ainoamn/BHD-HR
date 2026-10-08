@@ -17,7 +17,7 @@
 | أين رُكِّب المشغّل | رأس التطبيق `src/app/(app)/layout.tsx` — `src/components/bhd/BhdAppSwitcher.tsx` (تسع نقاط ثم زر الحساب ثم بطاقة الاسم/البريد/الحساب/خروج). الكتالوج `src/lib/bhd/apps.ts` منسوخ حرفياً. الفوتر `src/components/bhd/site-footer.tsx` (برامجنا + روابط bhd-om.com + `/api/auth/admin-entry`) |
 | تاريخ قلب `mode` إلى `sso` في ONE-BHD | — (بعد التسجيل والتحقق) |
 | أسرار البيئة (أسماء فقط) | `AUTH_SECRET`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_CLIENT_SECRET`، `BHD_OAUTH_REDIRECT_URI`، `BHD_ADMIN_EMAILS`، `APP_ORIGIN`، `DATABASE_URL`، `DATABASE_URL_UNPOOLED`، اختياري `BHD_IDENTITY_TOKEN_SECRET` |
-| **التقنيات الكاملة لبناء هذا الموقع وكيف يعمل** | Next.js 15 (App Router، Server Actions) + React 19 + TypeScript، Tailwind CSS v4، Prisma 6 + PostgreSQL على Neon (قاعدة مستقلة `bhd_hr`)، الملفات المرفوعة في جدول `StoredFile` وتُخدَم عبر `/files/[name]` بعد التحقق من الجلسة، `jose` للتحقق من `id_token`، لا طوابير ولا مدفوعات، منشور على Vercel (`bhd-hr.vercel.app`) بنشر تلقائي من `main`، المراقبة عبر سجل النشاط داخل النظام (`AuditLog`) |
+| **التقنيات الكاملة لبناء هذا الموقع وكيف يعمل** | Next.js 15 (App Router، Server Actions) + React 19 + TypeScript، Tailwind CSS v4، Prisma 6 + PostgreSQL على Neon (مشروع مستقل «BHD HR»)، الملفات المرفوعة في جدول `StoredFile` وتُخدَم عبر `/files/[name]` بعد التحقق من الجلسة، `jose` للتحقق من `id_token`، لا طوابير ولا مدفوعات، منشور على Vercel (`bhd-hr.vercel.app`) بنشر تلقائي من `main`، المراقبة عبر سجل النشاط داخل النظام (`AuditLog`) |
 | ما بقي محلياً ولم يُوحَّد | دخول الطوارئ المحلي بكلمة مرور (`/login?local=1`) — مسموح بالدليل. أدوار المنتج (`ADMIN` / `VIEWER` / `PENDING`) محلية لأن بيانات الرواتب سرية |
 | فريق الصيانة | فريق BHD |
 
