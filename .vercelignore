@@ -6,5 +6,6 @@ prisma/*.db-journal
 *.backup*.db
 storage/uploads
 tmp-*
+.neon
 .next
 node_modules
