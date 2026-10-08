@@ -16,14 +16,14 @@ export function mimeFor(name: string) {
   return MIME[path.extname(name).toLowerCase()] || "application/octet-stream";
 }
 
-export async function saveUpload(file: File | null, lang: "ar" | "en" = "ar") {
+export async function saveUpload(file: File | null, companyId: string, lang: "ar" | "en" = "ar") {
   if (!file || file.size === 0) return null;
   if (file.size > MAX_UPLOAD_BYTES) throw new Error(lang === "en" ? "File is larger than 4 MB" : "حجم الملف أكبر من 4 ميغابايت");
   const extension = path.extname(file.name).toLowerCase();
   if (!MIME[extension]) throw new Error(lang === "en" ? "Only PDF, JPG and PNG files are allowed" : "يُسمح بملفات PDF أو صور JPG و PNG فقط");
   const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension}`;
   const bytes = Buffer.from(await file.arrayBuffer());
-  await prisma.storedFile.create({ data: { name, mime: MIME[extension], size: bytes.length, data: bytes } });
+  await prisma.storedFile.create({ data: { companyId, name, mime: MIME[extension], size: bytes.length, data: bytes } });
   return `/files/${name}`;
 }
 

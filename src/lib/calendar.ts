@@ -162,7 +162,7 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
   const singleIds = monthRows.filter((row) => !row.groupId).map((row) => row.id);
   if (groupIds.length || singleIds.length) {
     const rows = await prisma.attendance.findMany({
-      where: { OR: [{ groupId: { in: groupIds } }, { id: { in: singleIds } }] },
+      where: { employee: { companyId }, OR: [{ groupId: { in: groupIds } }, { id: { in: singleIds } }] },
       include: { employee: { select: { id: true, fullName: true, nameEn: true } } },
     });
     const groups = new Map<string, typeof rows>();

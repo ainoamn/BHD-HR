@@ -22,10 +22,10 @@ function salariesPath(year: number, month: number, employerId?: string) {
   return `/salaries?year=${year}&month=${month}${employerId ? `&employerId=${employerId}` : ""}`;
 }
 
-async function maxReceiptNumber(year: number, month: number) {
+async function maxReceiptNumber(companyId: string, year: number, month: number) {
   const prefix = `PAY-${year}-${String(month).padStart(2, "0")}-`;
   const existing = await prisma.salary.findMany({
-    where: { receiptNo: { startsWith: prefix } },
+    where: { companyId, receiptNo: { startsWith: prefix } },
     select: { receiptNo: true },
   });
   const max = existing.reduce((highest, row) => {
@@ -96,6 +96,7 @@ export async function generatePayroll(formData: FormData) {
     });
     await prisma.salary.create({
       data: {
+        companyId: user.companyId,
         employeeId: employee.id,
         year,
         month,
@@ -153,7 +154,7 @@ export async function payAll(formData: FormData) {
   });
   const payable = salaries.filter((salary) => salary.netSalary >= 0);
   if (!payable.length) go(back, { error: t("لا توجد رواتب غير مصروفة في هذا العرض", "No unpaid salaries in this view") });
-  const { prefix, max } = await maxReceiptNumber(year, month);
+  const { prefix, max } = await maxReceiptNumber(user.companyId, year, month);
   let counter = max;
   const paidIds: string[] = [];
   await prisma.$transaction(async (tx) => {
@@ -288,7 +289,7 @@ export async function paySalary(formData: FormData) {
   const method = req(formData, "paymentMethod");
   if (!PAYMENT_LABEL[method]) go(`/salaries/${id}`, { error: t("اختر طريقة الدفع", "Choose a payment method") });
   const paidAt = parseDateInput(req(formData, "paidAt")) || parseDateInput(todayInputValue());
-  const { prefix, max } = await maxReceiptNumber(salary!.year, salary!.month);
+  const { prefix, max } = await maxReceiptNumber(user.companyId, salary!.year, salary!.month);
   const number = salary!.receiptNo || receiptNo(prefix, max + 1);
   await prisma.salary.update({
     where: { id },

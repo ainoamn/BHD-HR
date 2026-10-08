@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BhdAppSwitcher } from "@/components/bhd/BhdAppSwitcher";
+import { CompanySwitcher } from "@/components/company-switcher";
 import { SiteFooter } from "@/components/bhd/site-footer";
 import { LangToggle } from "@/components/lang-provider";
 import { SideNav } from "@/components/side-nav";
@@ -7,7 +8,7 @@ import { getAlerts } from "@/lib/alerts";
 import { requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { formatLongDate } from "@/lib/utils";
-import { logout } from "@/server/auth-actions";
+import { logout, switchCompany } from "@/server/auth-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { lang, t } = await getI18n();
   const alerts = await getAlerts();
   const urgent = alerts.filter((item) => item.severity !== "info").length;
+  const roleName = user.role === "ADMIN" ? t("مسؤول", "Admin") : user.role === "MANAGER" ? t("مدير", "Manager") : t("مستخدم — عرض فقط", "User — view only");
 
   return (
     <div className="app-shell min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
@@ -35,6 +37,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <p className="truncate text-sm font-semibold text-slate-900 sm:text-base">
               {t("مرحباً،", "Welcome,")} {user.name}
             </p>
+            {user.memberships.length > 1 ? (
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                <CompanySwitcher
+                  action={switchCompany}
+                  activeId={user.companyId}
+                  label={t("المنشأة", "Company")}
+                  companies={user.memberships.map((item) => ({
+                    id: item.companyId,
+                    name: lang === "en" && item.company.nameEn ? item.company.nameEn : item.company.name,
+                  }))}
+                />
+                <span>{roleName}</span>
+              </div>
+            ) : user.role !== "ADMIN" ? (
+              <p className="text-xs text-slate-500">{roleName}</p>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <LangToggle />

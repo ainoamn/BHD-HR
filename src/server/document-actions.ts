@@ -22,7 +22,7 @@ export async function addDocument(formData: FormData) {
   let fileUrl: string | null = null;
   try {
     const file = formData.get("file");
-    fileUrl = await saveUpload(file instanceof File ? file : null, lang);
+    fileUrl = await saveUpload(file instanceof File ? file : null, user.companyId, lang);
   } catch (error) {
     go(returnTo, { error: error instanceof Error ? error.message : t("تعذر رفع الملف", "Could not upload the file") });
   }

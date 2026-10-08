@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/auth";
+import { COMPANY_COOKIE, SESSION_COOKIE, requireUser, sessionCookieOptions, signSession } from "@/lib/auth";
 import { endSessionUrl, isSsoConfigured, safeReturnPath } from "@/lib/bhd/identity";
 import { requestOrigin } from "@/lib/request-origin";
 import { go } from "@/lib/http";
@@ -10,6 +10,7 @@ import { getI18n } from "@/lib/lang";
 import { verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { req, str } from "@/lib/utils";
+import { ensureWorkspace, linkInvitations } from "@/lib/workspace";
 
 export async function login(formData: FormData) {
   const email = req(formData, "email").toLowerCase();
@@ -34,14 +35,28 @@ export async function login(formData: FormData) {
     });
   }
   await prisma.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date() } });
+  await linkInvitations(user!);
+  await ensureWorkspace(user!);
   const jar = await cookies();
+  jar.delete(COMPANY_COOKIE);
   jar.set(SESSION_COOKIE, signSession(user!.id), sessionCookieOptions());
   redirect(next);
+}
+
+/** Switch the active company; only companies the user is a member of are accepted. */
+export async function switchCompany(formData: FormData) {
+  const user = await requireUser();
+  const companyId = req(formData, "companyId");
+  if (!user.memberships.some((item) => item.companyId === companyId)) redirect("/");
+  const jar = await cookies();
+  jar.set(COMPANY_COOKIE, companyId, sessionCookieOptions());
+  redirect("/");
 }
 
 export async function logout() {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
+  jar.delete(COMPANY_COOKIE);
   if (isSsoConfigured()) redirect(endSessionUrl(await requestOrigin()));
   redirect("/login?local=1");
 }

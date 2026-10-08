@@ -10,8 +10,8 @@ import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { clip, money, req, str } from "@/lib/utils";
 
-async function nextEmployeeNumber() {
-  const rows = await prisma.employee.findMany({ select: { employeeNumber: true } });
+async function nextEmployeeNumber(companyId: string) {
+  const rows = await prisma.employee.findMany({ where: { companyId }, select: { employeeNumber: true } });
   const max = rows.reduce((highest, row) => {
     const value = Number(row.employeeNumber.replace(/\D/g, "")) || 0;
     return Math.max(highest, value);
@@ -50,7 +50,7 @@ export async function createEmployee(formData: FormData) {
   const input = readEmployeeInput(formData);
   if (input.fullName.length < 2) go("/employees/new", { error: t("الاسم الكامل مطلوب", "Full name is required") });
   const employerId = await resolveEmployer(formData, user.companyId, "/employees/new");
-  const employeeNumber = await nextEmployeeNumber();
+  const employeeNumber = await nextEmployeeNumber(user.companyId);
   const employee = await prisma.employee.create({
     data: { ...input, employerId, employeeNumber, companyId: user.companyId },
   });

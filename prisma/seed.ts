@@ -28,9 +28,8 @@ async function main() {
       name: "مدير النظام",
       email,
       password: hashPassword("admin123"),
-      role: "ADMIN",
       mustChangePassword: true,
-      companyId: company.id,
+      memberships: { create: { companyId: company.id, email, role: "ADMIN" } },
     },
   });
 

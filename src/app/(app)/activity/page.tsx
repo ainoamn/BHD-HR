@@ -9,7 +9,7 @@ export default async function ActivityPage() {
   const user = await requireUser();
   const { t } = await getI18n();
   const logs = await prisma.auditLog.findMany({
-    where: { OR: [{ userId: user.id }, { employee: { companyId: user.companyId } }, { user: { companyId: user.companyId } }] },
+    where: { companyId: user.companyId },
     include: { user: true, employee: true },
     orderBy: { createdAt: "desc" },
     take: 200,

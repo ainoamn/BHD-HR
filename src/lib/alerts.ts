@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { getSessionUser } from "./auth";
 import { reminderDayIn, payDayFor } from "./calendar";
 import { ATTENDANCE_LABEL, BALANCE_LABEL, DOC_LABEL, monthName } from "./constants";
 import { daysUntil, describeExpiry } from "./expiry";
@@ -27,8 +28,9 @@ const BIRTHDAY_NOTICE_DAYS = 7;
 
 export const getAlerts = cache(async () => {
   const { lang, t } = await getI18n();
-  const company = await prisma.company.findFirst();
-  if (!company) return [] as AlertItem[];
+  const user = await getSessionUser();
+  if (!user) return [] as AlertItem[];
+  const company = user.company;
   const limits = {
     urgent: company.alertUrgentDays,
     warning: company.alertWarningDays,

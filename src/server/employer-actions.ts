@@ -23,12 +23,12 @@ function readEmployer(formData: FormData) {
   };
 }
 
-async function uploadLogo(formData: FormData, current: string | null, errorPath: string) {
+async function uploadLogo(formData: FormData, companyId: string, current: string | null, errorPath: string) {
   const { lang, t } = await getI18n();
   try {
     const file = formData.get("logo");
     if (file instanceof File && file.size > 0) {
-      const saved = await saveUpload(file, lang);
+      const saved = await saveUpload(file, companyId, lang);
       if (saved) return saved;
     }
     if (req(formData, "removeLogo") === "1") return null;
@@ -43,7 +43,7 @@ export async function createEmployer(formData: FormData) {
   const { t } = await getI18n();
   const data = readEmployer(formData);
   if (data.name.length < 2) go("/employers", { error: t("اسم الكفيل مطلوب", "Sponsor name is required") });
-  const logoUrl = await uploadLogo(formData, null, "/employers");
+  const logoUrl = await uploadLogo(formData, user.companyId, null, "/employers");
   const employer = await prisma.employer.create({ data: { ...data, logoUrl, companyId: user.companyId } });
   await writeAudit({ userId: user.id, action: "EMPLOYER_CREATE", message: t(`أضاف الكفيل ${employer.name}`, `Added sponsor ${employer.name}`) });
   refreshAll();
@@ -58,7 +58,7 @@ export async function updateEmployer(formData: FormData) {
   if (!existing) go("/employers", { error: t("الكفيل غير موجود", "Sponsor not found") });
   const data = readEmployer(formData);
   if (data.name.length < 2) go(`/employers/${id}`, { error: t("اسم الكفيل مطلوب", "Sponsor name is required") });
-  const logoUrl = await uploadLogo(formData, existing!.logoUrl, `/employers/${id}`);
+  const logoUrl = await uploadLogo(formData, user.companyId, existing!.logoUrl, `/employers/${id}`);
   await prisma.employer.update({ where: { id }, data: { ...data, logoUrl } });
   if (logoUrl !== existing!.logoUrl) await removeLogoIfUnused(existing!.logoUrl);
   await writeAudit({ userId: user.id, action: "EMPLOYER_UPDATE", message: t(`عدّل بيانات الكفيل ${data.name}`, `Updated sponsor ${data.name}`) });

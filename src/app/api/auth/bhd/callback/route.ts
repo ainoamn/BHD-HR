@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/auth";
-import { writeAudit } from "@/lib/audit";
+import { COMPANY_COOKIE, SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/auth";
 import {
   OAUTH_STATE_COOKIE,
   decodeOAuthState,
@@ -13,6 +12,7 @@ import {
 } from "@/lib/bhd/identity";
 import { prisma } from "@/lib/prisma";
 import { originOf } from "@/lib/request-origin";
+import { ensureWorkspace, linkInvitations } from "@/lib/workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,54 +24,44 @@ function failure(origin: string, code: string) {
   return response;
 }
 
-/** Product-local admin list (docs/BHD-UNIFIED-LOGIN-AND-APPS.md §2: admin rights stay per product). */
-function isBootstrapAdmin(email: string) {
-  return (process.env.BHD_ADMIN_EMAILS ?? "")
-    .split(/[\s,;]+/)
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email);
-}
-
+/**
+ * BHD-PRODUCT-SSO-ADMIN §3.3: bhd_sub → verified email (keep memberships/roles) → new account.
+ * Then attach any invitations for that email, and give an account with no access its own company.
+ */
 async function upsertUser(profile: IdentityProfile) {
+  const email = profile.email.toLowerCase();
   const bySub = await prisma.user.findUnique({ where: { bhdSub: profile.sub } });
+  let user;
   if (bySub) {
-    return prisma.user.update({
+    user = await prisma.user.update({
       where: { id: bySub.id },
       data: { name: profile.name, picture: profile.picture, lastLoginAt: new Date() },
     });
+  } else {
+    const byEmail = await prisma.user.findUnique({ where: { email } });
+    if (byEmail) {
+      if (byEmail.bhdSub) throw new Error("email_linked");
+      user = await prisma.user.update({
+        where: { id: byEmail.id },
+        data: { bhdSub: profile.sub, picture: profile.picture, lastLoginAt: new Date() },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          name: profile.name,
+          email,
+          password: "",
+          mustChangePassword: false,
+          bhdSub: profile.sub,
+          picture: profile.picture,
+          lastLoginAt: new Date(),
+        },
+      });
+    }
   }
-  const byEmail = await prisma.user.findUnique({ where: { email: profile.email } });
-  if (byEmail) {
-    if (byEmail.bhdSub) throw new Error("email_linked");
-    const linked = await prisma.user.update({
-      where: { id: byEmail.id },
-      data: { bhdSub: profile.sub, picture: profile.picture, lastLoginAt: new Date() },
-    });
-    await writeAudit({ userId: linked.id, action: "USER_SSO_LINK", message: `ربط المستخدم ${linked.email} بحساب BHD` });
-    return linked;
-  }
-  const company = await prisma.company.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!company) throw new Error("no_company");
-  const created = await prisma.user.create({
-    data: {
-      name: profile.name,
-      email: profile.email,
-      password: "",
-      role: isBootstrapAdmin(profile.email) ? "ADMIN" : "PENDING",
-      mustChangePassword: false,
-      bhdSub: profile.sub,
-      picture: profile.picture,
-      lastLoginAt: new Date(),
-      companyId: company.id,
-    },
-  });
-  await writeAudit({
-    userId: created.id,
-    action: "USER_SSO_CREATE",
-    message: created.role === "ADMIN" ? `مسؤول جديد من حساب BHD (BHD_ADMIN_EMAILS): ${created.email}` : `مستخدم جديد من حساب BHD بانتظار التفعيل: ${created.email}`,
-  });
-  return created;
+  await linkInvitations(user);
+  await ensureWorkspace(user);
+  return user;
 }
 
 export async function GET(request: Request) {
@@ -104,6 +94,7 @@ export async function GET(request: Request) {
 
   const response = NextResponse.redirect(new URL(oauth.returnTo, origin));
   response.cookies.delete(OAUTH_STATE_COOKIE);
+  response.cookies.delete(COMPANY_COOKIE);
   response.cookies.set(SESSION_COOKIE, signSession(userId), sessionCookieOptions());
   return response;
 }

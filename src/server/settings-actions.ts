@@ -1,7 +1,7 @@
 "use server";
 
 import { writeAudit } from "@/lib/audit";
-import { ROLES, requireWriter } from "@/lib/auth";
+import { isRole, requireAdmin, requireUser } from "@/lib/auth";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -9,8 +9,10 @@ import { prisma } from "@/lib/prisma";
 import { removeLogoIfUnused, saveUpload } from "@/lib/uploads";
 import { clip, intValue, req, str } from "@/lib/utils";
 
-export async function updateSettings(formData: FormData) {
-  const user = await requireWriter();
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function updateCompanySettings(formData: FormData) {
+  const user = await requireAdmin();
   const { lang, t } = await getI18n();
   const name = req(formData, "name");
   if (name.length < 2) go("/settings", { error: t("اسم النظام / المنشأة مطلوب", "System / company name is required") });
@@ -29,27 +31,13 @@ export async function updateSettings(formData: FormData) {
   if (!(alertUrgentDays <= alertWarningDays && alertWarningDays <= alertEarlyDays)) {
     go("/settings", { error: t("اجعل التنبيه العاجل أقل من التحذير، والتحذير أقل من التنبيه المبكر", "Urgent ≤ warning ≤ early") });
   }
-  const newName = req(formData, "userName");
-  const newEmail = user.bhdSub ? user.email : req(formData, "userEmail").toLowerCase() || user.email;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail) || newEmail.length > 120) {
-    go("/settings", { error: t("البريد غير صالح", "Invalid email") });
-  }
-  if (newEmail !== user.email && (await prisma.user.findUnique({ where: { email: newEmail } }))) {
-    go("/settings", { error: t("هذا البريد مستخدم لمستخدم آخر", "This email belongs to another user") });
-  }
-  const newPassword = req(formData, "newPassword");
-  const currentPassword = req(formData, "currentPassword");
-  if (newPassword) {
-    if (!verifyPassword(currentPassword, user.password)) go("/settings", { error: t("كلمة المرور الحالية غير صحيحة", "Current password is wrong") });
-    if (newPassword.length < 6) go("/settings", { error: t("كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف", "New password must be at least 6 characters") });
-  }
 
   const previousLogo = user.company.logoUrl;
   let logoUrl = req(formData, "removeLogo") === "1" ? null : previousLogo;
   try {
     const file = formData.get("logo");
     if (file instanceof File && file.size > 0) {
-      const saved = await saveUpload(file, lang);
+      const saved = await saveUpload(file, user.companyId, lang);
       if (saved) logoUrl = saved;
     }
   } catch (error) {
@@ -76,6 +64,26 @@ export async function updateSettings(formData: FormData) {
     },
   });
   if (logoUrl !== previousLogo) await removeLogoIfUnused(previousLogo);
+  await writeAudit({ userId: user.id, action: "SETTINGS", message: t("حدّث إعدادات المنشأة", "Updated company settings") });
+  refreshAll();
+  go("/settings", { message: t("تم حفظ إعدادات المنشأة", "Company settings saved") });
+}
+
+export async function updateProfile(formData: FormData) {
+  const user = await requireUser();
+  const { t } = await getI18n();
+  const newName = req(formData, "userName");
+  const newEmail = user.bhdSub ? user.email : req(formData, "userEmail").toLowerCase() || user.email;
+  if (!EMAIL.test(newEmail) || newEmail.length > 120) go("/settings", { error: t("البريد غير صالح", "Invalid email") });
+  if (newEmail !== user.email && (await prisma.user.findUnique({ where: { email: newEmail } }))) {
+    go("/settings", { error: t("هذا البريد مستخدم لمستخدم آخر", "This email belongs to another user") });
+  }
+  const newPassword = req(formData, "newPassword");
+  const currentPassword = req(formData, "currentPassword");
+  if (newPassword) {
+    if (!verifyPassword(currentPassword, user.password)) go("/settings", { error: t("كلمة المرور الحالية غير صحيحة", "Current password is wrong") });
+    if (newPassword.length < 6) go("/settings", { error: t("كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف", "New password must be at least 6 characters") });
+  }
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -84,23 +92,62 @@ export async function updateSettings(formData: FormData) {
       ...(newPassword ? { password: hashPassword(newPassword), mustChangePassword: false } : {}),
     },
   });
-  await writeAudit({ userId: user.id, action: "SETTINGS", message: t("حدّث الإعدادات", "Updated settings") });
+  if (newEmail !== user.email) {
+    await prisma.membership.updateMany({ where: { userId: user.id }, data: { email: newEmail } });
+  }
+  await writeAudit({ userId: user.id, action: "PROFILE", message: t("حدّث بياناته الشخصية", "Updated own profile") });
   refreshAll();
-  go("/settings", { message: t("تم حفظ الإعدادات", "Settings saved") });
+  go("/settings", { message: t("تم حفظ بياناتك", "Your details were saved") });
 }
 
-export async function updateUserRole(formData: FormData) {
-  const user = await requireWriter();
+export async function inviteMember(formData: FormData) {
+  const user = await requireAdmin();
   const { t } = await getI18n();
-  if (user.role !== "ADMIN") go("/settings", { error: t("هذه الصلاحية للمسؤول فقط", "Administrators only") });
-  const userId = req(formData, "userId");
+  const email = req(formData, "email").toLowerCase();
   const role = req(formData, "role");
-  if (!(ROLES as readonly string[]).includes(role)) go("/settings", { error: t("صلاحية غير معروفة", "Unknown role") });
-  if (userId === user.id) go("/settings", { error: t("لا يمكنك تغيير صلاحيتك بنفسك", "You cannot change your own role") });
-  const member = await prisma.user.findFirst({ where: { id: userId, companyId: user.companyId } });
-  if (!member) go("/settings", { error: t("المستخدم غير موجود", "User not found") });
-  await prisma.user.update({ where: { id: member!.id }, data: { role } });
-  await writeAudit({ userId: user.id, action: "USER_ROLE", message: `${member!.email}: ${member!.role} → ${role}` });
+  if (!EMAIL.test(email) || email.length > 120) go("/settings", { error: t("البريد غير صالح", "Invalid email") });
+  if (!isRole(role)) go("/settings", { error: t("صلاحية غير معروفة", "Unknown role") });
+  if (await prisma.membership.findUnique({ where: { companyId_email: { companyId: user.companyId, email } } })) {
+    go("/settings", { error: t("هذا البريد عضو في المنشأة مسبقاً", "This email is already a member") });
+  }
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  await prisma.membership.create({ data: { companyId: user.companyId, email, role, userId: existing?.id ?? null } });
+  await writeAudit({ userId: user.id, action: "MEMBER_INVITE", message: t(`أضاف ${email} بصلاحية ${role}`, `Added ${email} as ${role}`) });
   refreshAll();
-  go("/settings", { message: t("تم تحديث صلاحية المستخدم", "User role updated") });
+  go("/settings", {
+    message: existing
+      ? t("تمت الإضافة. يرى المنشأة الآن من قائمة المنشآت في الأعلى.", "Added. They can now open this company from the company menu.")
+      : t("تمت الإضافة. يُربط تلقائياً أول ما يدخل بحساب BHD بهذا البريد.", "Added. They are linked automatically the first time they sign in with this BHD email."),
+  });
+}
+
+async function memberOfCompany(membershipId: string, companyId: string) {
+  const { t } = await getI18n();
+  const member = await prisma.membership.findFirst({ where: { id: membershipId, companyId } });
+  if (!member) go("/settings", { error: t("العضو غير موجود", "Member not found") });
+  return member!;
+}
+
+export async function updateMemberRole(formData: FormData) {
+  const user = await requireAdmin();
+  const { t } = await getI18n();
+  const role = req(formData, "role");
+  if (!isRole(role)) go("/settings", { error: t("صلاحية غير معروفة", "Unknown role") });
+  const member = await memberOfCompany(req(formData, "membershipId"), user.companyId);
+  if (member.id === user.membershipId) go("/settings", { error: t("لا يمكنك تغيير صلاحيتك بنفسك", "You cannot change your own role") });
+  await prisma.membership.update({ where: { id: member.id }, data: { role } });
+  await writeAudit({ userId: user.id, action: "MEMBER_ROLE", message: `${member.email}: ${member.role} → ${role}` });
+  refreshAll();
+  go("/settings", { message: t("تم تحديث الصلاحية", "Role updated") });
+}
+
+export async function removeMember(formData: FormData) {
+  const user = await requireAdmin();
+  const { t } = await getI18n();
+  const member = await memberOfCompany(req(formData, "membershipId"), user.companyId);
+  if (member.id === user.membershipId) go("/settings", { error: t("لا يمكنك إزالة نفسك", "You cannot remove yourself") });
+  await prisma.membership.delete({ where: { id: member.id } });
+  await writeAudit({ userId: user.id, action: "MEMBER_REMOVE", message: t(`أزال ${member.email} من المنشأة`, `Removed ${member.email} from the company`) });
+  refreshAll();
+  go("/settings", { message: t("تمت إزالة العضو", "Member removed") });
 }
