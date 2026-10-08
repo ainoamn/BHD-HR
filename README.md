@@ -9,6 +9,7 @@
 | [`docs/BHD-HR-USER-GUIDE.md`](docs/BHD-HR-USER-GUIDE.md) | المستخدم | شرح كل صفحة وكل عملية خطوة بخطوة |
 | [`docs/BHD-HR-TECHNICAL.md`](docs/BHD-HR-TECHNICAL.md) | المطوّر | البنية، نموذج البيانات، القواعد الحسابية، الأمان، التشغيل، النسخ الاحتياطي |
 | [`docs/BHD-HR-SSO-INSTALL.md`](docs/BHD-HR-SSO-INSTALL.md) | المطوّر / ONE-BHD | قالب 12.8 المعبّأ وحالة الدخول الموحّد |
+| [`docs/BHD-HR-DEPLOYMENT-LOG.md`](docs/BHD-HR-DEPLOYMENT-LOG.md) | المطوّر / الإدارة | سجل النشر على Vercel: المشكلة وإصلاحها، نقل البيانات إلى Neon، الحوادث، والخطوات القادمة |
 | `docs/BHD-*.md` الأخرى | مرجع | مستندات ONE-BHD الرسمية: الهوية، الجلسة، المشغّل، الدخول الموحّد، الهوية البصرية |
 
 ## المزايا
