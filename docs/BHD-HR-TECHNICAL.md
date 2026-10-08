@@ -36,14 +36,14 @@ src/
     api/auth/            start / callback / logout / admin-entry للدخول الموحّد
     files/[name]/        تقديم الملفات المرفوعة بعد التحقق
     login/               غلاف الدخول + دخول الطوارئ المحلي
-    pending/             صفحة «بانتظار التفعيل»
   components/
     bhd/                 BhdAppSwitcher و BhdAppIcon (منسوخان من ONE-BHD) و site-footer
     ...                  النماذج، الشريط الجانبي، المطبوعات، عناصر الواجهة
   lib/
     bhd/apps.ts          كتالوج تطبيقات BHD المجمّد — منسوخ حرفياً، لا يُعدّل هنا
     bhd/identity.ts      إعدادات OIDC، PKCE، تبديل الرمز، التحقق من id_token
-    auth.ts              جلسة المنتج، الأدوار، requireUser / requireWriter
+    auth.ts              جلسة المنتج، المنشأة النشطة، الأدوار، requireUser / requireWriter / requireAdmin
+    workspace.ts         ربط الدعوات بالبريد، وإنشاء منشأة خاصة لكل حساب بلا عضوية
     salary.ts payroll.ts حساب الراتب والخصم
     leave.ts             أرصدة الإجازات وتنبيهاتها
     alerts.ts            توليد التنبيهات
@@ -59,17 +59,18 @@ src/
 
 | الجدول | الغرض | أهم الحقول |
 |---|---|---|
-| `Company` | المنشأة وإعدادات النظام | الاسم، العملة، `salaryDays`، أيام تنبيه المستندات، `payDay`، `leaveWarningDays` |
-| `User` | مستخدمو النظام | `email` (فريد)، `password` (scrypt أو فارغ لحسابات BHD)، `role`، `bhdSub` (فريد)، `picture`، `lastLoginAt` |
+| `Company` | المنشأة (مساحة العمل) وإعداداتها — حدّ العزل لكل البيانات | الاسم، العملة، `salaryDays`، أيام تنبيه المستندات، `payDay`، `leaveWarningDays` |
+| `User` | الحسابات | `email` (فريد)، `password` (scrypt أو فارغ لحسابات BHD)، `bhdSub` (فريد)، `picture`، `lastLoginAt`. لا دور ولا منشأة على الحساب نفسه |
+| `Membership` | من يصل إلى أي منشأة وبأي صلاحية | `companyId`، `userId` (فارغ للدعوة حتى أول دخول)، `email`، `role` (`ADMIN` / `MANAGER` / `VIEWER`)؛ فريد على (`companyId`، `email`) |
 | `Employer` | الكفلاء وأصحاب العمل | `kind` (COMPANY / PERSON)، الاسم، الهاتف، البريد، الشعار |
-| `Employee` | الموظفون | البيانات الشخصية، الوثائق وتواريخ انتهائها، الوظيفة، الحالة، أرصدة الإجازات، مكوّنات الراتب، `employerId` |
+| `Employee` | الموظفون | البيانات الشخصية، الوثائق وتواريخ انتهائها، الوظيفة، الحالة، أرصدة الإجازات، مكوّنات الراتب، `employerId`. `employeeNumber` فريد داخل المنشأة (كل منشأة تبدأ من EMP-0001) |
 | `EmployeeDocument` | المستندات الإضافية | النوع، الرقم، الانتهاء، `fileUrl` |
 | `Attendance` | يوم غياب / إجازة | `date` (يوم واحد لكل صف، فريد مع الموظف)، `type`، `deductsSalary`، `balanceKey`، `groupId` يجمع أيام الفترة الواحدة |
 | `LeaveCredit` | إضافة رصيد يدوية | `balanceKey`، `days`، السبب |
-| `Salary` | راتب شهر لموظف | لقطة كاملة للراتب والأسماء وقت الإنشاء، الخصومات، الصافي، حالة الصرف، `receiptNo` (فريد) |
+| `Salary` | راتب شهر لموظف | لقطة كاملة للراتب والأسماء وقت الإنشاء، الخصومات، الصافي، حالة الصرف، `companyId`، `receiptNo` (فريد داخل المنشأة، وتسلسله لكل منشأة) |
 | `Reminder` | تذكيرات التقويم | العنوان، التاريخ، التكرار (NONE / MONTHLY / YEARLY)، موظف اختياري، `done` |
-| `AuditLog` | سجل العمليات | المستخدم، الموظف، الإجراء، الرسالة |
-| `StoredFile` | الملفات المرفوعة (مستندات وشعارات) | `name` (فريد، يظهر في الرابط `/files/<name>`)، `mime`، `size`، `data` (البايتات) |
+| `AuditLog` | سجل العمليات | `companyId`، المستخدم، الموظف، الإجراء، الرسالة |
+| `StoredFile` | الملفات المرفوعة (مستندات وشعارات) | `companyId`، `name` (فريد، يظهر في الرابط `/files/<name>`)، `mime`، `size`، `data` (البايتات) |
 
 **التواريخ** تُخزّن عند الظهر بتوقيت UTC وتُقرأ بدوال `getUTC*` حتى لا ينزاح اليوم بسبب فرق التوقيت.
 
@@ -141,20 +142,35 @@ sequenceDiagram
 
 **التحقق من `id_token`:** أولاً RS256 من `/oauth/jwks.json`؛ ثم HS256 إن وُجد `BHD_IDENTITY_TOKEN_SECRET`؛ وإلا `/oauth/userinfo` بالـ access token مع فحص `iss` و`aud` و`exp` و`nonce` من الرمز ومطابقة `sub`. يُشترط `email_verified === true`. الهوية حالياً تنشر `{"keys":[]}` فيُستخدم مسار `userinfo`.
 
-**ربط المستخدم:**
+**ربط المستخدم** (`BHD-PRODUCT-SSO-ADMIN.md` §3.3، والدليل الموحّد §0.7 — نمط وازن: «إنشاء مستخدم + شركة، أدمن تلك الشركة فقط»):
 1. بالـ `bhdSub`.
-2. بالبريد الموثّق، مع الاحتفاظ بالدور.
-3. مستخدم جديد بدور `ADMIN` إن كان بريده في `BHD_ADMIN_EMAILS`، وإلا `PENDING`.
+2. بالبريد الموثّق، مع الاحتفاظ بعضوياته وأدواره.
+3. وإلا حساب جديد بلا كلمة مرور.
+4. ثم `linkInvitations`: كل `Membership` بنفس البريد و`userId` فارغ تُربط بالحساب.
+5. ثم `ensureWorkspace`: إن لم تكن للحساب أي عضوية تُنشأ له منشأة جديدة باسمه وهو `ADMIN` فيها. **لا تفعيل يدوي ولا حالة انتظار.**
 
-### الأدوار
+نفس المنطق (الخطوتان 4 و5) يعمل عند الدخول المحلي `?local=1`.
 
-| الدور | `requireUser` | `requireWriter` |
-|---|---|---|
-| `ADMIN` | ✓ | ✓ |
-| `VIEWER` | ✓ | ✗ (رسالة «للعرض فقط») |
-| `PENDING` | تحويل إلى `/pending` | ✗ |
+### العزل بين المنشآت
 
-كل صفحة داخلية وكل صفحة طباعة وكل ملف مرفوع يمر عبر `requireUser`، وكل عملية كتابة عبر `requireWriter`.
+- الحساب لا يصل إلى منشأة إلا عبر صف `Membership`. `getSessionUser` يحمّل عضويات الحساب ويختار المنشأة النشطة من الكوكي `hr_company` **بشرط أن تكون من عضوياته**؛ أي قيمة أخرى تُتجاهل ويُستخدم أول عضوية.
+- كل استعلام يقيّد بـ `companyId` من الجلسة: مباشرة (`Employee`، `Employer`، `Reminder`، `Salary`، `StoredFile`، `AuditLog`) أو عبر الموظف (`Attendance`، `EmployeeDocument`، `LeaveCredit`). الوصول بالمعرّف من منشأة أخرى يعطي «غير موجود».
+- `/files/<name>` يتحقق من `companyId` للملف. التنبيهات والتقويم والتقارير وسجل العمليات كلها للمنشأة النشطة فقط.
+- رقم الموظف ورقم الإيصال تسلسلهما لكل منشأة.
+- مستخدم في أكثر من منشأة يرى قائمة منسدلة في الرأس للتبديل (`switchCompany` يرفض أي منشأة ليست من عضوياته). الكوكي `hr_company` تُكتب فقط عند التبديل وتُمسح عند الدخول والخروج.
+- إزالة عضو تقطع وصوله فوراً. إن لم تبقَ له أي عضوية تُنشأ له منشأته الخاصة في دخوله التالي.
+
+### الأدوار (لكل منشأة على حدة)
+
+| الدور | الاسم في الواجهة | `requireUser` | `requireWriter` | `requireAdmin` |
+|---|---|---|---|---|
+| `ADMIN` | مسؤول | ✓ | ✓ | ✓ — إعدادات المنشأة، الأعضاء والدعوات |
+| `MANAGER` | مدير | ✓ | ✓ — الموظفون، الحضور، الرواتب والصرف، المستندات، الكفلاء، التذكيرات | ✗ |
+| `VIEWER` | مستخدم | ✓ — عرض وطباعة | ✗ (رسالة «للعرض فقط») | ✗ |
+
+كل صفحة داخلية وكل صفحة طباعة وكل ملف مرفوع يمر عبر `requireUser`، وكل عملية كتابة عبر `requireWriter`، وإدارة المنشأة والأعضاء عبر `requireAdmin`. كل مستخدم يعدّل بياناته الشخصية (`updateProfile`) أياً كان دوره. لا يغيّر المسؤول دوره ولا يزيل نفسه، فتبقى لكل منشأة مسؤول واحد على الأقل.
+
+**الدعوة:** المسؤول يضيف بريد حساب BHD ودوراً من الإعدادات ← أعضاء المنشأة. إن كان للبريد حساب يُربط فوراً، وإلا يُربط عند أول دخول بهذا البريد الموثّق.
 
 ---
 
@@ -174,7 +190,6 @@ sequenceDiagram
 | `BHD_OAUTH_CLIENT_ID` | للدخول الموحّد | `bhd-hr`. فارغ = دخول محلي فقط |
 | `BHD_OAUTH_CLIENT_SECRET` | لا | يُرسل إن وُجد؛ الهوية تقبل PKCE وحده لعملاء المنظومة |
 | `BHD_OAUTH_REDIRECT_URI` | لا | افتراضياً `{الأصل}/api/auth/bhd/callback` |
-| `BHD_ADMIN_EMAILS` | لا | بريد (أو أكثر بفواصل) يصبح مسؤولاً عند أول دخول موحّد |
 | `BHD_IDENTITY_TOKEN_SECRET` | لا | للتحقق HS256 إن وفّرته الهوية |
 
 ---
@@ -200,7 +215,7 @@ npm run dev          # http://localhost:3000
 ### النشر على Vercel
 
 - المشروع `bhd-hr` مربوط بمستودع `ainoamn/BHD-HR`. **كل `git push` إلى `main` يبني وينشر على الإنتاج تلقائياً.** سكربت البناء `prisma generate && next build`.
-- متغيرات البيئة مضبوطة في Vercel (Settings → Environment Variables) للبيئات الثلاث: `DATABASE_URL`، `DATABASE_URL_UNPOOLED`، `AUTH_SECRET`، `APP_ORIGIN`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_REDIRECT_URI`، `BHD_ADMIN_EMAILS`. غياب `DATABASE_URL` أو `AUTH_SECRET` يُظهر «Application error: a server-side exception».
+- متغيرات البيئة مضبوطة في Vercel (Settings → Environment Variables) للبيئات الثلاث: `DATABASE_URL`، `DATABASE_URL_UNPOOLED`، `AUTH_SECRET`، `APP_ORIGIN`، `BHD_IDENTITY_ISSUER`، `BHD_OAUTH_CLIENT_ID`، `BHD_OAUTH_REDIRECT_URI`. غياب `DATABASE_URL` أو `AUTH_SECRET` يُظهر «Application error: a server-side exception».
 - لا تنشر من سطر الأوامر (`vercel deploy`) إلا عند الضرورة؛ الملف `.vercelignore` يمنع رفع `.env` وملفات القواعد والنسخ الاحتياطية، لكن النشر عبر Git هو الطريق المعتمد.
 - Vercel يحدّ جسم الطلب بـ 4.5 ميغابايت، لذلك حد رفع الملف 4 ميغابايت (`MAX_UPLOAD_BYTES`) و`serverActions.bodySizeLimit` = `4.5mb`.
 - عند إضافة نطاق جديد (مثل `hr.bhd-om.com`): أضفه في Vercel، وحدّث `APP_ORIGIN` و`BHD_OAUTH_REDIRECT_URI`، وتأكد أن رابطي `callback` والخروج مسجّلان للعميل `bhd-hr` في `app/lib/identity/clients.ts` في ONE-BHD.
@@ -241,6 +256,7 @@ npx tsc --noEmit
 
 | التاريخ | التغيير |
 |---|---|
+| 2026-10-08 | عزل كامل بين المنشآت وتفعيل تلقائي: جدول `Membership` بأدوار مسؤول / مدير / مستخدم، منشأة خاصة لكل حساب BHD جديد، دعوة بالبريد، تبديل المنشأة، `companyId` على `Salary` و`StoredFile` و`AuditLog`، تسلسل رقم الموظف والإيصال لكل منشأة، إزالة `PENDING` و`BHD_ADMIN_EMAILS`. التفاصيل في `BHD-HR-DEPLOYMENT-LOG.md` §6 |
 | 2026-10-08 | الانتقال إلى مشروع Neon مستقل BHD HR (`billowing-hat-97652194`، `us-east-2`): `neon link`، `neon.ts`، مهارات Neon وMCP، نقل كل البيانات مع مطابقة الأعداد والملفات، تحديث متغيرات Vercel، والتحقق من أن الإنتاج يقرأ من القاعدة الجديدة. التفاصيل في `BHD-HR-DEPLOYMENT-LOG.md` §5 |
 | 2026-10-08 | النشر على Vercel: الانتقال من SQLite إلى PostgreSQL (Neon، قاعدة `bhd_hr`)، تخزين الملفات في `StoredFile`، بحث غير حساس لحالة الأحرف، متغيرات البيئة على Vercel، `.vercelignore`، تسجيل `bhd-hr.vercel.app` في ONE-BHD. نُقلت كل البيانات الحقيقية من SQLite |
 | 2026-10-08 | الدخول الموحّد BHD، سياسة الجلسة، المشغّل، الفوتر، الهوية البصرية، إدارة المستخدمين، توثيق شامل. تسجيل العميل `bhd-hr` في ONE-BHD |
