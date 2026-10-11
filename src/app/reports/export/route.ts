@@ -67,6 +67,9 @@ export async function GET(request: Request) {
         ? [
             { item: t("إجمالي الرواتب", "Gross payroll"), value: report.totals.gross },
             { item: t("الخصومات", "Deductions"), value: report.totals.deductions },
+            { item: t("مكافآت وإضافات (ضمن الإجمالي)", "Bonuses & additions (in gross)"), value: report.totals.extraEarnings },
+            { item: t("أقساط سلف وخصومات (ضمن الخصومات)", "Advance instalments & deductions (in deductions)"), value: report.totals.extraDeductions },
+            { item: t("متبقي السلف", "Advances outstanding"), value: report.advancesOutstanding },
             { item: t("صافي الرواتب", "Net payroll"), value: report.totals.net },
             { item: t("مسيرات مصروفة", "Paid records"), value: report.totals.paid },
             { item: t("مسيرات غير مصروفة", "Unpaid records"), value: report.totals.unpaid },
@@ -94,10 +97,12 @@ export async function GET(request: Request) {
         { header: t("صاحب العمل", "Employer"), key: "employer", width: 24 },
         { header: t("الأساسي", "Basic"), key: "basic", width: 13, money: true },
         { header: t("البدلات", "Allowances"), key: "allowances", width: 13, money: true },
-        { header: t("الإجمالي", "Gross"), key: "gross", width: 13, money: true },
+        { header: t("مكافآت وإضافات", "Bonuses & additions"), key: "extraEarnings", width: 14, money: true },
+        { header: t("إجمالي الاستحقاقات", "Total earnings"), key: "gross", width: 14, money: true },
         { header: t("أيام الغياب", "Absence days"), key: "absenceDays", width: 11 },
         { header: t("خصم الغياب", "Absence deduction"), key: "absenceDeduction", width: 13, money: true },
         { header: t("خصومات أخرى", "Other deductions"), key: "otherDeduction", width: 13, money: true },
+        { header: t("أقساط سلف وخصومات", "Advance instalments & deductions"), key: "extraDeductions", width: 16, money: true },
         { header: t("الصافي", "Net"), key: "net", width: 14, money: true },
         { header: t("الحالة", "Status"), key: "status", width: 12 },
         { header: t("تاريخ الصرف", "Pay date"), key: "paidAt", width: 12 },
@@ -111,8 +116,37 @@ export async function GET(request: Request) {
       })),
       rtl,
     );
-    const total = sheet.addRow({ name: t("المجموع", "Total"), gross: report.totals.gross, net: report.totals.net });
+    const total = sheet.addRow({
+      name: t("المجموع", "Total"),
+      extraEarnings: report.totals.extraEarnings,
+      gross: report.totals.gross,
+      extraDeductions: report.totals.extraDeductions,
+      net: report.totals.net,
+    });
     total.font = { bold: true };
+
+    if (report.advances.length) {
+      const advances = addSheet(
+        book,
+        t("السلف", "Advances"),
+        heading(t("السلف القائمة", "Open advances")),
+        [
+          { header: t("الرقم", "No."), key: "employeeNumber", width: 12 },
+          { header: t("الموظف", "Employee"), key: "name", width: 28 },
+          { header: t("السلفة", "Advance"), key: "title", width: 24 },
+          { header: t("تاريخ التسليم", "Handed over"), key: "issuedAt", width: 13 },
+          { header: t("المبلغ", "Amount"), key: "amount", width: 13, money: true },
+          { header: t("الأقساط", "Instalments"), key: "instalments", width: 10 },
+          { header: t("المسدّد", "Repaid"), key: "repaid", width: 13, money: true },
+          { header: t("المتبقي", "Outstanding"), key: "remaining", width: 13, money: true },
+          { header: t("قسط هذا الشهر", "This month"), key: "thisMonth", width: 13, money: true },
+        ],
+        report.advances.map((row) => ({ ...row, issuedAt: formatDate(row.issuedAt) })),
+        rtl,
+      );
+      const sum = advances.addRow({ name: t("المجموع", "Total"), remaining: report.advancesOutstanding });
+      sum.font = { bold: true };
+    }
   }
 
   if (report.show.attendance) {

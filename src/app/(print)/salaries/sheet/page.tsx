@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/auth";
 import { monthBoth } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
-import { packageGross } from "@/lib/salary";
+import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { currentPeriod, formatLongDate, money, round3 } from "@/lib/utils";
 
 function readMonth(value: string | undefined) {
@@ -48,7 +48,7 @@ export default async function PayrollSheetPage({
         return { year: Math.floor(key / 12), month: (key % 12) + 1 };
       }),
     },
-    include: { employer: true },
+    include: { employer: true, lines: { orderBy: { title: "asc" } } },
     orderBy: [{ year: "asc" }, { month: "asc" }, { employerName: "asc" }, { employeeName: "asc" }],
   });
 
@@ -136,8 +136,8 @@ export default async function PayrollSheetPage({
                       </span>
                     </td>
                     {showEmployer ? <td className={cell}>{row.employerName || "—"}</td> : null}
-                    <td className={`${cell} whitespace-nowrap`}>{money(packageGross(row), currency)}</td>
-                    <td className={`${cell} whitespace-nowrap`}>{money(row.absenceDeduction + row.otherDeduction, currency)}</td>
+                    <td className={`${cell} whitespace-nowrap`}>{money(totalEarnings(row), currency)}</td>
+                    <td className={`${cell} whitespace-nowrap`}>{money(totalDeductions(row), currency)}</td>
                     <td className={`${cell} whitespace-nowrap font-semibold`}>{money(row.netSalary, currency)}</td>
                     <td className={cell}>{row.paid ? `مصروف / Paid${row.receiptNo ? ` — ${row.receiptNo}` : ""}` : "غير مصروف / Unpaid"}</td>
                     <td className={cell} />
@@ -147,8 +147,8 @@ export default async function PayrollSheetPage({
                   <td className={cell} colSpan={showEmployer ? 3 : 2}>
                     المجموع / Total ({list.length})
                   </td>
-                  <td className={`${cell} whitespace-nowrap`}>{money(sum(list, packageGross), currency)}</td>
-                  <td className={`${cell} whitespace-nowrap`}>{money(sum(list, (row) => row.absenceDeduction + row.otherDeduction), currency)}</td>
+                  <td className={`${cell} whitespace-nowrap`}>{money(sum(list, totalEarnings), currency)}</td>
+                  <td className={`${cell} whitespace-nowrap`}>{money(sum(list, totalDeductions), currency)}</td>
                   <td className={`${cell} whitespace-nowrap`}>{money(sum(list, (row) => row.netSalary), currency)}</td>
                   <td className={cell} colSpan={2} />
                 </tr>

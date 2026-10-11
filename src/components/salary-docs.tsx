@@ -1,7 +1,7 @@
 import type { Company, Employer } from "@prisma/client";
-import { PAYMENT_LABEL, bothTerm, monthName } from "@/lib/constants";
-import { packageGross } from "@/lib/salary";
-import { daysLabel, formatDate, money, round3 } from "@/lib/utils";
+import { PAYMENT_LABEL, PAY_KIND_LABEL, bothTerm, monthName } from "@/lib/constants";
+import { totalDeductions, totalEarnings } from "@/lib/salary";
+import { daysLabel, formatDate, money } from "@/lib/utils";
 
 export type DocHeader = {
   name: string;
@@ -32,6 +32,9 @@ export type DocSalary = {
   absenceDays: number;
   absenceDeduction: number;
   otherDeduction: number;
+  extraEarnings?: number;
+  extraDeductions?: number;
+  lines?: { id: string; kind: string; title: string; amount: number; deduct: boolean }[];
   netSalary: number;
   paymentMethod?: string | null;
   paymentReference?: string | null;
@@ -183,8 +186,9 @@ export const sheetClass =
   "sheet mx-auto w-full max-w-[190mm] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none";
 
 export function Payslip({ header, salary, currency }: { header: DocHeader; salary: DocSalary; currency: string }) {
-  const gross = packageGross(salary);
-  const deductions = round3(salary.absenceDeduction + salary.otherDeduction);
+  const gross = totalEarnings(salary);
+  const deductions = totalDeductions(salary);
+  const lines = salary.lines || [];
   return (
     <article className={sheetClass}>
       <HeaderBar header={header} titleAr="قسيمة الراتب" titleEn="Payslip" />
@@ -203,6 +207,11 @@ export function Payslip({ header, salary, currency }: { header: DocHeader; salar
             <AmountRow ar="بدل السكن" en="Housing allowance" value={salary.housingAllowance} currency={currency} />
             <AmountRow ar="بدل النقل" en="Transport allowance" value={salary.transportAllowance} currency={currency} />
             <AmountRow ar="بدلات أخرى" en="Other allowances" value={salary.otherAllowance} currency={currency} />
+            {lines
+              .filter((line) => !line.deduct)
+              .map((line) => (
+                <AmountRow key={line.id} ar={line.title} en={PAY_KIND_LABEL[line.kind]?.en || line.kind} value={line.amount} currency={currency} />
+              ))}
             <AmountRow ar="إجمالي الاستحقاقات" en="Total earnings" value={gross} currency={currency} strong />
           </tbody>
         </table>
@@ -222,6 +231,17 @@ export function Payslip({ header, salary, currency }: { header: DocHeader; salar
               currency={currency}
             />
             <AmountRow ar="خصومات أخرى" en="Other deductions" value={salary.otherDeduction} currency={currency} />
+            {lines
+              .filter((line) => line.deduct)
+              .map((line) => (
+                <AmountRow
+                  key={line.id}
+                  ar={line.kind === "ADVANCE" ? `قسط: ${line.title}` : line.title}
+                  en={line.kind === "ADVANCE" ? "Advance instalment" : PAY_KIND_LABEL[line.kind]?.en || line.kind}
+                  value={line.amount}
+                  currency={currency}
+                />
+              ))}
             <AmountRow ar="إجمالي الاستقطاعات" en="Total deductions" value={deductions} currency={currency} strong />
           </tbody>
         </table>

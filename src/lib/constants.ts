@@ -92,6 +92,37 @@ export const PAYMENT_LABEL: Record<string, Bi> = {
   CHEQUE: { ar: "شيك", en: "Cheque" },
 };
 
+export const PAY_KINDS = ["ADVANCE", "BONUS", "ALLOWANCE", "ENTITLEMENT", "DEDUCTION"] as const;
+export type PayKind = (typeof PAY_KINDS)[number];
+
+export const PAY_KIND_LABEL: Record<string, Bi> = {
+  ADVANCE: { ar: "سلفة / مقدم راتب", en: "Salary advance" },
+  BONUS: { ar: "مكافأة", en: "Bonus" },
+  ALLOWANCE: { ar: "بدل إضافي", en: "Extra allowance" },
+  ENTITLEMENT: { ar: "استحقاق", en: "Entitlement" },
+  DEDUCTION: { ar: "خصم", en: "Deduction" },
+};
+
+export const PAY_KIND_HINT: Record<string, Bi> = {
+  ADVANCE: { ar: "يُسلَّم للموظف الآن ويُسترد من رواتبه على أقساط", en: "Paid to the employee now and recovered from salaries in instalments" },
+  BONUS: { ar: "مكافأة أداء، عيدية، حافز…", en: "Performance bonus, festival gift, incentive…" },
+  ALLOWANCE: { ar: "بدل هاتف، بدل سفر، بدل مؤقت…", en: "Phone, travel or temporary allowance…" },
+  ENTITLEMENT: { ar: "عمل إضافي، فروقات راتب، مستحقات سابقة…", en: "Overtime, salary arrears, back pay…" },
+  DEDUCTION: { ar: "جزاء، تلفيات، قرض، خصم مستقبلي…", en: "Penalty, damages, loan, future deduction…" },
+};
+
+export const PAY_KIND_TONE: Record<string, "amber" | "green" | "teal" | "sky" | "red"> = {
+  ADVANCE: "amber",
+  BONUS: "green",
+  ALLOWANCE: "teal",
+  ENTITLEMENT: "sky",
+  DEDUCTION: "red",
+};
+
+export function payKindDeducts(kind: string) {
+  return kind === "ADVANCE" || kind === "DEDUCTION";
+}
+
 const NATIONALITIES_AR = ["عماني", "هندي", "بنغلاديشي", "باكستاني", "فلبيني", "مصري", "سوداني", "نيبالي", "سريلانكي", "إندونيسي"];
 const NATIONALITIES_EN = ["Omani", "Indian", "Bangladeshi", "Pakistani", "Filipino", "Egyptian", "Sudanese", "Nepali", "Sri Lankan", "Indonesian"];
 const JOBS_AR = ["عامل", "سائق", "مشرف", "حارس", "فني", "محاسب", "مندوب", "موظف إداري"];

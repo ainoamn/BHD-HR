@@ -20,7 +20,7 @@ export default async function SalaryPrintPage({
   const { t } = await getI18n();
   const salary = await prisma.salary.findFirst({
     where: { id, employee: { companyId: user.companyId } },
-    include: { employer: true },
+    include: { employer: true, lines: { orderBy: { title: "asc" } } },
   });
   if (!salary) notFound();
 

@@ -6,6 +6,7 @@ import { requirePermission, type SessionUser } from "@/lib/auth";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
+import { syncSalaryLines } from "@/lib/pay-items";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
 import { buildSalaryAmounts } from "@/lib/salary";
@@ -74,7 +75,7 @@ async function createSalaryRecord(user: SessionUser, employee: Employee & { empl
     otherDeduction: 0,
     salaryDays: user.company.salaryDays,
   });
-  return prisma.salary.create({
+  const salary = await prisma.salary.create({
     data: {
       companyId: user.companyId,
       employeeId: employee.id,
@@ -91,6 +92,8 @@ async function createSalaryRecord(user: SessionUser, employee: Employee & { empl
       netSalary: amounts.netSalary,
     },
   });
+  await syncSalaryLines(prisma, salary.id, user.company.salaryDays);
+  return salary;
 }
 
 /** One employee, one month: used when an employee joins mid-run or a record was deleted. */
@@ -247,7 +250,14 @@ export async function updateSalaryAdjustments(formData: FormData) {
     otherAllowance: amount("otherAllowance"),
   };
   const otherDeduction = round3(Math.max(0, num(formData, "otherDeduction")));
-  const amounts = buildSalaryAmounts({ ...components, absenceDays: salary.absenceDays, otherDeduction, salaryDays: user.company.salaryDays });
+  const amounts = buildSalaryAmounts({
+    ...components,
+    absenceDays: salary.absenceDays,
+    otherDeduction,
+    extraEarnings: salary.extraEarnings,
+    extraDeductions: salary.extraDeductions,
+    salaryDays: user.company.salaryDays,
+  });
   await prisma.salary.update({
     where: { id },
     data: { ...components, otherDeduction, absenceDeduction: amounts.absenceDeduction, netSalary: amounts.netSalary, notes: clip(str(formData, "notes"), 500) },
@@ -296,30 +306,19 @@ export async function recalculateSalary(formData: FormData) {
   const id = req(formData, "id");
   const salary = await unpaidSalary(id, user.companyId);
   const absenceDays = await countAbsenceDays(salary.employeeId, salary.year, salary.month);
-  const amounts = buildSalaryAmounts({
-    basicSalary: salary.basicSalary,
-    housingAllowance: salary.housingAllowance,
-    transportAllowance: salary.transportAllowance,
-    otherAllowance: salary.otherAllowance,
-    absenceDays,
-    otherDeduction: salary.otherDeduction,
-    salaryDays: user.company.salaryDays,
-  });
-  await prisma.salary.update({
-    where: { id },
-    data: { absenceDays, absenceDeduction: amounts.absenceDeduction, netSalary: amounts.netSalary },
-  });
+  await prisma.salary.update({ where: { id }, data: { absenceDays } });
+  const updated = await syncSalaryLines(prisma, id, user.company.salaryDays);
   await writeAudit({
     userId: user.id,
     employeeId: salary.employeeId,
     action: "SALARY_RECALC",
     message: t(
-      `أعاد احتساب غياب ${salary.employeeName} لشهر ${monthName(salary.month, "ar")} ${salary.year}: ${absenceDays} يوم`,
-      `Recalculated absence for ${salary.employeeName}, ${monthName(salary.month, "en")} ${salary.year}: ${absenceDays} day(s)`,
+      `أعاد احتساب راتب ${salary.employeeName} لشهر ${monthName(salary.month, "ar")} ${salary.year}: غياب ${absenceDays} يوم، الصافي ${money(updated?.netSalary ?? 0, user.company.currency)}`,
+      `Recalculated ${salary.employeeName}, ${monthName(salary.month, "en")} ${salary.year}: ${absenceDays} absence day(s), net ${money(updated?.netSalary ?? 0, user.company.currency)}`,
     ),
   });
   refreshAll();
-  go(`/salaries/${id}`, { message: t("تم إعادة احتساب خصم الغياب", "Absence deduction recalculated") });
+  go(`/salaries/${id}`, { message: t("تم إعادة احتساب الغياب والسلف والمكافآت", "Absence and pay items recalculated") });
 }
 
 export async function deleteUnpaidSalary(formData: FormData) {

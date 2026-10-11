@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/auth";
 import { bothTerm, monthBoth } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
-import { packageGross } from "@/lib/salary";
+import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { formatDate, money, parseDateInput, round3, text } from "@/lib/utils";
 
 function monthIntersects(year: number, month: number, from: Date, to: Date) {
@@ -34,7 +34,7 @@ export default async function SalaryStatementPage({
     where: { id, companyId: user.companyId },
     include: {
       employer: true,
-      salaries: { orderBy: [{ year: "asc" }, { month: "asc" }], include: { employer: true } },
+      salaries: { orderBy: [{ year: "asc" }, { month: "asc" }], include: { employer: true, lines: { orderBy: { title: "asc" } } } },
     },
   });
   if (!employee) notFound();
@@ -58,8 +58,8 @@ export default async function SalaryStatementPage({
   const paidCount = salaries.filter((salary) => salary.paid).length;
   const currency = user.company.currency;
   const totalNet = round3(salaries.reduce((sum, salary) => sum + salary.netSalary, 0));
-  const totalDeduction = round3(salaries.reduce((sum, salary) => sum + salary.absenceDeduction + salary.otherDeduction, 0));
-  const totalGross = round3(salaries.reduce((sum, salary) => sum + packageGross(salary), 0));
+  const totalDeduction = round3(salaries.reduce((sum, salary) => sum + totalDeductions(salary), 0));
+  const totalGross = round3(salaries.reduce((sum, salary) => sum + totalEarnings(salary), 0));
   const header = headerFor({ employerName: employee.employer?.name, employerNameEn: employee.employer?.nameEn, employer: employee.employer }, user.company);
 
   const info: [string, string, string][] = [
@@ -111,8 +111,8 @@ export default async function SalaryStatementPage({
               {salaries.map((salary) => (
                 <tr key={salary.id}>
                   <td className={cell}>{monthBoth(salary.month)} {salary.year}</td>
-                  <td className={cell}>{money(packageGross(salary), currency)}</td>
-                  <td className={cell}>{money(salary.absenceDeduction + salary.otherDeduction, currency)}</td>
+                  <td className={cell}>{money(totalEarnings(salary), currency)}</td>
+                  <td className={cell}>{money(totalDeductions(salary), currency)}</td>
                   <td className={cell}>{money(salary.netSalary, currency)}</td>
                   <td className={cell}>{salary.paid ? "مصروف / Paid" : "غير مصروف / Unpaid"}</td>
                 </tr>

@@ -29,6 +29,7 @@ model Company {
   memberships      Membership[]
   reminders        Reminder[]
   salaries         Salary[]
+  payItems         PayItem[]
   files            StoredFile[]
   auditLogs        AuditLog[]
   createdAt        DateTime   @default(now())
@@ -128,6 +129,7 @@ model Employee {
   attendance         Attendance[]
   leaveCredits       LeaveCredit[]
   salaries           Salary[]
+  payItems           PayItem[]
   auditLogs          AuditLog[]
   reminders          Reminder[]
   createdAt          DateTime           @default(now())
@@ -213,6 +215,9 @@ model Salary {
   absenceDays        Float     @default(0)
   absenceDeduction   Float     @default(0)
   otherDeduction     Float     @default(0)
+  /// Sums of the pay-item lines below (bonuses, allowances, entitlements / advances, deductions).
+  extraEarnings      Float     @default(0)
+  extraDeductions    Float     @default(0)
   netSalary          Float     @default(0)
   notes              String?
   paid               Boolean   @default(false)
@@ -221,11 +226,56 @@ model Salary {
   paymentReference   String?
   paidByName         String?
   receiptNo          String?
+  lines              SalaryLine[]
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
   @@unique([employeeId, year, month])
   @@unique([companyId, receiptNo])
+}
+
+/// Advances, bonuses, allowances, entitlements and deductions that feed monthly salaries (src/lib/pay-items.ts).
+model PayItem {
+  id            String       @id @default(cuid())
+  companyId     String
+  company       Company      @relation(fields: [companyId], references: [id])
+  employeeId    String
+  employee      Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind          String
+  title         String
+  /// ADVANCE: the whole advance. Other kinds: the amount for each month.
+  amount        Float
+  issuedAt      DateTime
+  startYear     Int
+  startMonth    Int
+  /// ADVANCE: number of instalments. Other kinds: number of months; empty = every month until stopped.
+  months        Int?
+  paymentMethod String?
+  notes         String?
+  stoppedAt     DateTime?
+  createdByName String?
+  lines         SalaryLine[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+}
+
+/// A pay item applied to one monthly salary. Lines of a paid salary never change.
+model SalaryLine {
+  id        String   @id @default(cuid())
+  salaryId  String
+  salary    Salary   @relation(fields: [salaryId], references: [id], onDelete: Cascade)
+  payItemId String?
+  payItem   PayItem? @relation(fields: [payItemId], references: [id], onDelete: SetNull)
+  kind      String
+  title     String
+  amount    Float
+  deduct    Boolean
+
+  @@index([salaryId])
+  @@index([payItemId])
 }
 
 /// Uploaded documents and logos. Kept in the database because serverless hosting has no persistent disk.

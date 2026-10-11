@@ -27,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           ? t("صلاحيات مخصصة", "Custom permissions")
           : t("مستخدم — عرض فقط", "User — view only");
   const allowed = MODULES.filter((module) => can(user, `${module}.view`)).map((module) => MODULE_HREF[module]);
+  if (can(user, "salaries.view")) allowed.push("/pay-items");
 
   return (
     <div className="app-shell min-h-screen lg:grid lg:grid-cols-[260px_1fr]">

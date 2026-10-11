@@ -5,7 +5,8 @@ import { describeExpiry } from "./expiry";
 import { pick, type Lang } from "./i18n";
 import { salaryDayWeight } from "./leave";
 import { prisma } from "./prisma";
-import { packageGross } from "./salary";
+import { monthKey, payItemProgress } from "./pay-items";
+import { packageGross, totalDeductions, totalEarnings } from "./salary";
 import { monthRange, round3 } from "./utils";
 
 /**
@@ -21,12 +22,22 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
   };
   const { start, end } = monthRange(year, month);
   const limits = { urgent: user.company.alertUrgentDays, warning: user.company.alertWarningDays, early: user.company.alertEarlyDays };
-  const [employees, salaries, attendance] = await Promise.all([
+  const [employees, salaries, attendance, payItems] = await Promise.all([
     prisma.employee.findMany({ where: { companyId: user.companyId }, include: { documents: true, employer: true }, orderBy: { fullName: "asc" } }),
     show.salaries
       ? prisma.salary.findMany({ where: { year, month, companyId: user.companyId }, orderBy: [{ employerName: "asc" }, { employeeName: "asc" }] })
       : Promise.resolve([]),
     show.attendance ? prisma.attendance.findMany({ where: { date: { gte: start, lt: end }, employee: { companyId: user.companyId } } }) : Promise.resolve([]),
+    show.salaries
+      ? prisma.payItem.findMany({
+          where: { companyId: user.companyId, kind: "ADVANCE" },
+          include: {
+            employee: { select: { fullName: true, nameEn: true, employeeNumber: true } },
+            lines: { select: { amount: true, salary: { select: { year: true, month: true, paid: true } } } },
+          },
+          orderBy: { issuedAt: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
   const nameOf = (row: { fullName: string; nameEn: string | null }) => (lang === "en" && row.nameEn ? row.nameEn : row.fullName);
 
@@ -43,10 +54,13 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
     employer: (lang === "en" && salary.employerNameEn ? salary.employerNameEn : salary.employerName) || "",
     basic: salary.basicSalary,
     allowances: round3(salary.housingAllowance + salary.transportAllowance + salary.otherAllowance),
-    gross: packageGross(salary),
+    extraEarnings: salary.extraEarnings,
+    gross: totalEarnings(salary),
     absenceDays: salary.absenceDays,
     absenceDeduction: salary.absenceDeduction,
     otherDeduction: salary.otherDeduction,
+    extraDeductions: salary.extraDeductions,
+    deductions: totalDeductions(salary),
     net: salary.netSalary,
     paid: salary.paid,
     paidAt: salary.paidAt,
@@ -55,7 +69,9 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
   }));
   const totals = {
     gross: round3(payroll.reduce((sum, row) => sum + row.gross, 0)),
-    deductions: round3(payroll.reduce((sum, row) => sum + row.absenceDeduction + row.otherDeduction, 0)),
+    extraEarnings: round3(payroll.reduce((sum, row) => sum + row.extraEarnings, 0)),
+    extraDeductions: round3(payroll.reduce((sum, row) => sum + row.extraDeductions, 0)),
+    deductions: round3(payroll.reduce((sum, row) => sum + row.deductions, 0)),
     net: round3(payroll.reduce((sum, row) => sum + row.net, 0)),
     paid: payroll.filter((row) => row.paid).length,
     unpaid: payroll.filter((row) => !row.paid).length,
@@ -86,6 +102,29 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
         .sort((a, b) => a.status.days - b.status.days)
     : [];
 
+  const reportKey = monthKey(year, month);
+  const advances = show.salaries
+    ? payItems
+        .filter((item) => item.kind === "ADVANCE")
+        .map((item) => {
+          const progress = payItemProgress(item, reportKey);
+          return {
+            id: item.id,
+            employeeNumber: item.employee.employeeNumber,
+            name: nameOf(item.employee),
+            title: item.title,
+            issuedAt: item.issuedAt,
+            amount: item.amount,
+            instalments: item.months || 1,
+            repaid: progress.paidAmount,
+            remaining: progress.remaining || 0,
+            thisMonth: progress.thisMonth,
+            status: progress.status,
+          };
+        })
+        .filter((row) => row.status === "ACTIVE" || row.status === "SCHEDULED")
+    : [];
+
   const staff = show.employees
     ? employees.map((employee) => ({
         id: employee.id,
@@ -112,6 +151,8 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
     payroll,
     totals,
     absence,
+    advances,
+    advancesOutstanding: round3(advances.reduce((sum, row) => sum + row.remaining, 0)),
     documents,
     documentCounts: {
       expired: documents.filter((row) => row.status.key === "expired" || row.status.key === "today").length,

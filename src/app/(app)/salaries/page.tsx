@@ -9,7 +9,7 @@ import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
-import { packageGross } from "@/lib/salary";
+import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { daysLabel, money, readPeriod, round3, todayInputValue } from "@/lib/utils";
 import { createSalary, deleteUnpaidSalary, generatePayroll, payAll } from "@/server/salary-actions";
 
@@ -61,8 +61,8 @@ export default async function SalariesPage({
     }),
   );
   const totalNet = salaries.reduce((sum, row) => sum + row.netSalary, 0);
-  const totalGross = salaries.reduce((sum, row) => sum + packageGross(row), 0);
-  const totalDeduction = salaries.reduce((sum, row) => sum + row.absenceDeduction + row.otherDeduction, 0);
+  const totalGross = salaries.reduce((sum, row) => sum + totalEarnings(row), 0);
+  const totalDeduction = salaries.reduce((sum, row) => sum + totalDeductions(row), 0);
   const unpaid = salaries.filter((row) => !row.paid);
   const unpaidTotal = round3(unpaid.reduce((sum, row) => sum + row.netSalary, 0));
   const selected = employers.find((item) => item.id === employerId);
@@ -214,7 +214,7 @@ export default async function SalariesPage({
               <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
               <th className="px-4 py-3 text-start">{t("صاحب العمل", "Employer")}</th>
               <th className="px-4 py-3 text-start">{t("الأساسي", "Basic")}</th>
-              <th className="px-4 py-3 text-start">{t("البدلات", "Allowances")}</th>
+              <th className="px-4 py-3 text-start">{t("البدلات والإضافات", "Allowances & additions")}</th>
               <th className="px-4 py-3 text-start">{t("الخصومات", "Deductions")}</th>
               <th className="px-4 py-3 text-start">{t("الصافي", "Net")}</th>
               <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
@@ -223,8 +223,8 @@ export default async function SalariesPage({
           </thead>
           <tbody>
             {salaries.map((salary) => {
-              const allowances = round3(salary.housingAllowance + salary.transportAllowance + salary.otherAllowance);
-              const deductions = round3(salary.absenceDeduction + salary.otherDeduction);
+              const allowances = round3(salary.housingAllowance + salary.transportAllowance + salary.otherAllowance + salary.extraEarnings);
+              const deductions = totalDeductions(salary);
               const live = liveDays.get(salary.employeeId) ?? 0;
               const stale = !salary.paid && round3(live) !== round3(salary.absenceDays);
               const name = lang === "en" && salary.employeeNameEn ? salary.employeeNameEn : salary.employeeName;

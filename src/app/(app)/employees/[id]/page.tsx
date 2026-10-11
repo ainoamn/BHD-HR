@@ -23,13 +23,17 @@ import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
-import { packageGross } from "@/lib/salary";
-import { cn, daysLabel, formatDate, money, text } from "@/lib/utils";
+import { monthKey, payItemProgress } from "@/lib/pay-items";
+import { packageGross, totalDeductions, totalEarnings } from "@/lib/salary";
+import { cn, currentPeriod, daysLabel, formatDate, money, round3, text, todayInputValue } from "@/lib/utils";
 import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
 import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
 import { deleteEmployee } from "@/server/employee-actions";
 import { addLeaveCredit } from "@/server/leave-actions";
+import { savePayItem } from "@/server/pay-item-actions";
 import { createSalary } from "@/server/salary-actions";
+import { PayItemForm } from "@/components/pay-item-form";
+import { PayItemsList } from "@/components/pay-items-list";
 
 function Info({ label, value, wide, dir }: { label: string; value: React.ReactNode; wide?: boolean; dir?: "ltr" }) {
   return (
@@ -99,7 +103,23 @@ export default async function EmployeePage({
       other: balances.other.remaining,
     },
   };
-  const tabAllowed: Record<string, boolean> = { info: true, docs: allow.docs, attendance: allow.attendance, salaries: allow.salaries };
+  const tabAllowed: Record<string, boolean> = { info: true, docs: allow.docs, attendance: allow.attendance, salaries: allow.salaries, pay: allow.salaries };
+  const now = currentPeriod();
+  const nowKey = monthKey(now.year, now.month);
+  const defaultStart = `${now.year}-${String(now.month).padStart(2, "0")}`;
+  const payItems = allow.salaries
+    ? await prisma.payItem.findMany({
+        where: { employeeId: employee.id, companyId: user.companyId },
+        include: {
+          employee: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true } },
+          lines: { select: { amount: true, salary: { select: { year: true, month: true, paid: true } } } },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+  const payProgress = payItems.map((item) => payItemProgress(item, nowKey));
+  const outstanding = round3(payProgress.reduce((sum, progress) => sum + (progress.status === "STOPPED" ? 0 : progress.remaining || 0), 0));
+  const openPayItems = payProgress.filter((progress) => progress.status === "ACTIVE" || progress.status === "SCHEDULED").length;
   const tab = tabAllowed[sp.tab || ""] ? sp.tab! : "info";
   const limits = {
     urgent: user.company.alertUrgentDays,
@@ -124,6 +144,7 @@ export default async function EmployeePage({
     { id: "docs", label: t("الوثائق", "Documents"), count: primaryDocs.filter((doc) => doc.number || doc.expiry).length + employee.documents.length },
     { id: "attendance", label: t("الحضور والإجازات", "Attendance & leave"), count: periods.length },
     { id: "salaries", label: t("الرواتب", "Salaries"), count: employee.salaries.length },
+    { id: "pay", label: t("السلف والمكافآت", "Advances & bonuses"), count: openPayItems },
   ].filter((item) => tabAllowed[item.id]);
   const employer = employee.employer;
   const employerName = employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : null;
@@ -645,8 +666,8 @@ export default async function EmployeePage({
                             <td className="py-3 font-medium">
                               {monthName(salary.month, lang)} {salary.year}
                             </td>
-                            <td className="whitespace-nowrap">{money(packageGross(salary), currency)}</td>
-                            <td className="whitespace-nowrap">{money(salary.absenceDeduction + salary.otherDeduction, currency)}</td>
+                            <td className="whitespace-nowrap">{money(totalEarnings(salary), currency)}</td>
+                            <td className="whitespace-nowrap">{money(totalDeductions(salary), currency)}</td>
                             <td className="whitespace-nowrap font-semibold">{money(salary.netSalary, currency)}</td>
                             <td>
                               <ToneBadge tone={salary.paid ? "green" : "amber"}>{salary.paid ? t("مصروف", "Paid") : t("غير مصروف", "Unpaid")}</ToneBadge>
@@ -692,6 +713,39 @@ export default async function EmployeePage({
                   </label>
                   <button className={`${primaryBtn} sm:col-span-2`}>{t("طباعة الكشف", "Print statement")}</button>
                 </form>
+              </Card>
+            </>
+          ) : null}
+
+          {tab === "pay" ? (
+            <>
+              {can(user, "salaries.create") ? (
+                <Card>
+                  <SectionTitle>{t("إضافة سلفة أو مكافأة أو خصم", "Add an advance, bonus or deduction")}</SectionTitle>
+                  <PayItemForm action={savePayItem} returnTo={`${base}?tab=pay`} employeeId={employee.id} today={todayInputValue()} defaultStart={defaultStart} currency={currency} />
+                </Card>
+              ) : null}
+              <Card>
+                <SectionTitle
+                  action={
+                    outstanding > 0 ? (
+                      <ToneBadge tone="amber">{t(`متبقي السلف ${money(outstanding, currency)}`, `Advances outstanding ${money(outstanding, currency)}`)}</ToneBadge>
+                    ) : null
+                  }
+                >
+                  {t("السلف والمكافآت والخصومات", "Advances, bonuses & deductions")}
+                </SectionTitle>
+                <PayItemsList
+                  items={payItems}
+                  lang={lang}
+                  currency={currency}
+                  nowKey={nowKey}
+                  returnTo={`${base}?tab=pay`}
+                  allow={{ edit: can(user, "salaries.edit"), remove: can(user, "salaries.delete") }}
+                  showEmployee={false}
+                  today={todayInputValue()}
+                  defaultStart={defaultStart}
+                />
               </Card>
             </>
           ) : null}

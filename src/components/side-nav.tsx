@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Banknote, Bell, BookUser, CalendarClock, CalendarDays, Files, History, LayoutDashboard, Menu, PieChart, Settings, Users, X } from "lucide-react";
+import { Banknote, Bell, BookUser, CalendarClock, CalendarDays, Files, HandCoins, History, LayoutDashboard, Menu, PieChart, Settings, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLang } from "./lang-provider";
 
@@ -13,6 +13,7 @@ const items = [
   { href: "/employers", ar: "دفتر العناوين", en: "Address book", icon: BookUser },
   { href: "/attendance", ar: "الحضور والغياب", en: "Attendance & leave", icon: CalendarDays },
   { href: "/salaries", ar: "الرواتب", en: "Payroll", icon: Banknote },
+  { href: "/pay-items", ar: "السلف والمكافآت", en: "Advances & bonuses", icon: HandCoins },
   { href: "/documents", ar: "المستندات", en: "Documents", icon: Files },
   { href: "/calendar", ar: "التقويم", en: "Calendar", icon: CalendarClock },
   { href: "/notifications", ar: "التنبيهات", en: "Alerts", icon: Bell },

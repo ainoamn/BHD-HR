@@ -5,14 +5,16 @@ import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
-import { PAYMENT_LABEL, monthName } from "@/lib/constants";
+import { PAYMENT_LABEL, PAY_KIND_LABEL, monthName } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
-import { packageGross } from "@/lib/salary";
+import { packageGross, totalEarnings } from "@/lib/salary";
 import { daysLabel, formatDate, money, round3, todayInputValue } from "@/lib/utils";
+import { savePayItem } from "@/server/pay-item-actions";
 import { deleteUnpaidSalary, paySalary, recalculateSalary, unpaySalary, updateSalaryAdjustments } from "@/server/salary-actions";
+import { PayItemForm } from "@/components/pay-item-form";
 
 export default async function SalaryDetailPage({
   params,
@@ -27,10 +29,24 @@ export default async function SalaryDetailPage({
   const { lang, t } = await getI18n();
   const salary = await prisma.salary.findFirst({
     where: { id, employee: { companyId: user.companyId } },
-    include: { employee: true },
+    include: { employee: true, lines: { orderBy: { title: "asc" } } },
   });
   if (!salary) notFound();
-  const allow = { edit: can(user, "salaries.edit"), remove: can(user, "salaries.delete"), pay: can(user, "salaries.pay") };
+  const earningLines = salary.lines.filter((line) => !line.deduct);
+  const deductionLines = salary.lines.filter((line) => line.deduct);
+  const lineLabel = (line: (typeof salary.lines)[number]) => (
+    <>
+      <span className="me-2 text-xs text-slate-500">{pick(PAY_KIND_LABEL[line.kind], lang, line.kind)}</span>
+      {line.payItemId ? (
+        <Link href={`/employees/${salary.employeeId}?tab=pay#item-${line.payItemId}`} className="text-teal-800 hover:underline">
+          {line.title}
+        </Link>
+      ) : (
+        line.title
+      )}
+    </>
+  );
+  const allow = { edit: can(user, "salaries.edit"), remove: can(user, "salaries.delete"), pay: can(user, "salaries.pay"), addItem: can(user, "salaries.create") };
   const currency = user.company.currency;
   const gross = packageGross(salary);
   const daily = user.company.salaryDays > 0 ? gross / user.company.salaryDays : 0;
@@ -64,9 +80,15 @@ export default async function SalaryDetailPage({
                 <td className="py-2 text-end">{money(value, currency)}</td>
               </tr>
             ))}
+            {earningLines.map((line) => (
+              <tr key={line.id} className="border-b border-slate-100 text-emerald-800">
+                <td className="py-2">{lineLabel(line)}</td>
+                <td className="py-2 text-end">+{money(line.amount, currency)}</td>
+              </tr>
+            ))}
             <tr className="border-b border-slate-100 font-semibold">
-              <td className="py-2">{t("إجمالي الراتب", "Gross salary")}</td>
-              <td className="py-2 text-end">{money(gross, currency)}</td>
+              <td className="py-2">{earningLines.length ? t("إجمالي الاستحقاقات", "Total earnings") : t("إجمالي الراتب", "Gross salary")}</td>
+              <td className="py-2 text-end">{money(totalEarnings(salary), currency)}</td>
             </tr>
             <tr className="border-b border-slate-100">
               <td className="py-2">
@@ -78,6 +100,12 @@ export default async function SalaryDetailPage({
               <td className="py-2">{t("خصومات أخرى", "Other deductions")}</td>
               <td className="py-2 text-end">{money(salary.otherDeduction, currency)}</td>
             </tr>
+            {deductionLines.map((line) => (
+              <tr key={line.id} className="border-b border-slate-100 text-red-800">
+                <td className="py-2">{lineLabel(line)}</td>
+                <td className="py-2 text-end">−{money(line.amount, currency)}</td>
+              </tr>
+            ))}
             <tr className="text-base font-bold text-teal-900">
               <td className="pt-3">{t("صافي الراتب", "Net salary")}</td>
               <td className="pt-3 text-end">{money(salary.netSalary, currency)}</td>
@@ -153,7 +181,7 @@ export default async function SalaryDetailPage({
             </p>
             <form action={recalculateSalary}>
               <input type="hidden" name="id" value={salary.id} />
-              <SubmitButton variant="secondary">{t("إعادة احتساب الغياب", "Recalculate absence")}</SubmitButton>
+              <SubmitButton variant="secondary">{t("إعادة احتساب الغياب والسلف والمكافآت", "Recalculate absence and pay items")}</SubmitButton>
             </form>
             <form action={updateSalaryAdjustments} className="grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="id" value={salary.id} />
@@ -186,6 +214,31 @@ export default async function SalaryDetailPage({
               </div>
             </form>
           </Card>
+          ) : null}
+
+          {allow.addItem ? (
+            <Card>
+              <details>
+                <summary className="cursor-pointer font-bold">{t("+ مكافأة أو بدل أو خصم أو سلفة لهذا الراتب", "+ Bonus, allowance, deduction or advance for this salary")}</summary>
+                <p className="mt-2 text-sm text-slate-500">
+                  {t(
+                    "يُحفظ في «السلف والمكافآت» للموظف ويُطبّق على هذا الشهر فوراً. اختر التكرار إن أردت تطبيقه على الأشهر القادمة أيضاً.",
+                    "Saved under the employee's advances & bonuses and applied to this month at once. Choose a repeat to apply it to coming months too.",
+                  )}
+                </p>
+                <div className="mt-3">
+                  <PayItemForm
+                    action={savePayItem}
+                    returnTo={`/salaries/${salary.id}`}
+                    employeeId={salary.employeeId}
+                    defaultKind="BONUS"
+                    defaultStart={`${salary.year}-${String(salary.month).padStart(2, "0")}`}
+                    today={todayInputValue()}
+                    currency={currency}
+                  />
+                </div>
+              </details>
+            </Card>
           ) : null}
 
           {allow.pay ? (
