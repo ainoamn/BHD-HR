@@ -2,6 +2,9 @@ export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+/** Desktop sidebar state: "collapsed" shows the icon rail. */
+export const SIDEBAR_COOKIE = "hr_sidebar";
+
 export function round3(value: number) {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }

@@ -89,6 +89,10 @@
   --bottom-nav-height: 4rem;
 }
 
+.app-shell[data-sidebar="collapsed"] {
+  --sidebar-width: 5rem;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: 5rem;

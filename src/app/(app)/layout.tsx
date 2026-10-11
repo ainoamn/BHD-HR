@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
 import { AppFrame } from "@/components/app-frame";
@@ -9,7 +10,7 @@ import { getAlerts } from "@/lib/alerts";
 import { can, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { MODULES, MODULE_HREF } from "@/lib/permissions";
-import { formatLongDate } from "@/lib/utils";
+import { SIDEBAR_COOKIE, formatLongDate } from "@/lib/utils";
 import { logout, switchCompany } from "@/server/auth-actions";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const { lang, t } = await getI18n();
   const alerts = await getAlerts();
+  const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === "collapsed";
   const urgent = alerts.filter((item) => item.severity !== "info").length;
   const roleName =
     user.role === "ADMIN"
@@ -40,6 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       alertCount={alerts.length}
       urgentCount={urgent}
       allowed={allowed}
+      sidebarCollapsed={sidebarCollapsed}
       banner={
         user.mustChangePassword ? (
           <div className="no-print flex items-center justify-center gap-2 bg-gold-50 px-4 py-2 text-center text-sm text-gold-700 ring-1 ring-inset ring-gold-100">

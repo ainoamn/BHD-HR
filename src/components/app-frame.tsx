@@ -10,6 +10,8 @@ import {
   BookUser,
   CalendarClock,
   CalendarDays,
+  ChevronsLeft,
+  ChevronsRight,
   Files,
   HandCoins,
   History,
@@ -21,7 +23,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { SIDEBAR_COOKIE, cn } from "@/lib/utils";
 import { useLang } from "./lang-provider";
 import { NavSpeed } from "./nav-speed";
 
@@ -83,6 +85,8 @@ export type FrameProps = {
   urgentCount: number;
   /** Section paths the active membership can view; the server enforces the same rule. */
   allowed: string[];
+  /** Desktop sidebar shown as an icon rail; read from the cookie so the first paint matches. */
+  sidebarCollapsed: boolean;
   /** Company switcher, language toggle, BHD app switcher — rendered by the server layout. */
   headerTools: React.ReactNode;
   banner?: React.ReactNode;
@@ -90,10 +94,29 @@ export type FrameProps = {
   children: React.ReactNode;
 };
 
-export function AppFrame({ companyName, roleName, userName, dateLabel, alertCount, urgentCount, allowed, headerTools, banner, footer, children }: FrameProps) {
+export function AppFrame({
+  companyName,
+  roleName,
+  userName,
+  dateLabel,
+  alertCount,
+  urgentCount,
+  allowed,
+  sidebarCollapsed,
+  headerTools,
+  banner,
+  footer,
+  children,
+}: FrameProps) {
   const pathname = usePathname();
   const { t } = useLang();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(sidebarCollapsed);
+  const toggleSidebar = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    document.cookie = `${SIDEBAR_COOKIE}=${next ? "collapsed" : "expanded"}; path=/; max-age=31536000; samesite=lax`;
+  };
   const canSee = (href: string) => ALWAYS.includes(href) || allowed.includes(href);
   const groups = GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => canSee(item.href)) })).filter((group) => group.items.length);
   const flat = groups.flatMap((group) => group.items);
@@ -118,22 +141,25 @@ export function AppFrame({ companyName, roleName, userName, dateLabel, alertCoun
     };
   }, [open]);
 
-  const nav = (
-    <SidebarContent
-      groups={groups}
-      pathname={pathname}
-      companyName={companyName}
-      roleName={roleName}
-      alertCount={alertCount}
-      onClose={open ? () => setOpen(false) : undefined}
-    />
-  );
-
   return (
-    <div className="app-shell min-h-dvh lg:ps-[var(--sidebar-width)]">
+    <div
+      className="app-shell min-h-dvh transition-[padding] duration-200 ease-out motion-reduce:transition-none lg:ps-[var(--sidebar-width)]"
+      data-sidebar={collapsed ? "collapsed" : "expanded"}
+    >
       <NavSpeed sections={flat.map((item) => item.href)} />
-      <aside className="app-sidebar fixed inset-y-0 start-0 z-40 hidden w-[var(--sidebar-width)] lg:block" aria-label={t("القائمة الرئيسية", "Main menu")}>
-        {nav}
+      <aside
+        className="app-sidebar fixed inset-y-0 start-0 z-40 hidden w-[var(--sidebar-width)] transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block"
+        aria-label={t("القائمة الرئيسية", "Main menu")}
+      >
+        <SidebarContent
+          groups={groups}
+          pathname={pathname}
+          companyName={companyName}
+          roleName={roleName}
+          alertCount={alertCount}
+          collapsed={collapsed}
+          onToggle={toggleSidebar}
+        />
       </aside>
 
       <div
@@ -153,7 +179,14 @@ export function AppFrame({ companyName, roleName, userName, dateLabel, alertCoun
         aria-label={t("القائمة الرئيسية", "Main menu")}
         inert={!open}
       >
-        {nav}
+        <SidebarContent
+          groups={groups}
+          pathname={pathname}
+          companyName={companyName}
+          roleName={roleName}
+          alertCount={alertCount}
+          onClose={open ? () => setOpen(false) : undefined}
+        />
       </aside>
 
       <div className="flex min-h-dvh min-w-0 flex-col">
@@ -250,6 +283,8 @@ function SidebarContent({
   companyName,
   roleName,
   alertCount,
+  collapsed = false,
+  onToggle,
   onClose,
 }: {
   groups: { ar: string; en: string; items: NavItem[] }[];
@@ -257,20 +292,28 @@ function SidebarContent({
   companyName: string;
   roleName: string | null;
   alertCount: number;
+  collapsed?: boolean;
+  onToggle?: () => void;
   onClose?: () => void;
 }) {
   const { t } = useLang();
+  const toggleLabel = collapsed ? t("توسيع القائمة", "Expand menu") : t("طيّ القائمة", "Collapse menu");
+  const ToggleIcon = collapsed ? ChevronsRight : ChevronsLeft;
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-slate-900 text-white">
-      <div className="higher-horizon pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-[length:22rem] bg-[position:bottom_-2rem_center] opacity-[0.05]" aria-hidden="true" />
+      {collapsed ? null : (
+        <div className="higher-horizon pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-[length:22rem] bg-[position:bottom_-2rem_center] opacity-[0.05]" aria-hidden="true" />
+      )}
 
-      <div className="relative flex items-center gap-3 px-5 pb-4 pt-5">
-        <Link href="/" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl" aria-label={t("الرئيسية", "Dashboard")}>
-          <span className="official-logo official-logo-mark official-logo-light w-[3.25rem]" aria-hidden="true" />
-          <span className="min-w-0 border-s border-white/15 ps-3">
-            <span className="block truncate text-[0.95rem] font-bold leading-tight">{t("الموظفون والرواتب", "HR & Payroll")}</span>
-            <span className="block text-[0.7rem] leading-5 text-white/50">{t("من منتجات BHD", "A BHD product")}</span>
-          </span>
+      <div className={cn("relative flex items-center gap-3 pb-4 pt-5", collapsed ? "justify-center px-3" : "px-5")}>
+        <Link href="/" className={cn("flex min-w-0 items-center gap-3 rounded-xl", !collapsed && "flex-1")} aria-label={t("الرئيسية", "Dashboard")} title={collapsed ? t("الرئيسية", "Dashboard") : undefined}>
+          <span className={cn("official-logo official-logo-mark official-logo-light", collapsed ? "w-11" : "w-[3.25rem]")} aria-hidden="true" />
+          {collapsed ? null : (
+            <span className="min-w-0 border-s border-white/15 ps-3">
+              <span className="block truncate text-[0.95rem] font-bold leading-tight">{t("الموظفون والرواتب", "HR & Payroll")}</span>
+              <span className="block text-[0.7rem] leading-5 text-white/50">{t("من منتجات BHD", "A BHD product")}</span>
+            </span>
+          )}
         </Link>
         {onClose ? (
           <button
@@ -284,36 +327,62 @@ function SidebarContent({
         ) : null}
       </div>
 
-      <div className="relative mx-4 mb-3 rounded-2xl bg-white/[0.06] px-3.5 py-3 ring-1 ring-inset ring-white/10">
-        <p className="text-[0.68rem] font-medium text-white/45">{t("المنشأة", "Company")}</p>
-        <p className="truncate text-sm font-semibold leading-6">{companyName}</p>
-        {roleName ? <p className="truncate text-[0.7rem] text-gold-300">{roleName}</p> : null}
-      </div>
+      {collapsed ? (
+        <div
+          className="relative mx-auto mb-3 flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-sm font-bold ring-1 ring-inset ring-white/10"
+          title={roleName ? `${companyName} — ${roleName}` : companyName}
+        >
+          {companyName.trim().charAt(0)}
+        </div>
+      ) : (
+        <div className="relative mx-4 mb-3 rounded-2xl bg-white/[0.06] px-3.5 py-3 ring-1 ring-inset ring-white/10">
+          <p className="text-[0.68rem] font-medium text-white/45">{t("المنشأة", "Company")}</p>
+          <p className="truncate text-sm font-semibold leading-6">{companyName}</p>
+          {roleName ? <p className="truncate text-[0.7rem] text-gold-300">{roleName}</p> : null}
+        </div>
+      )}
 
-      <nav className="thin-scroll relative flex-1 space-y-5 overflow-y-auto px-3 pb-6 pt-2">
-        {groups.map((group) => (
+      <nav className={cn("thin-scroll relative flex-1 overflow-y-auto pb-6 pt-2", collapsed ? "space-y-3 px-2" : "space-y-5 px-3")}>
+        {groups.map((group, index) => (
           <div key={group.en}>
-            <p className="mb-1.5 px-3 text-[0.68rem] font-semibold tracking-wide text-white/40 ltr:uppercase">{t(group.ar, group.en)}</p>
-            <ul className="space-y-0.5">
+            {collapsed ? (
+              <>
+                <p className="sr-only">{t(group.ar, group.en)}</p>
+                {index > 0 ? <div className="mx-auto mb-3 h-px w-8 bg-white/10" aria-hidden="true" /> : null}
+              </>
+            ) : (
+              <p className="mb-1.5 px-3 text-[0.68rem] font-semibold tracking-wide text-white/40 ltr:uppercase">{t(group.ar, group.en)}</p>
+            )}
+            <ul className={collapsed ? "space-y-1" : "space-y-0.5"}>
               {group.items.map((item) => {
                 const active = isActive(pathname, item.href);
                 const Icon = item.icon;
+                const label = t(item.ar, item.en);
+                const count = item.href === "/notifications" && alertCount > 0 ? alertCount : 0;
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
                       prefetch
                       aria-current={active ? "page" : undefined}
+                      title={collapsed ? label : undefined}
                       className={cn(
-                        "group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition duration-150",
+                        "group relative flex items-center rounded-xl text-sm transition duration-150",
+                        collapsed ? "mx-auto size-11 justify-center" : "min-h-10 gap-3 px-3 py-2",
                         active ? "bg-white/[0.1] font-semibold text-white" : "text-white/65 hover:bg-white/[0.05] hover:text-white",
                       )}
                     >
                       {active ? <span className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-gold-400" aria-hidden="true" /> : null}
-                      <Icon size={18} strokeWidth={active ? 2.1 : 1.8} className={cn("shrink-0", active ? "text-gold-300" : "text-white/50 group-hover:text-white/80")} />
-                      <span className="min-w-0 flex-1 truncate">{t(item.ar, item.en)}</span>
-                      {item.href === "/notifications" && alertCount > 0 ? (
-                        <span className="tabular rounded-full bg-red-500/90 px-2 py-0.5 text-[0.68rem] font-bold leading-4 text-white">{alertCount}</span>
+                      <Icon size={collapsed ? 20 : 18} strokeWidth={active ? 2.1 : 1.8} className={cn("shrink-0", active ? "text-gold-300" : "text-white/50 group-hover:text-white/80")} />
+                      <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate"}>{label}</span>
+                      {count ? (
+                        collapsed ? (
+                          <span className="tabular absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-bold text-white ring-2 ring-slate-900">
+                            {count > 99 ? "99+" : count}
+                          </span>
+                        ) : (
+                          <span className="tabular rounded-full bg-red-500/90 px-2 py-0.5 text-[0.68rem] font-bold leading-4 text-white">{count}</span>
+                        )
                       ) : null}
                     </Link>
                   </li>
@@ -324,10 +393,27 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className="relative border-t border-white/10 px-5 py-4 text-[0.7rem] leading-5 text-white/40">
-        <p className="font-semibold text-white/60">BHD · Build Higher Dreams</p>
-        <p>{t("ابنِ أحلامًا أكبر.", "Build higher dreams.")}</p>
+      <div className={cn("relative flex items-center gap-2 border-t border-white/10 py-3", collapsed ? "justify-center px-2" : "ps-5 pe-3")}>
+        {collapsed ? null : (
+          <div className="min-w-0 flex-1 text-[0.7rem] leading-5 text-white/40">
+            <p className="truncate font-semibold text-white/60">BHD · Build Higher Dreams</p>
+            <p className="truncate">{t("ابنِ أحلامًا أكبر.", "Build higher dreams.")}</p>
+          </div>
+        )}
+        {onToggle ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={toggleLabel}
+            aria-expanded={!collapsed}
+            title={toggleLabel}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl text-white/60 ring-1 ring-inset ring-white/10 transition hover:bg-white/10 hover:text-white"
+          >
+            <ToggleIcon size={18} className="rtl:-scale-x-100" />
+          </button>
+        ) : null}
       </div>
     </div>
   );
 }
+
