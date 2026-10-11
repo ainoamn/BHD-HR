@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { DeleteButton } from "@/components/row-forms";
 import { EmptyState, PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
@@ -97,7 +98,7 @@ export default async function EmployeesPage({
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
       <Toolbar>
-        <form className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center" method="get">
+        <GetForm className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
           <div className="relative col-span-2 min-w-0 md:flex-1">
             <Search size={17} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -136,7 +137,7 @@ export default async function EmployeesPage({
               </Link>
             ) : null}
           </div>
-        </form>
+        </GetForm>
       </Toolbar>
 
       {employees.length === 0 ? (

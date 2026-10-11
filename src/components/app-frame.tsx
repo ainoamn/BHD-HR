@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLang } from "./lang-provider";
+import { NavSpeed } from "./nav-speed";
 
 type NavItem = { href: string; ar: string; en: string; icon: LucideIcon; short?: { ar: string; en: string } };
 
@@ -130,6 +131,7 @@ export function AppFrame({ companyName, roleName, userName, dateLabel, alertCoun
 
   return (
     <div className="app-shell min-h-dvh lg:ps-[var(--sidebar-width)]">
+      <NavSpeed sections={flat.map((item) => item.href)} />
       <aside className="app-sidebar fixed inset-y-0 start-0 z-40 hidden w-[var(--sidebar-width)] lg:block" aria-label={t("القائمة الرئيسية", "Main menu")}>
         {nav}
       </aside>
@@ -179,6 +181,7 @@ export function AppFrame({ companyName, roleName, userName, dateLabel, alertCoun
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Link
                 href="/notifications"
+                prefetch
                 aria-label={t(`التنبيهات (${alertCount})`, `Alerts (${alertCount})`)}
                 className={cn(
                   "relative flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-card transition hover:border-slate-300 hover:text-slate-900",
@@ -214,6 +217,7 @@ export function AppFrame({ companyName, roleName, userName, dateLabel, alertCoun
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[0.7rem] font-semibold transition",
@@ -298,6 +302,7 @@ function SidebarContent({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "group relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition duration-150",

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { Card, EmptyState, PageHeader, Stat, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
@@ -186,7 +187,7 @@ export default async function EmployersPage({
 
       <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-card sm:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <form method="get" className="flex w-full gap-2 md:max-w-md">
+          <GetForm className="flex w-full gap-2 md:max-w-md">
             {view !== "cards" ? <input type="hidden" name="view" value={view} /> : null}
             {kind ? <input type="hidden" name="kind" value={kind} /> : null}
             {employerId ? <input type="hidden" name="employerId" value={employerId} /> : null}
@@ -202,7 +203,7 @@ export default async function EmployersPage({
             <button className={primaryBtn} type="submit">
               {t("بحث", "Search")}
             </button>
-          </form>
+          </GetForm>
           <nav className="segmented grid grid-cols-3" aria-label={t("طريقة العرض", "View")}>
             {views.map((item) => {
               const Icon = item.icon;
@@ -231,7 +232,7 @@ export default async function EmployersPage({
             ))}
           </div>
           {view === "contacts" ? (
-            <form method="get" className="flex gap-2">
+            <GetForm className="flex gap-2">
               <input type="hidden" name="view" value="contacts" />
               {kind ? <input type="hidden" name="kind" value={kind} /> : null}
               {q ? <input type="hidden" name="q" value={q} /> : null}
@@ -247,7 +248,7 @@ export default async function EmployersPage({
               <button className={secondaryBtn} type="submit">
                 {t("عرض", "Show")}
               </button>
-            </form>
+            </GetForm>
           ) : null}
         </div>
         {filtered ? (

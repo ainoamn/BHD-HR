@@ -1,5 +1,6 @@
 import { ChevronDown, Filter, HandCoins, Plus, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { PayItemForm } from "@/components/pay-item-form";
 import { PayItemsList } from "@/components/pay-items-list";
 import { Card, PageHeader, Stat, fieldClass, primaryBtn } from "@/components/ui";
@@ -125,7 +126,7 @@ export default async function PayItemsPage({
       ) : null}
 
       <Card>
-        <form method="get" className="mb-3 grid grid-cols-2 items-end gap-2 border-b border-slate-100 pb-4 sm:flex sm:flex-wrap">
+        <GetForm className="mb-3 grid grid-cols-2 items-end gap-2 border-b border-slate-100 pb-4 sm:flex sm:flex-wrap">
           <label className="min-w-0 space-y-1.5 text-xs font-medium text-slate-500">
             {t("النوع", "Type")}
             <select name="kind" defaultValue={kind} className={`${fieldClass} block w-full sm:w-auto`}>
@@ -163,7 +164,7 @@ export default async function PayItemsPage({
             <Filter size={16} />
             {t("عرض", "Show")}
           </button>
-        </form>
+        </GetForm>
         <PayItemsList
           items={shown}
           lang={lang}

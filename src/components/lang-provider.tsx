@@ -1,7 +1,8 @@
 "use client";
 
 import { Languages } from "lucide-react";
-import { createContext, useContext } from "react";
+import { useRouter } from "next/navigation";
+import { createContext, useContext, useTransition } from "react";
 import { LANG_COOKIE, makeT, type Lang } from "@/lib/i18n";
 
 const LangContext = createContext<Lang>("ar");
@@ -18,6 +19,8 @@ export function useLang() {
 export function LangToggle({ className }: { className?: string }) {
   const { lang } = useLang();
   const next = lang === "ar" ? "en" : "ar";
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   return (
     <button
       type="button"
@@ -27,9 +30,10 @@ export function LangToggle({ className }: { className?: string }) {
       }
       lang={next}
       aria-label={next === "en" ? "Switch to English" : "التبديل إلى العربية"}
+      disabled={pending}
       onClick={() => {
         document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-        window.location.reload();
+        startTransition(() => router.refresh());
       }}
     >
       <Languages size={16} className="hidden shrink-0 text-slate-500 sm:block" aria-hidden="true" />

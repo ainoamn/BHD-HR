@@ -38,18 +38,41 @@ export const getAlerts = cache(async () => {
     warning: company.alertWarningDays,
     early: company.alertEarlyDays,
   };
-  const employees = await prisma.employee.findMany({
-    where: { companyId: company.id, status: { not: "TERMINATED" } },
-    include: {
-      documents: true,
-      attendance: { select: { type: true, balanceKey: true } },
-      leaveCredits: { select: { balanceKey: true, days: true } },
-    },
-  });
-  const leaveTypes = await getLeaveTypes(company.id);
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth() + 1;
+  const { start, end } = monthRange(thisYear, thisMonth);
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows] = await Promise.all([
+    prisma.employee.findMany({
+      where: { companyId: company.id, status: { not: "TERMINATED" } },
+      include: {
+        documents: true,
+        attendance: { select: { type: true, balanceKey: true } },
+        leaveCredits: { select: { balanceKey: true, days: true } },
+      },
+    }),
+    getLeaveTypes(company.id),
+    prisma.reminder.findMany({
+      where: { companyId: company.id, OR: [{ repeat: { not: "NONE" } }, { done: false }] },
+      include: { employee: { select: { fullName: true, nameEn: true } } },
+    }),
+    prisma.attendance.findMany({
+      where: {
+        date: { gte: start, lt: end },
+        deductsSalary: true,
+        employee: { companyId: company.id },
+      },
+      include: { employee: true },
+      orderBy: { date: "desc" },
+    }),
+    prisma.salary.count({ where: { year: thisYear, month: thisMonth, employee: { companyId: company.id } } }),
+    prisma.salary.findMany({
+      where: { paid: false, employee: { companyId: company.id } },
+      select: { year: true, month: true, netSalary: true },
+    }),
+  ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const alerts: AlertItem[] = [];
-  const now = new Date();
 
   for (const employee of employees) {
     const name = nameOf(employee);
@@ -114,10 +137,6 @@ export const getAlerts = cache(async () => {
     }
   }
 
-  const reminders = await prisma.reminder.findMany({
-    where: { companyId: company.id, OR: [{ repeat: { not: "NONE" } }, { done: false }] },
-    include: { employee: { select: { fullName: true, nameEn: true } } },
-  });
   for (const reminder of reminders) {
     let days: number | null = null;
     let when: Date | null = null;
@@ -157,16 +176,6 @@ export const getAlerts = cache(async () => {
     });
   }
 
-  const { start, end } = monthRange(now.getFullYear(), now.getMonth() + 1);
-  const absences = await prisma.attendance.findMany({
-    where: {
-      date: { gte: start, lt: end },
-      deductsSalary: true,
-      employee: { companyId: company.id },
-    },
-    include: { employee: true },
-    orderBy: { date: "desc" },
-  });
   for (const period of groupAttendance(absences).slice(0, 8)) {
     const kind = attendanceLabel(period.row, leaveTypes, lang);
     const when =
@@ -184,10 +193,7 @@ export const getAlerts = cache(async () => {
   }
 
   const payDueIn = (year: number, month: number) => daysUntil(new Date(Date.UTC(year, month - 1, payDayFor(year, month, company.payDay), 12)));
-  const thisYear = now.getFullYear();
-  const thisMonth = now.getMonth() + 1;
   const activeCount = employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION").length;
-  const generated = await prisma.salary.count({ where: { year: thisYear, month: thisMonth, employee: { companyId: company.id } } });
   const dueNow = payDueIn(thisYear, thisMonth);
   if (activeCount && !generated && dueNow <= limits.urgent) {
     alerts.push({
@@ -203,10 +209,6 @@ export const getAlerts = cache(async () => {
     });
   }
 
-  const unpaidRows = await prisma.salary.findMany({
-    where: { paid: false, employee: { companyId: company.id } },
-    select: { year: true, month: true, netSalary: true },
-  });
   const unpaidGroups = new Map<string, { year: number; month: number; count: number; total: number }>();
   for (const row of unpaidRows) {
     const key = `${row.year}-${row.month}`;

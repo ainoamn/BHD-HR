@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { BilingualFields } from "@/components/bilingual-fields";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { MultiCheck } from "@/components/multi-check";
 import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
@@ -88,11 +89,11 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
         </Card>
         <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <form className="flex min-w-0 flex-1 basis-60 gap-2" method="get">
+            <GetForm className="flex min-w-0 flex-1 basis-60 gap-2">
               <input type="hidden" name="tab" value={list} />
               <input className={`${fieldClass} w-0 min-w-0 flex-1`} name="q" defaultValue={sp.q || ""} placeholder={t("ابحث بالعربية أو الإنجليزية…", "Search in Arabic or English…")} />
               <button className={secondaryBtn}>{t("بحث", "Search")}</button>
-            </form>
+            </GetForm>
             <div className="flex flex-wrap gap-2">
               {translateButton(list, missingEn(rows))}
               <form action={importDefaults}>

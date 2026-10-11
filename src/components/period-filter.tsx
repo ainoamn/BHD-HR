@@ -1,6 +1,7 @@
 import { CalendarSearch } from "lucide-react";
 import { monthNames } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
+import { GetForm } from "./get-form";
 import { fieldClass, primaryBtn } from "./ui";
 
 export async function PeriodFilter({
@@ -17,8 +18,7 @@ export async function PeriodFilter({
   const { lang, t } = await getI18n();
   const years = Array.from(new Set([year - 2, year - 1, year, year + 1, new Date().getFullYear()])).sort();
   return (
-    <form
-      method="get"
+    <GetForm
       className="no-print grid w-full grid-cols-[1fr_1fr_auto] gap-2 rounded-2xl border border-slate-200/90 bg-white p-2 shadow-card sm:flex sm:w-auto sm:flex-wrap sm:items-center"
     >
       {employers ? (
@@ -65,6 +65,6 @@ export async function PeriodFilter({
         <CalendarSearch size={16} />
         {t("عرض", "Show")}
       </button>
-    </form>
+    </GetForm>
   );
 }

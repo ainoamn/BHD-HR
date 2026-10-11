@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
     return [{ source: "/pending", destination: "/", permanent: false }];
   },
   experimental: {
+    // Visited and prefetched pages are reused from the client cache; every save clears it (refreshAll).
+    staleTimes: {
+      dynamic: 30,
+      static: 120,
+    },
     serverActions: {
       bodySizeLimit: "4.5mb",
     },
