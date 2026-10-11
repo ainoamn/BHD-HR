@@ -1,6 +1,6 @@
 "use client";
 
-import { FileDown, FileSpreadsheet, Printer } from "lucide-react";
+import { FileDown, FileSpreadsheet, LoaderCircle, Printer } from "lucide-react";
 import { useState } from "react";
 import { useLang } from "./lang-provider";
 import { primaryBtn, secondaryBtn } from "./ui";
@@ -49,18 +49,18 @@ export function ReportToolbar({ targetId, excelHref, fileName, canExport }: { ta
 
   return (
     <div className="no-print flex flex-wrap gap-2" data-pdf-ignore="true">
-      <button type="button" onClick={() => window.print()} className={secondaryBtn}>
+      <button type="button" onClick={() => window.print()} className={`${secondaryBtn} flex-1 sm:flex-none`}>
         <Printer className="size-4" />
         {t("طباعة", "Print")}
       </button>
       {canExport ? (
         <>
-          <a href={excelHref} className={secondaryBtn}>
+          <a href={excelHref} className={`${secondaryBtn} flex-1 sm:flex-none`}>
             <FileSpreadsheet className="size-4 text-emerald-700" />
-            {t("تحميل Excel", "Download Excel")}
+            Excel
           </a>
-          <button type="button" onClick={downloadPdf} disabled={busy} className={primaryBtn}>
-            <FileDown className="size-4" />
+          <button type="button" onClick={downloadPdf} disabled={busy} className={`${primaryBtn} flex-1 sm:flex-none`}>
+            {busy ? <LoaderCircle className="size-4 animate-spin" /> : <FileDown className="size-4" />}
             {busy ? t("جارٍ إنشاء PDF...", "Creating PDF...") : t("تحميل PDF", "Download PDF")}
           </button>
         </>

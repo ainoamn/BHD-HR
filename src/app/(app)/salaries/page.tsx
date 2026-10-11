@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { Banknote, FileText, HandCoins, Printer, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { PeriodFilter } from "@/components/period-filter";
 import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, PageHeader, ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
+import { Card, PageHeader, SectionTitle, Stat, ToneBadge, fieldClass, linkAction, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
@@ -75,15 +76,27 @@ export default async function SalariesPage({
       : t("كل أصحاب العمل", "All employers");
   const period = `${year}-${String(month).padStart(2, "0")}`;
   const stats = [
-    [t("المسيرات", "Records"), String(salaries.length)],
-    [t("الإجمالي", "Gross"), money(totalGross, currency)],
-    [t("الخصومات", "Deductions"), money(totalDeduction, currency)],
-    [t("الصافي", "Net"), money(totalNet, currency)],
+    { label: t("المسيرات", "Records"), value: String(salaries.length), icon: FileText, tone: "navy" as const },
+    { label: t("الإجمالي", "Gross"), value: money(totalGross, currency), icon: TrendingUp, tone: "teal" as const },
+    { label: t("الخصومات", "Deductions"), value: money(totalDeduction, currency), icon: TrendingDown, tone: "red" as const },
+    { label: t("الصافي", "Net"), value: money(totalNet, currency), icon: Wallet, tone: "gold" as const },
   ];
+  const step = (number: number, title: string, Icon: typeof Wallet) => (
+    <div className="flex items-center gap-3">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+        <Icon size={19} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[0.7rem] font-semibold text-slate-400">{t(`الخطوة ${number}`, `Step ${number}`)}</p>
+        <h2 className="font-bold leading-tight text-slate-900">{title}</h2>
+      </div>
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
+        icon={Banknote}
         title={t("الرواتب", "Payroll")}
         description={t(
           `مسير ${monthName(month, "ar")} ${year} — ${scope}. إنشاء الرواتب ينسخ راتب الموظف الحالي ولا يغيّر الشهور السابقة.`,
@@ -94,19 +107,16 @@ export default async function SalariesPage({
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
-        {stats.map(([label, value]) => (
-          <div key={label} className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="text-xl font-bold">{value}</p>
-          </div>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {stats.map((item) => (
+          <Stat key={item.label} label={item.label} value={item.value} icon={item.icon} tone={item.tone} />
         ))}
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Card className="space-y-3">
-          <h2 className="font-bold">{t("1. إنشاء الرواتب", "1. Generate payroll")}</h2>
-          <p className="text-sm text-slate-600">
+      <div className="mb-6 grid gap-4 lg:grid-cols-3">
+        <Card className="space-y-4">
+          {step(1, t("إنشاء الرواتب", "Generate payroll"), Sparkles)}
+          <p className="text-sm leading-6 text-slate-600">
             {t(
               `الموظفون النشطون (${scope}): ${activeCount}. لديهم مسير: ${salaries.length}.`,
               `Active employees (${scope}): ${activeCount}. With a record: ${salaries.length}.`,
@@ -118,7 +128,10 @@ export default async function SalariesPage({
                 <input type="hidden" name="year" value={year} />
                 <input type="hidden" name="month" value={month} />
                 <input type="hidden" name="employerId" value={employerId} />
-                <SubmitButton>{t(`إنشاء رواتب ${scope}`, `Generate for ${scope}`)}</SubmitButton>
+                <SubmitButton className="w-full">
+                  <Sparkles size={16} />
+                  {t(`إنشاء رواتب ${scope}`, `Generate for ${scope}`)}
+                </SubmitButton>
               </form>
               {missing.length ? (
                 <form action={createSalary} className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
@@ -143,9 +156,9 @@ export default async function SalariesPage({
           )}
         </Card>
 
-        <Card className="space-y-3">
-          <h2 className="font-bold">{t("2. صرف الكل", "2. Pay all")}</h2>
-          <p className="text-sm text-slate-600">
+        <Card className="space-y-4">
+          {step(2, t("صرف الكل", "Pay all"), HandCoins)}
+          <p className="text-sm leading-6 text-slate-600">
             {t(
               `غير المصروف: ${unpaid.length} بمجموع ${money(unpaidTotal, currency)}. بعد الصرف تُفتح الإيصالات للطباعة.`,
               `Unpaid: ${unpaid.length}, total ${money(unpaidTotal, currency)}. Receipts open for printing after payment.`,
@@ -164,16 +177,19 @@ export default async function SalariesPage({
                 ))}
               </select>
               <div className="grid grid-cols-2 gap-2">
-                <input className={fieldClass} type="date" name="paidAt" defaultValue={todayInputValue()} required />
-                <input className={fieldClass} name="paymentReference" placeholder={t("رقم العملية (اختياري)", "Reference (optional)")} />
+                <input className={`${fieldClass} w-full`} type="date" name="paidAt" defaultValue={todayInputValue()} required aria-label={t("تاريخ الصرف", "Payment date")} />
+                <input className={`${fieldClass} w-full`} name="paymentReference" placeholder={t("رقم العملية (اختياري)", "Reference (optional)")} />
               </div>
-              <SubmitButton pendingLabel={t("جارٍ الصرف...", "Paying...")}>{t(`صرف ${unpaid.length} راتب`, `Pay ${unpaid.length} salaries`)}</SubmitButton>
+              <SubmitButton className="w-full" pendingLabel={t("جارٍ الصرف...", "Paying...")}>
+                <HandCoins size={16} />
+                {t(`صرف ${unpaid.length} راتب`, `Pay ${unpaid.length} salaries`)}
+              </SubmitButton>
             </form>
           ) : null}
         </Card>
 
-        <Card className="space-y-3">
-          <h2 className="font-bold">{t("3. الطباعة", "3. Print")}</h2>
+        <Card className="space-y-4">
+          {step(3, t("الطباعة", "Print"), Printer)}
           <form method="get" action="/salaries/sheet" target="_blank" className="space-y-2">
             <input type="hidden" name="employerId" value={employerId} />
             <div className="grid grid-cols-2 gap-2">
@@ -197,7 +213,8 @@ export default async function SalariesPage({
               <option value="paid">{t("المصروف فقط", "Paid only")}</option>
               <option value="unpaid">{t("غير المصروف فقط", "Unpaid only")}</option>
             </select>
-            <button type="submit" className={secondaryBtn}>
+            <button type="submit" className={`${secondaryBtn} w-full`}>
+              <Printer size={16} />
               {t(`طباعة كشف ${scope}`, `Print ${scope}`)}
             </button>
           </form>
@@ -207,10 +224,13 @@ export default async function SalariesPage({
         </Card>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
+      <SectionTitle hint={t(`${salaries.length} مسير في ${monthName(month, lang)} ${year}`, `${salaries.length} record(s) in ${monthName(month, lang)} ${year}`)}>
+        {t("مسير الشهر", "Month payroll")}
+      </SectionTitle>
+      <div className="table-shell">
+        <table className="table-stack min-w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-start text-xs font-semibold text-slate-500">
+            <tr>
               <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
               <th className="px-4 py-3 text-start">{t("صاحب العمل", "Employer")}</th>
               <th className="px-4 py-3 text-start">{t("الأساسي", "Basic")}</th>
@@ -218,7 +238,7 @@ export default async function SalariesPage({
               <th className="px-4 py-3 text-start">{t("الخصومات", "Deductions")}</th>
               <th className="px-4 py-3 text-start">{t("الصافي", "Net")}</th>
               <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
-              <th className="px-4 py-3"></th>
+              <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -230,51 +250,61 @@ export default async function SalariesPage({
               const name = lang === "en" && salary.employeeNameEn ? salary.employeeNameEn : salary.employeeName;
               const employerName = lang === "en" && salary.employerNameEn ? salary.employerNameEn : salary.employerName;
               return (
-                <tr key={salary.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3">
-                    <div className="font-semibold">{name}</div>
+                <tr key={salary.id}>
+                  <td className="cell-title px-4 py-3">
+                    <Link href={`/salaries/${salary.id}`} className="block font-semibold text-slate-900 hover:text-teal-700">
+                      {name}
+                    </Link>
                     <div className="text-xs text-slate-500">
-                      {salary.employeeNumber} · {t("غياب", "Absence")} {daysLabel(salary.absenceDays)}
-                      {stale ? t(" · تغيّر الغياب", " · absence changed") : ""}
+                      <span className="tabular">{salary.employeeNumber}</span> · {t("غياب", "Absence")} {daysLabel(salary.absenceDays)}
+                      {stale ? <span className="font-semibold text-amber-700">{t(" · تغيّر الغياب", " · absence changed")}</span> : ""}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" data-label={t("صاحب العمل", "Employer")}>
                     {salary.employerId ? (
-                      <Link href={`/employers/${salary.employerId}`} className="text-teal-800 hover:underline">
+                      <Link href={`/employers/${salary.employerId}`} className="hover:text-teal-700">
                         {employerName}
                       </Link>
                     ) : (
                       employerName || "—"
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">{money(salary.basicSalary, currency)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{money(allowances, currency)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{money(deductions, currency)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap font-semibold">{money(salary.netSalary, currency)}</td>
-                  <td className="px-4 py-3">
+                  <td className="tabular px-4 py-3 whitespace-nowrap" data-label={t("الأساسي", "Basic")}>
+                    {money(salary.basicSalary, currency)}
+                  </td>
+                  <td className="tabular px-4 py-3 whitespace-nowrap text-teal-700" data-label={t("البدلات والإضافات", "Allowances & additions")}>
+                    {money(allowances, currency)}
+                  </td>
+                  <td className="tabular px-4 py-3 whitespace-nowrap text-red-700" data-label={t("الخصومات", "Deductions")}>
+                    {money(deductions, currency)}
+                  </td>
+                  <td className="tabular px-4 py-3 whitespace-nowrap font-bold text-slate-900" data-label={t("الصافي", "Net")}>
+                    {money(salary.netSalary, currency)}
+                  </td>
+                  <td className="px-4 py-3" data-label={t("الحالة", "Status")}>
                     <ToneBadge tone={salary.paid ? "green" : "amber"}>{salary.paid ? t("مصروف", "Paid") : t("غير مصروف", "Unpaid")}</ToneBadge>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Link className="font-semibold text-teal-800" href={`/salaries/${salary.id}`}>
-                      {salary.paid || !(allow.pay || allow.edit) ? t("عرض", "View") : allow.pay ? t("صرف", "Pay") : t("تعديل", "Edit")}
-                    </Link>
-                    <Link className="ms-3 font-semibold text-slate-700" href={`/salaries/${salary.id}/print?doc=slip`}>
-                      {t("القسيمة", "Payslip")}
-                    </Link>
-                    {salary.paid ? (
-                      <Link className="ms-3 font-semibold text-slate-700" href={`/salaries/${salary.id}/print?doc=receipt`}>
-                        {t("إيصال", "Receipt")}
+                  <td className="cell-actions px-4 py-3 whitespace-nowrap">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:justify-end">
+                      <Link className={linkAction} href={`/salaries/${salary.id}`}>
+                        {salary.paid || !(allow.pay || allow.edit) ? t("عرض", "View") : allow.pay ? t("صرف", "Pay") : t("تعديل", "Edit")}
                       </Link>
-                    ) : null}
-                    {!salary.paid && allow.remove ? (
-                      <span className="ms-3 inline-block">
+                      <Link className="text-sm font-semibold text-slate-600 hover:text-slate-900" href={`/salaries/${salary.id}/print?doc=slip`}>
+                        {t("القسيمة", "Payslip")}
+                      </Link>
+                      {salary.paid ? (
+                        <Link className="text-sm font-semibold text-slate-600 hover:text-slate-900" href={`/salaries/${salary.id}/print?doc=receipt`}>
+                          {t("إيصال", "Receipt")}
+                        </Link>
+                      ) : null}
+                      {!salary.paid && allow.remove ? (
                         <DeleteButton
                           action={deleteUnpaidSalary}
                           fields={{ id: salary.id }}
                           confirm={t(`حذف مسير ${name} غير المصروف؟`, `Delete the unpaid record of ${name}?`)}
                         />
-                      </span>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               );
@@ -282,9 +312,12 @@ export default async function SalariesPage({
           </tbody>
         </table>
         {salaries.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-slate-500">
-            {t("لا توجد رواتب لهذا الشهر. اضغط إنشاء الرواتب.", "No salaries for this month. Click Generate payroll.")}
-          </p>
+          <div className="flex flex-col items-center px-4 py-12 text-center">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-inset ring-slate-200">
+              <Banknote size={22} />
+            </span>
+            <p className="mt-3 text-sm text-slate-500">{t("لا توجد رواتب لهذا الشهر. اضغط إنشاء الرواتب.", "No salaries for this month. Click Generate payroll.")}</p>
+          </div>
         ) : null}
       </div>
     </div>

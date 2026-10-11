@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { UserPen } from "lucide-react";
 import { EmployeeForm } from "@/components/employee-form";
 import { Flash } from "@/components/flash";
 import { PageHeader } from "@/components/ui";
@@ -27,7 +28,7 @@ export default async function EditEmployeePage({
   if (!employee) notFound();
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title={t("تعديل بيانات الموظف", "Edit employee")} description={employee.fullName} />
+      <PageHeader icon={UserPen} title={t("تعديل بيانات الموظف", "Edit employee")} description={`${employee.fullName} · ${employee.employeeNumber}`} />
       <Flash error={sp.error} message={sp.message} />
       <EmployeeForm
         action={updateEmployee}

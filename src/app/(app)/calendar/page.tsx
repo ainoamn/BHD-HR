@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { BellPlus, Check, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
+import { BellPlus, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, Field, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { Card, Field, PageHeader, SectionTitle, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { EVENT_KINDS, type EventKind, REMINDER_REPEAT, getCalendarEvents, lastDayOf } from "@/lib/calendar";
 import { monthName } from "@/lib/constants";
@@ -90,6 +90,7 @@ export default async function CalendarPage({
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
+        icon={CalendarClock}
         title={t("التقويم", "Calendar")}
         description={t(
           "استحقاق الرواتب، وانتهاء البطاقات والجوازات والإقامات والعقود، وأعياد الميلاد، والإجازات، وتذكيراتك — في مكان واحد.",
@@ -107,17 +108,20 @@ export default async function CalendarPage({
       <Card className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Link href={link(prev)} className={cn(secondaryBtn, "px-2.5")} aria-label={t("الشهر السابق", "Previous month")}>
+            <Link href={link(prev)} className={cn(secondaryBtn, "size-10 px-0")} aria-label={t("الشهر السابق", "Previous month")}>
               {lang === "en" ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
             </Link>
-            <h2 className="whitespace-nowrap text-center text-lg font-bold text-slate-900 sm:min-w-36">
+            <h2 className="tabular whitespace-nowrap text-center text-lg font-bold text-slate-900 sm:min-w-40 sm:text-xl">
               {monthName(month, lang)} {year}
             </h2>
-            <Link href={link(next)} className={cn(secondaryBtn, "px-2.5")} aria-label={t("الشهر التالي", "Next month")}>
+            <Link href={link(next)} className={cn(secondaryBtn, "size-10 px-0")} aria-label={t("الشهر التالي", "Next month")}>
               {lang === "en" ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </Link>
             {!isCurrentMonth ? (
-              <Link href={link({ year: now.getFullYear(), month: now.getMonth() + 1 })} className="text-sm font-semibold text-teal-800">
+              <Link
+                href={link({ year: now.getFullYear(), month: now.getMonth() + 1 })}
+                className="ms-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-teal-700 ring-1 ring-inset ring-teal-200 transition hover:bg-teal-50"
+              >
                 {t("اليوم", "Today")}
               </Link>
             ) : null}
@@ -127,7 +131,7 @@ export default async function CalendarPage({
             {urgentCount ? <ToneBadge tone="red">{t(`${urgentCount} عاجل`, `${urgentCount} urgent`)}</ToneBadge> : null}
           </div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:px-0">
           {EVENT_KINDS.map((kind) => {
             const active = shown.has(kind.id);
             const count = allEvents.filter((event) => event.kind === kind.id).length;
@@ -136,7 +140,7 @@ export default async function CalendarPage({
                 key={kind.id}
                 href={toggleKind(kind.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1",
+                  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition",
                   active ? kind.chip : "bg-white text-slate-400 ring-slate-200 line-through",
                 )}
               >
@@ -150,17 +154,17 @@ export default async function CalendarPage({
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="p-2 sm:p-3">
-          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500 sm:text-xs">
+        <Card className="p-2 sm:p-4">
+          <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500 sm:gap-1.5 sm:text-xs">
             {weekdays.map((name, index) => (
               <div key={name} className={cn("truncate py-1.5", index >= 5 && "text-slate-400")}>
                 {name}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
             {cells.map((day, index) => {
-              if (!day) return <div key={`blank-${index}`} className="min-h-14 rounded-lg bg-slate-50/50 sm:min-h-24" />;
+              if (!day) return <div key={`blank-${index}`} className="min-h-14 rounded-xl bg-slate-50/60 sm:min-h-24" />;
               const list = byDay.get(day) || [];
               const weekend = index % 7 >= 5;
               const hasUrgent = list.some((event) => event.urgent && !event.done);
@@ -169,9 +173,9 @@ export default async function CalendarPage({
                   key={day}
                   href={list.length ? `#day-${day}` : `${link({ extra: { new: "1", date: `${year}-${pad(month)}-${pad(day)}` } })}#reminder`}
                   className={cn(
-                    "group flex min-h-14 min-w-0 flex-col rounded-lg border p-1 text-start transition hover:border-teal-300 sm:min-h-24 sm:p-1.5",
-                    weekend ? "bg-slate-50" : "bg-white",
-                    day === todayDay ? "border-teal-600 ring-2 ring-teal-100" : hasUrgent ? "border-red-200" : "border-slate-100",
+                    "group flex min-h-14 min-w-0 flex-col rounded-xl border p-1 text-start transition duration-150 hover:border-teal-300 hover:shadow-card sm:min-h-24 sm:p-1.5",
+                    weekend ? "bg-sand-50" : "bg-white",
+                    day === todayDay ? "border-teal-600 ring-2 ring-teal-100" : hasUrgent ? "border-red-200" : "border-slate-200/70",
                   )}
                 >
                   <span
@@ -215,18 +219,15 @@ export default async function CalendarPage({
 
         <div className="space-y-4">
           {allow.create ? (
-          <details id="reminder" open={openForm} className="group scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5">
-              <span className="flex items-center gap-2 font-bold text-slate-900">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-                  <BellPlus size={16} />
+          <details id="reminder" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70">
+              <span className="flex items-center gap-3 font-bold text-slate-900">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-gold-50 text-gold-600 ring-1 ring-inset ring-gold-100">
+                  <BellPlus size={18} />
                 </span>
                 {t("إضافة تذكير", "Add reminder")}
               </span>
-              <span className="text-xs font-semibold text-teal-800">
-                <span className="group-open:hidden">{t("فتح", "Open")}</span>
-                <span className="hidden group-open:inline">{t("إغلاق", "Close")}</span>
-              </span>
+              <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
             </summary>
             <form action={createReminder} className="space-y-3 border-t border-slate-100 px-4 py-4">
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -260,14 +261,21 @@ export default async function CalendarPage({
               <Field label={t("ملاحظات", "Notes")}>
                 <textarea className={`${fieldClass} w-full`} name="notes" rows={2} />
               </Field>
-              <SubmitButton>{t("حفظ التذكير", "Save reminder")}</SubmitButton>
+              <SubmitButton className="w-full">{t("حفظ التذكير", "Save reminder")}</SubmitButton>
             </form>
           </details>
           ) : null}
 
           <Card>
-            <h2 className="mb-3 font-bold text-slate-900">{t(`أحداث ${monthName(month, "ar")}`, `${monthName(month, "en")} events`)}</h2>
-            {events.length === 0 ? <p className="text-sm text-slate-500">{t("لا توجد أحداث في هذا الشهر.", "No events this month.")}</p> : null}
+            <SectionTitle>{t(`أحداث ${monthName(month, "ar")}`, `${monthName(month, "en")} events`)}</SectionTitle>
+            {events.length === 0 ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                  <CalendarClock size={22} />
+                </span>
+                <p className="mt-3 text-sm text-slate-500">{t("لا توجد أحداث في هذا الشهر.", "No events this month.")}</p>
+              </div>
+            ) : null}
             <div className="space-y-4">
               {[...byDay.entries()].map(([day, list]) => (
                 <section key={day} id={`day-${day}`} className="scroll-mt-24">
@@ -290,8 +298,8 @@ export default async function CalendarPage({
                       <li
                         key={event.id}
                         className={cn(
-                          "flex items-start gap-2 rounded-xl border px-3 py-2",
-                          event.urgent && !event.done ? "border-red-200 bg-red-50" : "border-slate-100 bg-white",
+                          "flex items-start gap-2.5 rounded-xl border px-3 py-2.5",
+                          event.urgent && !event.done ? "border-red-200 bg-red-50" : "border-slate-200/70 bg-white",
                         )}
                       >
                         <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", kindMeta(event.kind).dot)} />

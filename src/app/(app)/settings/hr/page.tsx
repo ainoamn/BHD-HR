@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { BilingualFields } from "@/components/bilingual-fields";
 import { Flash } from "@/components/flash";
 import { MultiCheck } from "@/components/multi-check";
@@ -61,7 +62,8 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
       <form action={translateMissing}>
         <input type="hidden" name="list" value={list} />
         <SubmitButton variant="secondary" pendingLabel={t("جارٍ الترجمة بالذكاء الاصطناعي…", "Translating with AI…")}>
-          {t(`✨ ترجمة الناقص بالذكاء الاصطناعي (${missing})`, `✨ AI-translate missing (${missing})`)}
+          <Sparkles size={15} className="text-gold-500" />
+          {t(`ترجمة الناقص بالذكاء الاصطناعي (${missing})`, `AI-translate missing (${missing})`)}
         </SubmitButton>
       </form>
     ) : null;
@@ -114,8 +116,8 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
                   </div>
                   <div className="flex flex-wrap items-start gap-3">
                     <details className="group">
-                      <summary className="cursor-pointer list-none text-xs font-semibold text-teal-800 hover:underline">{t("تعديل", "Edit")}</summary>
-                      <form action={saveCatalogEntry} className="mt-2 grid w-72 max-w-[80vw] grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <summary className="inline-flex cursor-pointer list-none items-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 group-open:bg-slate-100 group-open:text-slate-600">{t("تعديل", "Edit")}</summary>
+                      <form action={saveCatalogEntry} className="mt-2 grid w-72 max-w-[80vw] grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
                         <input type="hidden" name="list" value={list} />
                         <input type="hidden" name="id" value={row.id} />
                         <BilingualFields arName="nameAr" enName="nameEn" arLabel={t("بالعربية", "Arabic")} enLabel={t("بالإنجليزية", "English")} arDefault={row.nameAr} enDefault={row.nameEn} required compact />
@@ -227,10 +229,12 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
 
   return (
     <div className="mx-auto max-w-4xl">
-      <Link href="/settings" className="mb-3 inline-flex text-sm font-semibold text-teal-800">
-        {lang === "en" ? "←" : "→"} {t("الإعدادات", "Settings")}
+      <Link href="/settings" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
+        {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
+        {t("الإعدادات", "Settings")}
       </Link>
       <PageHeader
+        icon={Sparkles}
         title={t("إعدادات الموارد البشرية", "HR settings")}
         description={t(
           "المسميات الوظيفية والأقسام وأنواع الإجازات والعلاوات لهذه المنشأة، بالعربية والإنجليزية. اكتب الاسم بلغة واحدة فتكمل الأخرى بالذكاء الاصطناعي.",
@@ -238,20 +242,15 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
         )}
       />
       <Flash error={sp.error} message={sp.message} />
-      <nav className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-1 sm:inline-flex">
-        {tabs.map((item) => (
-          <Link
-            key={item.id}
-            href={`/settings/hr?tab=${item.id}`}
-            className={cn(
-              "flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold sm:px-4",
-              item.id === tab ? "bg-teal-800 text-white" : "text-slate-600 hover:bg-slate-50",
-            )}
-          >
-            {item.label}
-            <span className={cn("rounded-full px-1.5 text-xs", item.id === tab ? "bg-white/20" : "bg-slate-100 text-slate-500")}>{item.count}</span>
-          </Link>
-        ))}
+      <nav className="-mx-4 mb-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label={t("القوائم", "Lists")}>
+        <div className="segmented flex-nowrap">
+          {tabs.map((item) => (
+            <Link key={item.id} href={`/settings/hr?tab=${item.id}`} aria-current={item.id === tab ? "page" : undefined}>
+              {item.label}
+              <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === tab ? "bg-teal-50 text-teal-800" : "bg-white/70 text-slate-500")}>{item.count}</span>
+            </Link>
+          ))}
+        </div>
       </nav>
 
       <div className="space-y-4">
@@ -287,8 +286,8 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
                         <DeleteButton action={deleteLeaveType} fields={{ id: type.id }} confirm={t(`حذف نوع الإجازة «${type.nameAr}»؟`, `Delete leave type "${type.nameAr}"?`)} />
                       </div>
                       <details className="group">
-                        <summary className="cursor-pointer list-none text-xs font-semibold text-teal-800 hover:underline">{t("تعديل", "Edit")}</summary>
-                        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{leaveForm(type)}</div>
+                        <summary className="inline-flex cursor-pointer list-none items-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 group-open:bg-slate-100 group-open:text-slate-600">{t("تعديل", "Edit")}</summary>
+                        <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">{leaveForm(type)}</div>
                       </details>
                     </li>
                   );
@@ -339,8 +338,8 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
                         />
                       </div>
                       <details className="group">
-                        <summary className="cursor-pointer list-none text-xs font-semibold text-teal-800 hover:underline">{t("تعديل", "Edit")}</summary>
-                        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">{allowanceForm(type)}</div>
+                        <summary className="inline-flex cursor-pointer list-none items-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 group-open:bg-slate-100 group-open:text-slate-600">{t("تعديل", "Edit")}</summary>
+                        <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">{allowanceForm(type)}</div>
                       </details>
                     </li>
                   );

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { CalendarDays, CalendarRange, TriangleAlert } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { PeriodFilter } from "@/components/period-filter";
 import { AttendanceEditForm, DeleteButton } from "@/components/row-forms";
-import { Card, PageHeader } from "@/components/ui";
+import { Card, PageHeader, SectionTitle, ToneBadge } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { getI18n } from "@/lib/lang";
@@ -70,6 +71,7 @@ export default async function AttendancePage({
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
+        icon={CalendarDays}
         title={t("الحضور والغياب", "Attendance & leave")}
         description={t(
           "اختر الفترة فيُحسب عدد الأيام مباشرة. الإجازة السنوية والمرضية والتعويضية تخصم من الرصيد ولا تخصم الراتب. الغياب والإجازة بخصم تخصم الراتب ولا تخصم الرصيد. يمكن تغيير خصم الراتب قبل الحفظ.",
@@ -80,9 +82,11 @@ export default async function AttendancePage({
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
       {leaveAlerts.length ? (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
+        <div className="mb-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-red-800" role="alert">
+          <TriangleAlert size={19} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
           <p className="font-bold">{t("موظفون تجاوزوا أو اقتربوا من نفاد إجازاتهم", "Employees over or close to their leave limit")}</p>
-          <ul className="mt-1.5 space-y-1 text-sm">
+          <ul className="mt-1.5 space-y-1 text-sm leading-6">
             {leaveAlerts.map(({ employee, warnings }) => (
               <li key={employee.id}>
                 <Link href={`/employees/${employee.id}?tab=attendance`} className="font-semibold underline">
@@ -93,10 +97,14 @@ export default async function AttendancePage({
               </li>
             ))}
           </ul>
+          </div>
         </div>
       ) : null}
       {can(user, "attendance.create") ? (
-        <Card className="mb-4">
+        <Card className="mb-6">
+          <SectionTitle hint={t("يُحسب عدد الأيام والرصيد المتبقي قبل الحفظ.", "Days and the remaining balance are counted before saving.")}>
+            {t("تسجيل غياب أو إجازة", "Record absence or leave")}
+          </SectionTitle>
           <LeaveRangeForm
             action={markAttendance}
             employees={employees.map((employee) => ({ id: employee.id, fullName: displayName(employee) }))}
@@ -109,12 +117,14 @@ export default async function AttendancePage({
         </Card>
       ) : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
+      <SectionTitle hint={t(`${calendarDays(year, month)} يوماً في الشهر`, `${calendarDays(year, month)} days in the month`)}>
+        {t("ملخص الشهر", "Month summary")}
+      </SectionTitle>
+      <div className="table-shell">
+        <table className="table-stack min-w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-xs font-semibold text-slate-500">
+            <tr>
               <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
-              <th className="px-4 py-3 text-start">{t("أيام الشهر", "Month days")}</th>
               <th className="px-4 py-3 text-start">{t("خصم من الراتب", "Salary deduction")}</th>
               {leaveTypes.map((type) => (
                 <th key={type.key} className="px-4 py-3 text-start">
@@ -125,17 +135,18 @@ export default async function AttendancePage({
           </thead>
           <tbody>
             {summary.map((row) => (
-              <tr key={row.employee.id} className="border-t border-slate-100">
-                <td className="px-4 py-3">
-                  <Link href={`/employees/${row.employee.id}?tab=attendance`} className="font-semibold hover:text-teal-800">
+              <tr key={row.employee.id}>
+                <td className="cell-title px-4 py-3">
+                  <Link href={`/employees/${row.employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
                     {displayName(row.employee)}
                   </Link>
                 </td>
-                <td className="px-4 py-3">{calendarDays(year, month)}</td>
-                <td className="px-4 py-3">{daysLabel(row.salaryDays)}</td>
+                <td className="tabular px-4 py-3" data-label={t("خصم من الراتب", "Salary deduction")}>
+                  {row.salaryDays > 0 ? <span className="font-semibold text-red-700">{daysLabel(row.salaryDays)}</span> : <span className="text-slate-400">0</span>}
+                </td>
                 {leaveTypes.map((type) => (
-                  <td key={type.key} className="px-4 py-3">
-                    {daysLabel(row.used[type.key])}
+                  <td key={type.key} className="tabular px-4 py-3" data-label={leaveName(type, lang)}>
+                    {row.used[type.key] > 0 ? <span className="font-semibold text-slate-900">{daysLabel(row.used[type.key])}</span> : <span className="text-slate-400">0</span>}
                   </td>
                 ))}
               </tr>
@@ -144,23 +155,35 @@ export default async function AttendancePage({
         </table>
       </div>
 
-      <Card className="mt-4">
-        <h2 className="mb-3 font-bold">{t("سجل الشهر", "Month log")}</h2>
-        {periods.length === 0 ? <p className="text-sm text-slate-500">{t("لا توجد سجلات في هذا الشهر.", "No records this month.")}</p> : null}
-        <div className="space-y-2">
+      <Card className="mt-6">
+        <SectionTitle hint={t(`${periods.length} فترة مسجّلة`, `${periods.length} recorded period(s)`)}>{t("سجل الشهر", "Month log")}</SectionTitle>
+        {periods.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">{t("لا توجد سجلات في هذا الشهر.", "No records this month.")}</p>
+        ) : null}
+        <ul className="divide-y divide-slate-100">
           {periods.map((period) => (
-            <div key={period.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 px-3 py-2 text-sm">
-              <div>
-                <span className="font-semibold">{displayName(period.row.employee)}</span>
-                <span className="text-slate-500">
-                  {" "}
-                  — {formatDate(period.start)} {t("إلى", "to")} {formatDate(period.end)} — {daysLabel(period.days)} {t("يوم", "day(s)")} —{" "}
-                  {attendanceLabel(period.row, leaveTypes, lang)}
-                  {period.row.deductsSalary ? t(" — خصم راتب", " — salary deducted") : t(" — بدون خصم راتب", " — no salary deduction")}
-                  {period.row.notes ? ` — ${period.row.notes}` : ""}
+            <li key={period.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 gap-3">
+                <span
+                  className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${period.row.deductsSalary ? "bg-red-50 text-red-600" : "bg-teal-50 text-teal-700"}`}
+                >
+                  <CalendarRange size={17} />
                 </span>
+                <div className="min-w-0 text-sm">
+                  <p className="font-semibold text-slate-900">
+                    {displayName(period.row.employee)}
+                    <span className="ms-2 inline-block align-middle">
+                      <ToneBadge tone={period.row.deductsSalary ? "red" : "teal"}>{attendanceLabel(period.row, leaveTypes, lang)}</ToneBadge>
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-slate-500">
+                    {formatDate(period.start)} {t("إلى", "to")} {formatDate(period.end)} · {daysLabel(period.days)} {t("يوم", "day(s)")} ·{" "}
+                    {period.row.deductsSalary ? t("خصم راتب", "salary deducted") : t("بدون خصم راتب", "no salary deduction")}
+                  </p>
+                  {period.row.notes ? <p className="mt-0.5 text-xs text-slate-500">{period.row.notes}</p> : null}
+                </div>
               </div>
-              <div className="flex flex-wrap items-start gap-3">
+              <div className="flex flex-wrap items-start gap-4 ps-12 sm:ps-0">
                 {can(user, "attendance.edit") ? (
                   <AttendanceEditForm
                     action={updateAttendance}
@@ -182,9 +205,9 @@ export default async function AttendancePage({
                   />
                 ) : null}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </Card>
     </div>
   );

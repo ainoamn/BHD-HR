@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
-import { EmptyState, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { EmptyState, PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { worstExpiry } from "@/lib/expiry";
@@ -82,55 +83,94 @@ export default async function EmployeesPage({
   const employerName = (employer: { name: string; nameEn: string | null } | null) =>
     employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : "—";
 
+  const filtered = Boolean(q || employerId || status !== "ALL");
+
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader title={t("الموظفون", "Employees")} description={t("سجل العمال وبيانات الراتب وحالة الوثائق.", "Staff records, salaries and document status.")}>
+      <PageHeader icon={Users} title={t("الموظفون", "Employees")} description={t("سجل العمال وبيانات الراتب وحالة الوثائق.", "Staff records, salaries and document status.")}>
         {allow.create ? (
           <Link href="/employees/new" className={primaryBtn}>
+            <UserPlus size={17} />
             {t("إضافة موظف", "Add employee")}
           </Link>
         ) : null}
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
-      <form className="mb-4 flex flex-wrap gap-2" method="get">
-        <input className={`${fieldClass} w-full sm:w-72`} name="q" defaultValue={q} placeholder={t("بحث بالاسم أو الرقم أو الهاتف", "Search name, number or phone")} />
-        <select className={fieldClass} name="employerId" defaultValue={employerId}>
-          <option value="">{t("كل الكفلاء", "All sponsors")}</option>
-          {employers.map((employer) => (
-            <option key={employer.id} value={employer.id}>
-              {employerName(employer)}
-            </option>
-          ))}
-          <option value="none">{t("بدون كفيل", "No sponsor")}</option>
-        </select>
-        <select className={fieldClass} name="status" defaultValue={status}>
-          <option value="ALL">{t("كل الحالات", "All statuses")}</option>
-          {Object.entries(STATUS_LABEL).map(([value, label]) => (
-            <option key={value} value={value}>
-              {pick(label, lang)}
-            </option>
-          ))}
-        </select>
-        <button className={secondaryBtn} type="submit">
-          {t("بحث", "Search")}
-        </button>
-      </form>
+      <Toolbar>
+        <form className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center" method="get">
+          <div className="relative col-span-2 min-w-0 md:flex-1">
+            <Search size={17} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className={`${fieldClass} w-full ps-10`}
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder={t("ابحث بالاسم أو الرقم أو الهاتف أو الجنسية", "Search name, number, phone or nationality")}
+              aria-label={t("بحث", "Search")}
+            />
+          </div>
+          <select className={`${fieldClass} w-full md:w-auto md:min-w-44`} name="employerId" defaultValue={employerId} aria-label={t("الكفيل", "Sponsor")}>
+            <option value="">{t("كل الكفلاء", "All sponsors")}</option>
+            {employers.map((employer) => (
+              <option key={employer.id} value={employer.id}>
+                {employerName(employer)}
+              </option>
+            ))}
+            <option value="none">{t("بدون كفيل", "No sponsor")}</option>
+          </select>
+          <select className={`${fieldClass} w-full md:w-auto md:min-w-36`} name="status" defaultValue={status} aria-label={t("الحالة", "Status")}>
+            <option value="ALL">{t("كل الحالات", "All statuses")}</option>
+            {Object.entries(STATUS_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {pick(label, lang)}
+              </option>
+            ))}
+          </select>
+          <div className="col-span-2 flex gap-2 md:col-span-1">
+            <button className={`${primaryBtn} flex-1 md:flex-none`} type="submit">
+              {t("بحث", "Search")}
+            </button>
+            {filtered ? (
+              <Link href="/employees" className={`${secondaryBtn} flex-1 md:flex-none`}>
+                {t("مسح", "Clear")}
+              </Link>
+            ) : null}
+          </div>
+        </form>
+      </Toolbar>
 
       {employees.length === 0 ? (
-        <EmptyState title={t("لا يوجد موظفون", "No employees")} text={t("أضف أول موظف لتبدأ بتسجيل الوثائق والرواتب.", "Add your first employee to start tracking documents and payroll.")} />
+        <EmptyState
+          icon={Users}
+          title={filtered ? t("لا توجد نتائج", "No results") : t("لا يوجد موظفون", "No employees")}
+          text={
+            filtered
+              ? t("جرّب كلمة بحث أخرى أو امسح عوامل التصفية.", "Try another search or clear the filters.")
+              : t("أضف أول موظف لتبدأ بتسجيل الوثائق والرواتب.", "Add your first employee to start tracking documents and payroll.")
+          }
+        >
+          {!filtered && allow.create ? (
+            <Link href="/employees/new" className={primaryBtn}>
+              <UserPlus size={17} />
+              {t("إضافة موظف", "Add employee")}
+            </Link>
+          ) : null}
+        </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="min-w-full text-sm">
+        <>
+        <p className="mb-2 px-1 text-xs font-medium text-slate-500">{t(`${employees.length} موظف`, `${employees.length} employee(s)`)}</p>
+        <div className="table-shell">
+          <table className="table-stack min-w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 text-start text-xs font-semibold text-slate-500">
-                <th className="px-4 py-3 text-start">{t("الرقم", "No.")}</th>
+              <tr>
                 <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
-                <th className="px-4 py-3 text-start">{t("الكفيل", "Sponsor")}</th>
-                <th className="px-4 py-3 text-start">{t("الوظيفة", "Job")}</th>
+                <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الرقم", "No.")}</th>
+                <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الكفيل", "Sponsor")}</th>
+                <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الوظيفة", "Job")}</th>
                 {allow.salaries ? <th className="px-4 py-3 text-start">{t("الراتب", "Salary")}</th> : null}
                 <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
                 {allow.docs ? <th className="px-4 py-3 text-start">{t("المستندات", "Documents")}</th> : null}
-                {allow.edit || allow.remove ? <th className="px-4 py-3 text-start">{t("إجراءات", "Actions")}</th> : null}
+                {allow.edit || allow.remove ? <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -146,28 +186,45 @@ export default async function EmployeesPage({
                   : leave.some((item) => item.level === "exhausted")
                     ? t("نفد رصيد الإجازة", "Leave used up")
                     : t("اقترب نفاد الإجازة", "Leave almost used");
+                const name = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
                 return (
-                  <tr key={employee.id} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-500">{employee.employeeNumber}</td>
-                    <td className="px-4 py-3">
-                      <Link href={`/employees/${employee.id}`} className="font-semibold text-slate-900 hover:text-teal-800">
-                        {lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName}
+                  <tr key={employee.id}>
+                    <td className="cell-title px-4 py-3">
+                      <Link href={`/employees/${employee.id}`} className="group flex min-w-0 items-center gap-3">
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-sm font-bold text-teal-800 ring-1 ring-inset ring-teal-100">
+                          {name.trim().slice(0, 1)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold text-slate-900 group-hover:text-teal-700">{name}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            <span className="tabular hidden sm:inline xl:hidden">{employee.employeeNumber} · </span>
+                            {text(nationalityName(employee.nationality, lang))}
+                          </span>
+                        </span>
                       </Link>
-                      <div className="text-xs text-slate-500">{text(nationalityName(employee.nationality, lang))}</div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="tabular hidden px-4 py-3 font-medium whitespace-nowrap text-slate-500 xl:table-cell" data-label={t("الرقم", "No.")}>
+                      {employee.employeeNumber}
+                    </td>
+                    <td className="hidden px-4 py-3 xl:table-cell" data-label={t("الكفيل", "Sponsor")}>
                       {employee.employer ? (
-                        <Link href={`/employers/${employee.employer.id}`} className="hover:text-teal-800">
+                        <Link href={`/employers/${employee.employer.id}`} className="hover:text-teal-700">
                           {employerName(employee.employer)}
                         </Link>
                       ) : (
-                        "—"
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">{text(termText(employee.jobTitle, employee.jobTitleEn, lang))}</td>
-                    {allow.salaries ? <td className="px-4 py-3 whitespace-nowrap">{money(packageGross(employee), user.company.currency)}</td> : null}
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1">
+                    <td className="hidden px-4 py-3 xl:table-cell" data-label={t("الوظيفة", "Job")}>
+                      {text(termText(employee.jobTitle, employee.jobTitleEn, lang))}
+                    </td>
+                    {allow.salaries ? (
+                      <td className="tabular px-4 py-3 font-medium whitespace-nowrap" data-label={t("الراتب", "Salary")}>
+                        {money(packageGross(employee), user.company.currency)}
+                      </td>
+                    ) : null}
+                    <td className="px-4 py-3" data-label={t("الحالة", "Status")}>
+                      <div className="flex flex-wrap items-center gap-1.5 sm:flex-col sm:items-start">
                         <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
                         {allow.attendance && leave.length ? (
                           <Link href={`/employees/${employee.id}?tab=attendance`} title={leave.map((item) => leaveWarningText(item, lang)).join(" · ")}>
@@ -177,15 +234,16 @@ export default async function EmployeesPage({
                       </div>
                     </td>
                     {allow.docs ? (
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" data-label={t("المستندات", "Documents")}>
                         <ToneBadge tone={docs.tone}>{docs.label}</ToneBadge>
                       </td>
                     ) : null}
                     {allow.edit || allow.remove ? (
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3 whitespace-nowrap">
+                      <td className="cell-actions px-4 py-3">
+                        <div className="flex items-center gap-4 whitespace-nowrap sm:justify-end">
                           {allow.edit ? (
-                            <Link href={`/employees/${employee.id}/edit`} className="text-xs font-semibold text-teal-800 hover:underline">
+                            <Link href={`/employees/${employee.id}/edit`} className={linkAction}>
+                              <Pencil size={14} />
                               {t("تعديل", "Edit")}
                             </Link>
                           ) : null}
@@ -205,6 +263,7 @@ export default async function EmployeesPage({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

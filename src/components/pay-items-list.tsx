@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PayItem } from "@prisma/client";
+import { HandCoins, Pencil, Printer } from "lucide-react";
 import { PAYMENT_LABEL, PAY_KIND_LABEL, PAY_KIND_TONE, monthName } from "@/lib/constants";
 import { makeT, pick, type Lang } from "@/lib/i18n";
 import { keyToPeriod, payItemProgress, type PayItemStatus } from "@/lib/pay-items";
@@ -49,7 +50,15 @@ export function PayItemsList({
   defaultStart: string;
 }) {
   const t = makeT(lang);
-  if (!items.length) return <p className="py-6 text-center text-sm text-slate-500">{t("لا توجد بنود.", "No items.")}</p>;
+  if (!items.length)
+    return (
+      <div className="flex flex-col items-center py-10 text-center">
+        <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+          <HandCoins size={22} />
+        </span>
+        <p className="mt-3 text-sm text-slate-500">{t("لا توجد بنود.", "No items.")}</p>
+      </div>
+    );
   return (
     <ul className="divide-y divide-slate-100">
       {items.map((item) => {
@@ -72,16 +81,16 @@ export function PayItemsList({
                 );
         const percent = advance && item.amount > 0 ? Math.min(100, Math.round((progress.paidAmount / item.amount) * 100)) : 0;
         return (
-          <li key={item.id} id={`item-${item.id}`} className="scroll-mt-24 py-4">
+          <li key={item.id} id={`item-${item.id}`} className="scroll-mt-24 py-5 first:pt-2 last:pb-2">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
+              <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <ToneBadge tone={PAY_KIND_TONE[item.kind] || "slate"}>{pick(PAY_KIND_LABEL[item.kind], lang, item.kind)}</ToneBadge>
                   <span className="font-semibold text-slate-900">{item.title}</span>
                   <ToneBadge tone={status.tone}>{lang === "en" ? status.en : status.ar}</ToneBadge>
                 </div>
                 {showEmployee ? (
-                  <Link href={`/employees/${item.employee.id}?tab=pay`} className="block text-sm font-medium text-teal-800 hover:underline">
+                  <Link href={`/employees/${item.employee.id}?tab=pay`} className="block text-sm font-semibold text-teal-700 hover:underline">
                     {name} — {item.employee.employeeNumber}
                   </Link>
                 ) : null}
@@ -93,8 +102,8 @@ export function PayItemsList({
                   {item.notes ? ` — ${item.notes}` : ""}
                 </p>
               </div>
-              <div className="text-end">
-                <p className={`text-lg font-bold ${progress.deducts ? "text-red-700" : "text-emerald-700"}`}>
+              <div className="shrink-0 rounded-xl bg-slate-50 px-3.5 py-2 text-end ring-1 ring-inset ring-slate-100">
+                <p className={`tabular text-lg font-bold ${progress.deducts ? "text-red-700" : "text-emerald-700"}`}>
                   {progress.deducts ? "−" : "+"}
                   {money(item.amount, currency)}
                 </p>
@@ -102,11 +111,11 @@ export function PayItemsList({
               </div>
             </div>
 
-            <div className="mt-2 space-y-1 text-xs text-slate-600">
+            <div className="mt-3 space-y-1.5 text-xs text-slate-600">
               {advance ? (
                 <>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-teal-600" style={{ width: `${percent}%` }} />
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="h-full rounded-full bg-gradient-to-l from-teal-500 to-teal-700 transition-[width] duration-300" style={{ width: `${percent}%` }} />
                   </div>
                   <p>
                     {t(
@@ -132,17 +141,21 @@ export function PayItemsList({
             </div>
 
             {advance ? (
-              <Link href={`/pay-items/${item.id}/print`} className="mt-2 inline-block text-xs font-semibold text-teal-800 hover:underline">
+              <Link href={`/pay-items/${item.id}/print`} className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:underline">
+                <Printer size={14} />
                 {t("طباعة إيصال استلام السلفة", "Print advance receipt")}
               </Link>
             ) : null}
 
             {allow.edit || allow.remove ? (
-              <div className="mt-3 flex flex-wrap items-start gap-4">
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                 {allow.edit ? (
-                  <details className="w-full sm:w-auto sm:min-w-[28rem]">
-                    <summary className="cursor-pointer list-none text-xs font-semibold text-teal-800 hover:underline">{t("تعديل", "Edit")}</summary>
-                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <details className="group w-full open:order-last sm:w-auto open:sm:w-full">
+                    <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 group-open:bg-slate-100 group-open:text-slate-600">
+                      <Pencil size={13} />
+                      {t("تعديل", "Edit")}
+                    </summary>
+                    <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 sm:max-w-2xl">
                       <PayItemForm
                         action={savePayItem}
                         returnTo={`${returnTo}#item-${item.id}`}

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarCheck2, FileBadge, Mail, Pencil, Phone, ReceiptText, Wallet } from "lucide-react";
 import { AttendanceEditForm, DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { can, requirePermission } from "@/lib/auth";
 import { allowanceAmount, describeAllowance } from "@/lib/allowances";
@@ -36,26 +37,6 @@ import { savePayItem } from "@/server/pay-item-actions";
 import { createSalary } from "@/server/salary-actions";
 import { PayItemForm } from "@/components/pay-item-form";
 import { PayItemsList } from "@/components/pay-items-list";
-
-function Info({ label, value, wide, dir }: { label: string; value: React.ReactNode; wide?: boolean; dir?: "ltr" }) {
-  return (
-    <div className={cn("min-w-0 rounded-xl bg-slate-50 px-3 py-2.5", wide && "sm:col-span-2")}>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-0.5 break-words font-medium text-slate-900" dir={dir}>
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <h2 className="font-bold text-slate-900">{children}</h2>
-      {action}
-    </div>
-  );
-}
 
 export default async function EmployeePage({
   params,
@@ -197,20 +178,24 @@ export default async function EmployeePage({
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <Link href="/employees" className="inline-flex text-sm font-semibold text-teal-800">
-        {lang === "en" ? "←" : "→"} {t("كل الموظفين", "All employees")}
+    <div className="mx-auto max-w-6xl space-y-5">
+      <Link href="/employees" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
+        {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
+        {t("كل الموظفين", "All employees")}
       </Link>
 
-      <Card className="p-0 sm:p-0">
-        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-teal-800 text-2xl font-bold text-white sm:h-16 sm:w-16">
-              {displayName.slice(0, 1)}
+      <section className="animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-card">
+        <div className="relative h-24 overflow-hidden bg-gradient-to-l from-slate-900 to-teal-800 sm:h-28" aria-hidden="true">
+          <div className="higher-horizon absolute -bottom-10 end-4 h-44 w-72 bg-[length:100%] opacity-[0.1]" />
+        </div>
+        <div className="flex flex-col gap-4 px-4 pb-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+          <div className="flex min-w-0 items-end gap-4">
+            <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-white sm:-mt-12 sm:size-24">
+              {displayName.trim().slice(0, 1)}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 pb-0.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="break-words text-xl font-bold text-slate-900 sm:text-2xl">{displayName}</h1>
+                <h1 className="break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{displayName}</h1>
                 <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
               </div>
               {secondName ? (
@@ -223,11 +208,13 @@ export default async function EmployeePage({
           <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:items-center">
             {allow.edit ? (
               <Link href={`${base}/edit`} className={primaryBtn}>
+                <Pencil size={16} />
                 {t("تعديل البيانات", "Edit")}
               </Link>
             ) : null}
             {allow.salaries ? (
               <Link href={`${base}?tab=salaries#statement`} className={secondaryBtn}>
+                <ReceiptText size={16} />
                 {t("كشف الرواتب", "Statement")}
               </Link>
             ) : null}
@@ -245,29 +232,36 @@ export default async function EmployeePage({
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 text-xs sm:px-5">
-          <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">{employee.employeeNumber}</span>
-          {jobTitle ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{jobTitle}</span> : null}
-          {department ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{department}</span> : null}
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs sm:px-6">
+          <span className="tabular inline-flex items-center rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">{employee.employeeNumber}</span>
+          {jobTitle ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200">
+              <BriefcaseBusiness size={13} className="text-slate-400" />
+              {jobTitle}
+            </span>
+          ) : null}
+          {department ? <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200">{department}</span> : null}
           {employerName ? (
-            <Link href={`/employers/${employer!.id}`} className="rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-800 ring-1 ring-teal-100">
+            <Link href={`/employers/${employer!.id}`} className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-800 ring-1 ring-teal-100 hover:bg-teal-100">
               {t("الكفيل:", "Sponsor:")} {employerName}
             </Link>
           ) : (
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">{t("بدون كفيل", "No sponsor")}</span>
+            <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-amber-800 ring-1 ring-amber-100">{t("بدون كفيل", "No sponsor")}</span>
           )}
           {employee.phone ? (
-            <a href={`tel:${employee.phone}`} className="rounded-full bg-slate-100 px-3 py-1 text-slate-700" dir="ltr">
+            <a href={`tel:${employee.phone}`} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
+              <Phone size={13} className="text-slate-400" />
               {employee.phone}
             </a>
           ) : null}
           {employee.email ? (
-            <a href={`mailto:${employee.email}`} className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-slate-700" dir="ltr">
-              {employee.email}
+            <a href={`mailto:${employee.email}`} className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
+              <Mail size={13} className="shrink-0 text-slate-400" />
+              <span className="truncate">{employee.email}</span>
             </a>
           ) : null}
         </div>
-      </Card>
+      </section>
 
       {allow.attendance && warnings.length ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
@@ -290,62 +284,67 @@ export default async function EmployeePage({
 
       <Flash error={sp.error} message={sp.message} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {allow.salaries ? (
-          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-500">{t("إجمالي الراتب", "Gross salary")}</p>
-            <p className="mt-1 truncate text-lg font-bold text-slate-900">{money(gross, currency)}</p>
+          <div className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-medium text-slate-500">{t("إجمالي الراتب", "Gross salary")}</p>
+              <Wallet size={17} className="shrink-0 text-gold-500" />
+            </div>
+            <p className="tabular mt-1.5 truncate text-lg font-bold text-slate-900">{money(gross, currency)}</p>
           </div>
         ) : null}
         {allow.attendance && annual ? (
-          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-sm", warnedKeys.has(annual.key) ? "border-red-200 bg-red-50" : "border-slate-200 bg-white")}>
-            <p className={cn("truncate text-xs", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-500")}>
-              {t("رصيد", "Left:")} {leaveName(annual, lang)}
-            </p>
-            <p className={cn("mt-1 text-lg font-bold", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-900")}>
+          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-card", warnedKeys.has(annual.key) ? "border-red-200 bg-red-50" : "border-slate-200/90 bg-white")}>
+            <div className="flex items-center justify-between gap-2">
+              <p className={cn("truncate text-xs font-medium", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-500")}>
+                {t("رصيد", "Left:")} {leaveName(annual, lang)}
+              </p>
+              <CalendarCheck2 size={17} className={cn("shrink-0", warnedKeys.has(annual.key) ? "text-red-500" : "text-teal-600")} />
+            </div>
+            <p className={cn("tabular mt-1.5 text-lg font-bold", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-900")}>
               {daysLabel(annual.remaining)} <span className="text-sm font-normal text-slate-500">{t("يوم", "days")}</span>
             </p>
           </div>
         ) : null}
         {allow.docs ? (
-          <Link href={`${base}?tab=docs`} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-teal-200">
-            <p className="text-xs text-slate-500">{t("أقرب انتهاء وثيقة", "Nearest document expiry")}</p>
-            <div className="mt-1.5">
+          <Link href={`${base}?tab=docs`} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-raised">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-medium text-slate-500">{t("أقرب انتهاء وثيقة", "Nearest document expiry")}</p>
+              <FileBadge size={17} className="shrink-0 text-navy-500" />
+            </div>
+            <div className="mt-2">
               <ToneBadge tone={docsWorst.tone}>{docsWorst.label}</ToneBadge>
             </div>
           </Link>
         ) : null}
         {allow.salaries ? (
-        <Link href={`${base}?tab=salaries`} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-teal-200">
-          <p className="text-xs text-slate-500">{t("آخر راتب", "Last salary")}</p>
+        <Link href={`${base}?tab=salaries`} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-raised">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-xs font-medium text-slate-500">{t("آخر راتب", "Last salary")}</p>
+            <ReceiptText size={17} className="shrink-0 text-aqua-600" />
+          </div>
           {lastSalary ? (
-            <div className="mt-1 flex flex-wrap items-center gap-2">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="font-bold text-slate-900">
                 {monthName(lastSalary.month, lang)} {lastSalary.year}
               </span>
               <ToneBadge tone={lastSalary.paid ? "green" : "amber"}>{lastSalary.paid ? t("مصروف", "Paid") : t("غير مصروف", "Unpaid")}</ToneBadge>
             </div>
           ) : (
-            <p className="mt-1 text-sm text-slate-500">{t("لا يوجد بعد", "None yet")}</p>
+            <p className="mt-1.5 text-sm text-slate-500">{t("لا يوجد بعد", "None yet")}</p>
           )}
         </Link>
         ) : null}
       </div>
 
-      <nav className="no-print">
-        <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-1 sm:inline-flex">
+      <nav className="no-print -mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label={t("أقسام ملف الموظف", "Profile sections")}>
+        <div className="segmented flex-nowrap">
           {tabs.map((item) => (
-            <Link
-              key={item.id}
-              href={`${base}?tab=${item.id}`}
-              className={cn(
-                "flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold sm:px-4",
-                item.id === tab ? "bg-teal-800 text-white" : "text-slate-600 hover:bg-slate-50",
-              )}
-            >
+            <Link key={item.id} href={`${base}?tab=${item.id}`} aria-current={item.id === tab ? "page" : undefined}>
               {item.label}
               {item.count ? (
-                <span className={cn("rounded-full px-1.5 text-xs", item.id === tab ? "bg-white/20" : "bg-slate-100 text-slate-500")}>{item.count}</span>
+                <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === tab ? "bg-teal-50 text-teal-800" : "bg-white/70 text-slate-500")}>{item.count}</span>
               ) : null}
             </Link>
           ))}

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ChevronDown, MailOpen } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
 import { SubmitButton } from "@/components/submit-button";
@@ -33,15 +34,24 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
   const granted = invite ? permissionsFor(invite.role, invite.permissions) : [];
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-4 flex justify-end">
-          <LangToggle />
+    <div className="flex min-h-dvh flex-col bg-sand-50">
+      <div className="flex items-center justify-between gap-3 px-5 pt-5 sm:px-8 sm:pt-8">
+        <span className="flex items-center gap-2.5">
+          <span className="official-logo official-logo-mark official-logo-ink w-10" aria-hidden="true" />
+          <span className="text-sm font-bold text-slate-900">{t("الموظفون والرواتب", "HR & Payroll")}</span>
+        </span>
+        <LangToggle />
+      </div>
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+      <div className="w-full max-w-lg animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-raised">
+        <div className="relative flex items-center gap-3.5 overflow-hidden bg-gradient-to-l from-slate-900 to-teal-900 px-6 py-6 text-white sm:px-8">
+          <span className="higher-horizon pointer-events-none absolute -bottom-6 end-0 h-28 w-48 bg-[length:100%] opacity-[0.08]" aria-hidden="true" />
+          <span className="relative flex size-11 items-center justify-center rounded-xl bg-white/10 text-gold-300 ring-1 ring-inset ring-white/15">
+            <MailOpen size={20} />
+          </span>
+          <h1 className="relative text-xl font-bold">{t("دعوة للانضمام", "Invitation to join")}</h1>
         </div>
-        <div className="mb-6 flex items-center gap-3">
-          <span className="official-logo official-logo-mark official-logo-ink w-14" aria-hidden="true" />
-          <h1 className="text-xl font-bold text-slate-900">{t("دعوة للانضمام", "Invitation to join")}</h1>
-        </div>
+        <div className="p-6 sm:p-8">
         <Flash error={sp.error} />
         {!invite || takenByOther ? (
           <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -52,7 +62,7 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
           </p>
         ) : (
           <div className="space-y-4 text-sm">
-            <div className="rounded-2xl bg-slate-50 p-4 leading-7">
+            <div className="rounded-2xl bg-slate-50 p-4 leading-7 ring-1 ring-inset ring-slate-100">
               <p>
                 {t("المنشأة", "Company")}: <strong>{lang === "en" && invite.company.nameEn ? invite.company.nameEn : invite.company.name}</strong>
               </p>
@@ -69,8 +79,11 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
                 </p>
               ) : null}
             </div>
-            <details className="rounded-2xl border border-slate-200 p-4">
-              <summary className="cursor-pointer font-semibold">{t("تفاصيل الصلاحيات", "Permission details")}</summary>
+            <details className="group rounded-2xl border border-slate-200 p-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-semibold">
+                {t("تفاصيل الصلاحيات", "Permission details")}
+                <ChevronDown size={17} className="text-slate-400 transition group-open:rotate-180" />
+              </summary>
               <ul className="mt-3 space-y-1.5">
                 {MODULES.map((module) => {
                   const actions = MODULE_ACTIONS[module].filter((action) => granted.includes(`${module}.${action}`));
@@ -100,13 +113,15 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
             ) : (
               <form action={acceptInvite}>
                 <input type="hidden" name="token" value={token} />
-                <SubmitButton pendingLabel={t("جارٍ الفتح...", "Opening...")}>
+                <SubmitButton className="w-full" pendingLabel={t("جارٍ الفتح...", "Opening...")}>
                   {invite.userId ? t("فتح بيانات المنشأة", "Open the company") : t("قبول الدعوة وفتح البيانات", "Accept and open")}
                 </SubmitButton>
               </form>
             )}
           </div>
         )}
+        </div>
+      </div>
       </div>
     </div>
   );

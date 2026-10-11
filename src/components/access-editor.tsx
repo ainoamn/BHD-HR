@@ -53,24 +53,24 @@ export function AccessEditor({ defaultRole = "VIEWER", defaultPermissions = [] }
     <div className="space-y-3">
       <input type="hidden" name="role" value={role} />
       {role === "CUSTOM" ? custom.map((permission) => <input key={permission} type="hidden" name="perm" value={permission} />) : null}
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {presets.map((preset) => (
           <button
             key={preset.id}
             type="button"
             onClick={() => choosePreset(preset.id)}
             aria-pressed={role === preset.id}
-            className={`rounded-xl border px-3 py-2 text-start transition ${role === preset.id ? "border-teal-700 bg-teal-50 ring-2 ring-teal-100" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+            className={`rounded-xl border px-3 py-2.5 text-start transition duration-150 ${role === preset.id ? "border-teal-600 bg-teal-50 ring-4 ring-teal-600/10" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
           >
             <span className="block text-sm font-bold text-slate-900">{preset.title}</span>
             <span className="block text-xs leading-5 text-slate-500">{preset.text}</span>
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="min-w-full text-sm">
+      <div className="table-shell shadow-none">
+        <table className="text-sm">
           <thead>
-            <tr className="bg-slate-50 text-xs font-semibold text-slate-500">
+            <tr>
               <th className="px-3 py-2 text-start">{t("القسم", "Section")}</th>
               {ACTION_COLUMNS.map((action) => (
                 <th key={action} className="px-2 py-2 text-center">
@@ -85,8 +85,8 @@ export function AccessEditor({ defaultRole = "VIEWER", defaultPermissions = [] }
               const actions = MODULE_ACTIONS[module];
               const all = actions.every((action) => granted.has(`${module}.${action}`));
               return (
-                <tr key={module} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-medium text-slate-800">{pick(MODULE_LABEL[module], lang)}</td>
+                <tr key={module}>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-800">{pick(MODULE_LABEL[module], lang)}</td>
                   {ACTION_COLUMNS.map((action) => (
                     <td key={action} className="px-2 py-2 text-center">
                       {actions.includes(action) ? (

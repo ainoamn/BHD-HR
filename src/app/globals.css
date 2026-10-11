@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-/* BHD shared identity (docs/BHD-UNIFIED-LOGIN-AND-APPS.md §0.1): ink, emerald, sand, #d7e2dc borders. */
+/*
+ * BHD shared identity (docs/BHD-UNIFIED-LOGIN-AND-APPS.md §0.1, docs/BHD-BRAND-IDENTITY.md §8–13):
+ * ink #092d24, emerald #075c45, sand #fbfaf7 / #f4f0e8, line #d7e2dc. Teal, navy and gold are accents only.
+ * `teal` is the emerald scale; `slate` is the brand-tinted neutral scale (muted #66756f).
+ */
 @theme {
   --color-teal-50: #e6f1ec;
   --color-teal-100: #cfe5dc;
@@ -13,8 +17,66 @@
   --color-teal-800: #0a493b;
   --color-teal-900: #092d24;
   --color-teal-950: #061f19;
+
+  --color-slate-50: #f6f8f7;
+  --color-slate-100: #eef2f0;
   --color-slate-200: #d7e2dc;
+  --color-slate-300: #c3d0c9;
+  --color-slate-400: #8fa09a;
+  --color-slate-500: #66756f;
+  --color-slate-600: #4e5e57;
+  --color-slate-700: #364841;
+  --color-slate-800: #1c3129;
   --color-slate-900: #092d24;
+  --color-slate-950: #061f19;
+
+  --color-sand-50: #fbfaf7;
+  --color-sand-100: #f4f0e8;
+  --color-sand-200: #e9e1d2;
+
+  --color-gold-50: #fbf6ee;
+  --color-gold-100: #f4e8d4;
+  --color-gold-200: #e8d0a9;
+  --color-gold-300: #d6b27e;
+  --color-gold-400: #c59f68;
+  --color-gold-500: #b58d55;
+  --color-gold-600: #9a7443;
+  --color-gold-700: #7b5b35;
+
+  --color-aqua-50: #e7f6f5;
+  --color-aqua-100: #c6ebe9;
+  --color-aqua-500: #08a39f;
+  --color-aqua-600: #078a87;
+  --color-aqua-700: #066f6c;
+
+  --color-navy-50: #eaf0f6;
+  --color-navy-100: #d0dfeb;
+  --color-navy-500: #174b70;
+  --color-navy-700: #10364f;
+
+  --shadow-card: 0 1px 2px rgb(9 45 36 / 0.04), 0 1px 1px rgb(9 45 36 / 0.02);
+  --shadow-raised: 0 12px 32px -14px rgb(9 45 36 / 0.22), 0 2px 6px -2px rgb(9 45 36 / 0.06);
+  --shadow-float: 0 24px 60px -20px rgb(9 45 36 / 0.35);
+
+  --ease-calm: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --animate-fade-up: fade-up 0.32s var(--ease-calm) both;
+  --animate-fade-in: fade-in 0.22s ease-out both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+/* next/font variables live on <html>; `inline` resolves them where the utility is used. */
+@theme inline {
+  --font-sans: var(--font-inter), var(--font-plex-arabic), "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 :root {
@@ -23,12 +85,263 @@
   --sand: #fbfaf7;
   --sand-deep: #f4f0e8;
   --line: #d7e2dc;
+  --sidebar-width: 17rem;
+  --bottom-nav-height: 4rem;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 5rem;
 }
 
 body {
-  font-family: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  font-family: var(--font-sans);
   background: var(--sand);
   color: var(--ink);
+  line-height: 1.6;
+  font-feature-settings: "cv11";
+}
+
+:lang(ar) body {
+  line-height: 1.7;
+}
+
+::selection {
+  background: var(--color-teal-100);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-teal-600);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-teal-700);
+  }
+
+  input[type="file"]::file-selector-button {
+    margin-inline-end: 0.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--color-teal-50);
+    padding: 0.3rem 0.75rem;
+    color: var(--color-teal-800);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Data tables: <div class="table-shell"><table>…</table></div>. */
+  .table-shell {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: var(--shadow-card);
+    scrollbar-width: thin;
+  }
+
+  .table-shell table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table-shell thead th {
+    background: var(--color-slate-50);
+    border-bottom: 1px solid var(--color-slate-200);
+    color: var(--color-slate-500);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .table-shell thead tr {
+    background: transparent;
+  }
+
+  .table-shell tbody tr {
+    transition: background-color 0.15s ease;
+  }
+
+  .table-shell tbody tr + tr > td {
+    border-top: 1px solid var(--color-slate-100);
+  }
+
+  .table-shell tbody tr:hover {
+    background: #f9fbfa;
+  }
+
+  .table-shell tfoot td,
+  .table-shell tfoot th {
+    border-top: 1px solid var(--color-slate-200);
+    background: var(--color-slate-50);
+    font-weight: 700;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Segmented control: links or buttons inside; the current one gets aria-current or data-active. */
+  .segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    border-radius: 0.875rem;
+    background: var(--color-slate-100);
+    padding: 0.25rem;
+  }
+
+  .segmented > * {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 2.25rem;
+    border-radius: 0.625rem;
+    padding: 0.35rem 0.85rem;
+    color: var(--color-slate-600);
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .segmented > *:hover {
+    color: var(--ink);
+  }
+
+  .segmented > [aria-current="page"],
+  .segmented > [aria-current="true"],
+  .segmented > [data-active="true"] {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgb(9 45 36 / 0.08), 0 0 0 1px rgb(9 45 36 / 0.04);
+  }
+
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+  }
+
+  /* BHD Higher Horizon: three rising strokes, kept under 12% opacity (brand §10). */
+  .higher-horizon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160' fill='none'%3E%3Cpath d='M-10 150 L70 70' stroke='white' stroke-width='14' stroke-linecap='round'/%3E%3Cpath d='M50 170 L150 70' stroke='white' stroke-width='14' stroke-linecap='round'/%3E%3Cpath d='M110 190 L230 70' stroke='white' stroke-width='14' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+  }
+}
+
+/* Under 640px a `.table-stack` table turns each row into a card; cells show their data-label. */
+@media (max-width: 639.98px) {
+  .table-shell:has(.table-stack) {
+    overflow: visible;
+  }
+
+  .table-stack thead {
+    display: none;
+  }
+
+  .table-stack,
+  .table-stack tbody,
+  .table-stack tfoot,
+  .table-stack tr {
+    display: block;
+    width: 100%;
+  }
+
+  .table-stack tr {
+    padding: 0.9rem 1rem;
+  }
+
+  .table-stack tbody tr + tr {
+    border-top: 1px solid var(--color-slate-100);
+  }
+
+  .table-stack tbody tr:first-child {
+    border-top: 0;
+  }
+
+  .table-stack tbody tr + tr > td {
+    border-top: 0;
+  }
+
+  .table-stack td {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 0.75rem;
+    min-height: 1.9rem;
+    padding: 0.2rem 0 !important;
+    text-align: end;
+  }
+
+  .table-stack td[data-label]::before {
+    content: attr(data-label);
+    margin-inline-end: auto;
+    color: var(--color-slate-500);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: start;
+  }
+
+  .table-stack td.cell-title {
+    display: block;
+    padding-bottom: 0.45rem !important;
+    text-align: start;
+  }
+
+  .table-stack td.cell-actions {
+    justify-content: flex-start;
+    margin-top: 0.4rem;
+    padding-top: 0.6rem !important;
+    border-top: 1px dashed var(--color-slate-200);
+  }
+
+  .table-stack td.cell-actions::before {
+    display: none;
+  }
+
+  .table-stack td:empty {
+    display: none;
+  }
 }
 
 /* Official logo (mask so it can take the ink / light tone). */
@@ -359,10 +672,12 @@ body {
 @media print {
   .app-shell {
     display: block !important;
+    padding: 0 !important;
   }
 
   .app-sidebar,
   .app-header,
+  .app-bottom-nav,
   .site-footer,
   .no-print {
     display: none !important;

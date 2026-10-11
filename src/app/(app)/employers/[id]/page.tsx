@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, ArrowRight, Banknote, FileText, Mail, MapPin, PencilLine, Phone, Printer, ReceiptText, Trash2, UserPlus, Users, Wallet } from "lucide-react";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
-import { Card, ToneBadge, primaryBtn, secondaryBtn } from "@/components/ui";
+import { Card, EmptyState, SectionTitle, Stat, ToneBadge, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
@@ -48,22 +48,32 @@ export default async function EmployerPage({
   const employeeName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <Link href="/employers" className="inline-flex text-sm font-semibold text-teal-800">
-        {lang === "en" ? "←" : "→"} {t("دفتر العناوين", "Address book")}
+    <div className="mx-auto max-w-5xl space-y-5">
+      <Link href="/employers" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
+        {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
+        {t("دفتر العناوين", "Address book")}
       </Link>
 
-      <Card className="p-0 sm:p-0">
-        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
-          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+      <section className="animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-card">
+        <div className="relative h-24 overflow-hidden bg-gradient-to-l from-slate-900 to-navy-700 sm:h-28" aria-hidden="true">
+          <div className="higher-horizon absolute -bottom-10 end-4 h-44 w-72 bg-[length:100%] opacity-[0.1]" />
+        </div>
+        <div className="flex flex-col gap-4 px-4 pb-5 sm:px-6 md:flex-row md:items-end md:justify-between">
+          <div className="flex min-w-0 items-end gap-4">
             {employer.logoUrl ? (
-              <img src={employer.logoUrl} alt="" className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-1" />
+              <img
+                src={employer.logoUrl}
+                alt=""
+                className="relative -mt-10 size-20 shrink-0 rounded-2xl bg-white object-contain p-1.5 shadow-raised ring-4 ring-white sm:-mt-12 sm:size-24"
+              />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-teal-800 text-2xl font-bold text-white">{title.slice(0, 1)}</div>
+              <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-white sm:-mt-12 sm:size-24">
+                {title.trim().slice(0, 1)}
+              </div>
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 pb-0.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="break-words text-xl font-bold text-slate-900 sm:text-2xl">{title}</h1>
+                <h1 className="break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{title}</h1>
                 <ToneBadge tone="teal">{pick(EMPLOYER_KIND[employer.kind], lang, employer.kind)}</ToneBadge>
               </div>
               {subtitle ? (
@@ -71,115 +81,108 @@ export default async function EmployerPage({
                   {subtitle}
                 </p>
               ) : null}
-              {contacts.length ? (
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-                  {contacts.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <span key={item.value} className="inline-flex min-w-0 items-center gap-1.5">
-                        <Icon size={14} className="shrink-0 text-slate-400" />
-                        {item.href ? (
-                          <a href={item.href} className="break-all hover:text-teal-800" dir="ltr">
-                            {item.value}
-                          </a>
-                        ) : (
-                          <span className="break-words" dir={item.ltr ? "ltr" : undefined}>
-                            {item.value}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : null}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:items-center md:justify-end">
             {can(user, "employees.create") ? (
               <Link href={`/employees/new?employerId=${employer.id}`} className={primaryBtn}>
+                <UserPlus size={16} />
                 {t("إضافة موظف", "Add employee")}
               </Link>
             ) : null}
-            {can(user, "salaries.view") ? (
+            {showPay ? (
               <>
                 <Link href={`/salaries?employerId=${employer.id}`} className={secondaryBtn}>
+                  <Banknote size={16} />
                   {t("الرواتب", "Payroll")}
                 </Link>
                 <Link href={`/salaries/sheet?from=${period}&to=${period}&employerId=${employer.id}`} target="_blank" className={secondaryBtn}>
-                  {t("كشف رواتب الشهر", "This month's sheet")}
+                  <ReceiptText size={16} />
+                  {t("كشف الشهر", "Month sheet")}
                 </Link>
               </>
             ) : null}
             <Link href={`/address-book/print?employerId=${employer.id}`} target="_blank" className={secondaryBtn}>
+              <Printer size={16} />
               {t("طباعة جهات الاتصال", "Print contacts")}
             </Link>
           </div>
         </div>
-        <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 text-center rtl:divide-x-reverse">
-          <div className="px-2 py-3">
-            <p className="text-xs text-slate-500">{t("كل الموظفين", "All employees")}</p>
-            <p className="font-bold text-slate-900">{employer.employees.length}</p>
+        {contacts.length ? (
+          <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs sm:px-6">
+            {contacts.map((item) => {
+              const Icon = item.icon;
+              const chip = "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200";
+              return item.href ? (
+                <a key={item.value} href={item.href} className={`${chip} hover:text-teal-700`} dir="ltr">
+                  <Icon size={13} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{item.value}</span>
+                </a>
+              ) : (
+                <span key={item.value} className={chip} dir={item.ltr ? "ltr" : undefined}>
+                  <Icon size={13} className="shrink-0 text-slate-400" />
+                  <span className="break-words">{item.value}</span>
+                </span>
+              );
+            })}
           </div>
-          <div className="px-2 py-3">
-            <p className="text-xs text-slate-500">{t("النشطون", "Active")}</p>
-            <p className="font-bold text-slate-900">{active.length}</p>
-          </div>
-          <div className="min-w-0 px-2 py-3">
-            <p className="text-xs text-slate-500">{t("الرواتب الشهرية", "Monthly payroll")}</p>
-            <p className="truncate font-bold text-slate-900">{showPay ? money(monthly, currency) : "—"}</p>
-          </div>
+        ) : null}
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <Stat label={t("كل الموظفين", "All employees")} value={String(employer.employees.length)} icon={Users} tone="navy" />
+        <Stat label={t("النشطون", "Active")} value={String(active.length)} icon={Users} tone="teal" />
+        <div className="col-span-2 sm:col-span-1">
+          <Stat label={t("الرواتب الشهرية", "Monthly payroll")} value={showPay ? money(monthly, currency) : "—"} icon={Wallet} tone="gold" />
         </div>
-      </Card>
+      </div>
 
       <Flash error={sp.error} message={sp.message} />
 
       <Card>
-        <h2 className="mb-3 font-bold">
-          {t("الموظفون المرتبطون", "Linked employees")} ({employer.employees.length})
-        </h2>
+        <SectionTitle hint={t(`${employer.employees.length} موظف`, `${employer.employees.length} employee(s)`)}>{t("الموظفون المرتبطون", "Linked employees")}</SectionTitle>
         {employer.employees.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("لا يوجد موظفون مرتبطون بهذا الكفيل.", "No employees linked to this sponsor.")}</p>
-        ) : null}
-        <div className="space-y-2 md:hidden">
-          {employer.employees.map((employee) => (
-            <Link key={employee.id} href={`/employees/${employee.id}`} className="block rounded-xl border border-slate-100 p-3 hover:border-teal-200">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="break-words font-semibold text-slate-900">{employeeName(employee)}</p>
-                  <p className="text-xs text-slate-500">
-                    {employee.employeeNumber} · {text(termText(employee.jobTitle, employee.jobTitleEn, lang))}
-                  </p>
-                </div>
-                <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
-              </div>
-              {showPay ? <p className="mt-1 text-sm font-semibold text-slate-700">{money(packageGross(employee), currency)}</p> : null}
-            </Link>
-          ))}
-        </div>
-        {employer.employees.length ? (
-          <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-full text-sm">
+          <EmptyState icon={Users} title={t("لا يوجد موظفون", "No employees")} text={t("لا يوجد موظفون مرتبطون بهذا الكفيل.", "No employees linked to this sponsor.")}>
+            {can(user, "employees.create") ? (
+              <Link href={`/employees/new?employerId=${employer.id}`} className={primaryBtn}>
+                <UserPlus size={16} />
+                {t("إضافة موظف", "Add employee")}
+              </Link>
+            ) : null}
+          </EmptyState>
+        ) : (
+          <div className="table-shell -mx-1 sm:mx-0">
+            <table className="table-stack text-sm">
               <thead>
-                <tr className="border-b border-slate-100 text-xs text-slate-500">
-                  <th className="py-2 text-start font-semibold">{t("الرقم", "No.")}</th>
-                  <th className="py-2 text-start font-semibold">{t("الموظف", "Employee")}</th>
-                  <th className="py-2 text-start font-semibold">{t("الوظيفة", "Job title")}</th>
-                  <th className="py-2 text-start font-semibold">{t("إجمالي الراتب", "Gross salary")}</th>
-                  <th className="py-2 text-start font-semibold">{t("الحالة", "Status")}</th>
+                <tr>
+                  <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
+                  <th className="px-4 py-3 text-start">{t("الرقم", "No.")}</th>
+                  <th className="px-4 py-3 text-start">{t("الوظيفة", "Job title")}</th>
+                  <th className="px-4 py-3 text-start">{t("إجمالي الراتب", "Gross salary")}</th>
+                  <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
                 </tr>
               </thead>
               <tbody>
                 {employer.employees.map((employee) => (
-                  <tr key={employee.id} className="border-t border-slate-100">
-                    <td className="py-2.5 text-slate-500">{employee.employeeNumber}</td>
-                    <td className="py-2.5">
-                      <Link href={`/employees/${employee.id}`} className="font-semibold hover:text-teal-800">
-                        {employeeName(employee)}
+                  <tr key={employee.id}>
+                    <td className="cell-title px-4 py-3">
+                      <Link href={`/employees/${employee.id}`} className="flex items-center gap-2.5 font-semibold text-slate-900 hover:text-teal-700">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-sm font-bold text-teal-700">
+                          {employeeName(employee).trim().slice(0, 1)}
+                        </span>
+                        <span className="min-w-0 break-words">{employeeName(employee)}</span>
                       </Link>
                     </td>
-                    <td className="py-2.5">{text(termText(employee.jobTitle, employee.jobTitleEn, lang))}</td>
-                    <td className="whitespace-nowrap py-2.5">{showPay ? money(packageGross(employee), currency) : "—"}</td>
-                    <td className="py-2.5">
+                    <td data-label={t("الرقم", "No.")} className="tabular px-4 py-3 text-slate-500">
+                      {employee.employeeNumber}
+                    </td>
+                    <td data-label={t("الوظيفة", "Job title")} className="px-4 py-3">
+                      {text(termText(employee.jobTitle, employee.jobTitleEn, lang))}
+                    </td>
+                    <td data-label={t("إجمالي الراتب", "Gross salary")} className="tabular whitespace-nowrap px-4 py-3 font-semibold">
+                      {showPay ? money(packageGross(employee), currency) : "—"}
+                    </td>
+                    <td data-label={t("الحالة", "Status")} className="px-4 py-3">
                       <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
                     </td>
                   </tr>
@@ -187,34 +190,47 @@ export default async function EmployerPage({
               </tbody>
             </table>
           </div>
-        ) : null}
+        )}
       </Card>
 
       {can(user, "employers.edit") ? (
-      <Card>
-        <div id="details" className="scroll-mt-24" />
-        <h2 className="mb-4 font-bold">{t("تعديل بيانات الكفيل", "Edit sponsor details")}</h2>
-        <EmployerForm action={updateEmployer} employer={employer} submitLabel={t("حفظ التعديلات", "Save changes")} />
-      </Card>
+        <Card id="details" className="scroll-mt-24">
+          <SectionTitle hint={t("الاسم والشعار وبيانات التواصل.", "Name, logo and contact details.")}>
+            <span className="inline-flex items-center gap-2">
+              <PencilLine size={18} className="text-teal-700" />
+              {t("تعديل بيانات الكفيل", "Edit sponsor details")}
+            </span>
+          </SectionTitle>
+          <EmployerForm action={updateEmployer} employer={employer} submitLabel={t("حفظ التعديلات", "Save changes")} />
+        </Card>
       ) : null}
 
       {can(user, "employers.delete") ? (
-      <Card className="border-red-100">
-        <h2 className="font-bold text-red-800">{t("حذف الكفيل", "Delete sponsor")}</h2>
-        <p className="mb-3 mt-1 text-sm text-slate-500">
-          {t(
-            "يمكن حذف الكفيل فقط إذا لم يكن مرتبطاً بأي موظف. الرواتب السابقة تحتفظ باسمه.",
-            "A sponsor can be deleted only when no employees are linked. Past salaries keep its name.",
-          )}
-        </p>
-        <DeleteButton
-          action={deleteEmployer}
-          fields={{ id: employer.id }}
-          variant="danger"
-          label={t("حذف الكفيل", "Delete sponsor")}
-          confirm={t(`حذف ${employer.name} من دفتر العناوين؟`, `Delete ${employer.name} from the address book?`)}
-        />
-      </Card>
+        <Card className="border-red-100 bg-red-50/30">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-inset ring-red-100">
+                <Trash2 size={18} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-bold text-red-800">{t("حذف الكفيل", "Delete sponsor")}</h2>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {t(
+                    "يمكن حذف الكفيل فقط إذا لم يكن مرتبطاً بأي موظف. الرواتب السابقة تحتفظ باسمه.",
+                    "A sponsor can be deleted only when no employees are linked. Past salaries keep its name.",
+                  )}
+                </p>
+              </div>
+            </div>
+            <DeleteButton
+              action={deleteEmployer}
+              fields={{ id: employer.id }}
+              variant="danger"
+              label={t("حذف الكفيل", "Delete sponsor")}
+              confirm={t(`حذف ${employer.name} من دفتر العناوين؟`, `Delete ${employer.name} from the address book?`)}
+            />
+          </div>
+        </Card>
       ) : null}
     </div>
   );

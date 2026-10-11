@@ -68,8 +68,8 @@ export function PayItemForm({
       <input type="hidden" name="returnTo" value={returnTo} />
 
       {employees ? (
-        <label className="space-y-1 text-sm sm:col-span-2">
-          <span className="text-slate-600">{t("الموظف", "Employee")}</span>
+        <label className="min-w-0 space-y-1.5 text-sm sm:col-span-2">
+          <span className="block font-medium text-slate-700">{t("الموظف", "Employee")}</span>
           <select className={`${fieldClass} w-full`} name="employeeId" required defaultValue="">
             <option value="" disabled>
               {t("اختر الموظف", "Choose the employee")}
@@ -83,8 +83,8 @@ export function PayItemForm({
         </label>
       ) : null}
 
-      <label className="space-y-1 text-sm">
-        <span className="text-slate-600">{t("النوع", "Type")}</span>
+      <label className="min-w-0 space-y-1.5 text-sm">
+        <span className="block font-medium text-slate-700">{t("النوع", "Type")}</span>
         <select className={`${fieldClass} w-full`} name="kind" value={kind} onChange={(event) => setKind(event.target.value)}>
           {PAY_KINDS.map((value) => (
             <option key={value} value={value}>
@@ -94,13 +94,13 @@ export function PayItemForm({
         </select>
         <span className="block text-xs text-slate-500">{pick(PAY_KIND_HINT[kind], lang)}</span>
       </label>
-      <label className="space-y-1 text-sm">
-        <span className="text-slate-600">{t("الوصف", "Description")}</span>
+      <label className="min-w-0 space-y-1.5 text-sm">
+        <span className="block font-medium text-slate-700">{t("الوصف", "Description")}</span>
         <input className={`${fieldClass} w-full`} name="title" maxLength={120} defaultValue={item?.title || ""} placeholder={pick(PAY_KIND_LABEL[kind], lang)} />
       </label>
 
-      <label className="space-y-1 text-sm">
-        <span className="text-slate-600">
+      <label className="min-w-0 space-y-1.5 text-sm">
+        <span className="block font-medium text-slate-700">
           {advance ? t("مبلغ السلفة", "Advance amount") : repeat === "once" ? t("المبلغ", "Amount") : t("المبلغ لكل شهر", "Amount per month")} ({currency})
         </span>
         <input
@@ -114,15 +114,15 @@ export function PayItemForm({
           onChange={(event) => setAmount(event.target.value)}
         />
       </label>
-      <label className="space-y-1 text-sm">
-        <span className="text-slate-600">{advance ? t("تاريخ تسليم السلفة", "Date handed over") : t("تاريخ الاعتماد", "Approval date")}</span>
+      <label className="min-w-0 space-y-1.5 text-sm">
+        <span className="block font-medium text-slate-700">{advance ? t("تاريخ تسليم السلفة", "Date handed over") : t("تاريخ الاعتماد", "Approval date")}</span>
         <input className={`${fieldClass} w-full`} type="date" name="issuedAt" defaultValue={item ? dateValue(item.issuedAt) : today} required />
       </label>
 
       {advance ? (
         <>
-          <label className="space-y-1 text-sm">
-            <span className="text-slate-600">{t("عدد الأقساط (أشهر)", "Instalments (months)")}</span>
+          <label className="min-w-0 space-y-1.5 text-sm">
+            <span className="block font-medium text-slate-700">{t("عدد الأقساط (أشهر)", "Instalments (months)")}</span>
             <input
               className={`${fieldClass} w-full`}
               type="number"
@@ -139,12 +139,12 @@ export function PayItemForm({
               </span>
             ) : null}
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-slate-600">{t("أول قسط يُخصم من راتب شهر", "First instalment from the salary of")}</span>
+          <label className="min-w-0 space-y-1.5 text-sm">
+            <span className="block font-medium text-slate-700">{t("أول قسط يُخصم من راتب شهر", "First instalment from the salary of")}</span>
             <input className={`${fieldClass} w-full`} type="month" name="start" defaultValue={item ? monthValue(item.startYear, item.startMonth) : defaultStart} required />
           </label>
-          <label className="space-y-1 text-sm sm:col-span-2">
-            <span className="text-slate-600">{t("طريقة التسليم", "Handed over by")}</span>
+          <label className="min-w-0 space-y-1.5 text-sm sm:col-span-2">
+            <span className="block font-medium text-slate-700">{t("طريقة التسليم", "Handed over by")}</span>
             <select className={`${fieldClass} w-full`} name="paymentMethod" defaultValue={item?.paymentMethod || "CASH"}>
               {Object.entries(PAYMENT_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -156,13 +156,13 @@ export function PayItemForm({
         </>
       ) : (
         <>
-          <label className="space-y-1 text-sm">
-            <span className="text-slate-600">{t("يُطبّق من راتب شهر", "Applies from the salary of")}</span>
+          <label className="min-w-0 space-y-1.5 text-sm">
+            <span className="block font-medium text-slate-700">{t("يُطبّق من راتب شهر", "Applies from the salary of")}</span>
             <input className={`${fieldClass} w-full`} type="month" name="start" defaultValue={item ? monthValue(item.startYear, item.startMonth) : defaultStart} required />
           </label>
-          <fieldset className="space-y-1 text-sm">
-            <legend className="text-slate-600">{t("التكرار", "Repeat")}</legend>
-            <div className="flex flex-wrap gap-2 pt-1">
+          <fieldset className="min-w-0 space-y-1.5 text-sm">
+            <legend className="mb-1.5 font-medium text-slate-700">{t("التكرار", "Repeat")}</legend>
+            <div className="flex flex-wrap gap-2">
               {(
                 [
                   ["once", t("مرة واحدة", "Once")],
@@ -170,7 +170,10 @@ export function PayItemForm({
                   ["ongoing", t("كل شهر حتى الإيقاف", "Every month until stopped")],
                 ] as const
               ).map(([value, label]) => (
-                <label key={value} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs">
+                <label
+                  key={value}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-900"
+                >
                   <input type="radio" name="repeat" value={value} checked={repeat === value} onChange={() => setRepeat(value)} className="accent-teal-700" />
                   {label}
                 </label>
@@ -192,12 +195,14 @@ export function PayItemForm({
         </>
       )}
 
-      <label className="space-y-1 text-sm sm:col-span-2">
-        <span className="text-slate-600">{t("ملاحظات", "Notes")}</span>
+      <label className="min-w-0 space-y-1.5 text-sm sm:col-span-2">
+        <span className="block font-medium text-slate-700">{t("ملاحظات", "Notes")}</span>
         <input className={`${fieldClass} w-full`} name="notes" maxLength={500} defaultValue={item?.notes || ""} />
       </label>
-      <div className="sm:col-span-2">
-        <SubmitButton pendingLabel={t("جارٍ الحفظ...", "Saving...")}>{item ? t("حفظ التعديل", "Save changes") : t("إضافة", "Add")}</SubmitButton>
+      <div className="pt-1 sm:col-span-2">
+        <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الحفظ...", "Saving...")}>
+          {item ? t("حفظ التعديل", "Save changes") : t("إضافة", "Add")}
+        </SubmitButton>
       </div>
     </form>
   );

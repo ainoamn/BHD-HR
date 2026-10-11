@@ -1,5 +1,7 @@
 import type { Employee, EmployeeAllowance } from "@prisma/client";
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, Building2, CalendarCheck2, IdCard, NotebookPen, Save, UserRound, Wallet } from "lucide-react";
 import { GENDER_LABEL, STATUS_LABEL, termText } from "@/lib/constants";
 import type { getHrCatalog } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
@@ -64,8 +66,23 @@ export async function EmployeeForm({
       </Link>
     ) : null;
 
+  const section = (Icon: LucideIcon, title: string, description?: React.ReactNode, action?: React.ReactNode) => (
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+          <Icon size={19} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-slate-900">{title}</h2>
+          {description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p> : null}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+
   const docRow = (prefix: "id" | "passport" | "residence", numberLabel: string, expiryLabel: string, current: string | null | undefined) => (
-    <div className="grid gap-4 rounded-xl border border-slate-100 p-3 md:grid-cols-3">
+    <div className="grid gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 md:grid-cols-3">
       <Field label={numberLabel}>
         <input className={`${fieldClass} w-full`} name={`${prefix}Number`} defaultValue={(employee?.[`${prefix}Number`] as string | null) || ""} />
       </Field>
@@ -94,17 +111,16 @@ export async function EmployeeForm({
   return (
     <form action={action} className="space-y-5">
       {employee ? <input type="hidden" name="id" value={employee.id} /> : null}
-      <Card className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">{t("الكفيل وصاحب العمل", "Sponsor & employer")}</h2>
-        </div>
+      <Card className="space-y-5">
+        {section(Building2, t("الكفيل وصاحب العمل", "Sponsor & employer"), t("تُصرف رواتب الموظف باسم كفيله وشعاره.", "Salaries are issued under the sponsor's name and logo."))}
         <EmployerPicker employers={employers} defaultId={employee ? employee.employerId : defaultEmployerId} />
       </Card>
 
-      <Card className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">{t("البيانات الشخصية", "Personal details")}</h2>
-          <p className="mt-1 text-xs text-slate-500">
+      <Card className="space-y-5">
+        {section(
+          UserRound,
+          t("البيانات الشخصية", "Personal details"),
+          <>
             {employee
               ? `${t("الرقم الوظيفي:", "Employee no.:")} ${employee.employeeNumber}`
               : t("سيُنشأ الرقم الوظيفي تلقائياً عند الحفظ.", "The employee number is generated on save.")}{" "}
@@ -112,8 +128,8 @@ export async function EmployeeForm({
               "اكتب الاسم بلغة واحدة فتُكتب الأخرى تلقائياً بالذكاء الاصطناعي، ويمكنك تعديلها.",
               "Type the name in one language and AI fills in the other; you can still edit it.",
             )}
-          </p>
-        </div>
+          </>,
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <BilingualFields
             arName="fullName"
@@ -159,13 +175,12 @@ export async function EmployeeForm({
         </div>
       </Card>
 
-      <Card className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">{t("البطاقة والجواز والإقامة", "ID, passport & residence")}</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {t("تواريخ الانتهاء هنا هي مصدر التنبيهات. أرفق نسخة من كل وثيقة بجانب تاريخها.", "Expiry dates here drive the alerts. Attach a copy of each document next to its date.")}
-          </p>
-        </div>
+      <Card className="space-y-5">
+        {section(
+          IdCard,
+          t("البطاقة والجواز والإقامة", "ID, passport & residence"),
+          t("تواريخ الانتهاء هنا هي مصدر التنبيهات. أرفق نسخة من كل وثيقة بجانب تاريخها.", "Expiry dates here drive the alerts. Attach a copy of each document next to its date."),
+        )}
         <div className="space-y-3">
           {docRow("id", t("رقم البطاقة الشخصية", "ID number"), t("انتهاء البطاقة", "ID expiry"), employee?.idFileUrl)}
           {docRow("passport", t("رقم الجواز", "Passport number"), t("انتهاء الجواز", "Passport expiry"), employee?.passportFileUrl)}
@@ -173,8 +188,8 @@ export async function EmployeeForm({
         </div>
       </Card>
 
-      <Card className="space-y-4">
-        <h2 className="text-base font-bold text-slate-900">{t("الوظيفة", "Job")}</h2>
+      <Card className="space-y-5">
+        {section(BriefcaseBusiness, t("الوظيفة", "Job"))}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
@@ -220,19 +235,16 @@ export async function EmployeeForm({
         </div>
       </Card>
 
-      <Card className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">{t("أرصدة الإجازة", "Leave entitlements")}</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              {t(
-                "اترك الخانة فارغة ليأخذ الموظف العدد المحدد في الضبط. المتبقي = المستحق + الأيام الإضافية − الإجازات المسجّلة.",
-                "Leave a box empty to use the number set in Settings. Remaining = entitlement + extra days − leave taken.",
-              )}
-            </p>
-          </div>
-          {manageLink("leave", t("إدارة أنواع الإجازات", "Manage leave types"))}
-        </div>
+      <Card className="space-y-5">
+        {section(
+          CalendarCheck2,
+          t("أرصدة الإجازة", "Leave entitlements"),
+          t(
+            "اترك الخانة فارغة ليأخذ الموظف العدد المحدد في الضبط. المتبقي = المستحق + الأيام الإضافية − الإجازات المسجّلة.",
+            "Leave a box empty to use the number set in Settings. Remaining = entitlement + extra days − leave taken.",
+          ),
+          manageLink("leave", t("إدارة أنواع الإجازات", "Manage leave types")),
+        )}
         <div className="grid gap-4 md:grid-cols-3">
           {catalog.leaveTypes.map((type) => (
             <Field
@@ -259,8 +271,8 @@ export async function EmployeeForm({
       </Card>
 
       {showSalary ? (
-        <Card className="space-y-4">
-          <h2 className="text-base font-bold text-slate-900">{t("الراتب الشهري", "Monthly salary")}</h2>
+        <Card className="space-y-5">
+          {section(Wallet, t("الراتب الشهري", "Monthly salary"), t("الأساسي والبدلات الثابتة والعلاوات الدورية.", "Basic pay, fixed allowances and recurring allowances."))}
           <SalaryFields
             currency={currency}
             defaults={{
@@ -289,17 +301,24 @@ export async function EmployeeForm({
         </Card>
       ) : null}
 
-      <Card>
-        <Field label={t("ملاحظات", "Notes")}>
-          <textarea className={`${fieldClass} min-h-24 w-full`} name="notes" defaultValue={employee?.notes || ""} />
-        </Field>
+      <Card className="space-y-5">
+        {section(NotebookPen, t("ملاحظات", "Notes"))}
+        <textarea className={`${fieldClass} min-h-28 w-full`} name="notes" defaultValue={employee?.notes || ""} aria-label={t("ملاحظات", "Notes")} />
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <SubmitButton>{t("حفظ الموظف", "Save employee")}</SubmitButton>
-        <Link href={employee ? `/employees/${employee.id}` : "/employees"} className={secondaryBtn}>
-          {t("رجوع", "Back")}
-        </Link>
+      <div className="sticky bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+0.75rem)] z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-raised backdrop-blur-md lg:bottom-4">
+        <p className="hidden min-w-0 truncate text-sm text-slate-500 sm:block">
+          {employee ? t("راجع التعديلات ثم احفظ.", "Review your changes, then save.") : t("سيُنشأ الرقم الوظيفي عند الحفظ.", "The employee number is generated on save.")}
+        </p>
+        <div className="flex flex-1 gap-2 sm:flex-none">
+          <Link href={employee ? `/employees/${employee.id}` : "/employees"} className={`${secondaryBtn} flex-1 sm:flex-none`}>
+            {t("رجوع", "Back")}
+          </Link>
+          <SubmitButton className="flex-[2] sm:flex-none">
+            <Save size={16} />
+            {t("حفظ الموظف", "Save employee")}
+          </SubmitButton>
+        </div>
       </div>
     </form>
   );

@@ -1,8 +1,27 @@
 import Link from "next/link";
-import { Building2, Contact, FileText, LayoutGrid, List, Mail, MapPin, Phone, Plus, Printer, Search, User, UserRound } from "lucide-react";
+import {
+  BookUser,
+  Building2,
+  ChevronDown,
+  Contact,
+  FileText,
+  LayoutGrid,
+  List,
+  Mail,
+  MapPin,
+  Phone,
+  Plus,
+  Printer,
+  Search,
+  SearchX,
+  User,
+  UserRound,
+  UserRoundX,
+  Users,
+} from "lucide-react";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
-import { Card, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { Card, EmptyState, PageHeader, Stat, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { type ContactKind, loadContacts, readContactKind } from "@/lib/contacts";
@@ -110,6 +129,7 @@ export default async function EmployersPage({
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <PageHeader
+        icon={BookUser}
         title={t("دفتر العناوين", "Address book")}
         description={t(
           "سجل الكفلاء وأصحاب العمل وجهات الاتصال. تُصرف رواتب كل موظف باسم كفيله وشعاره، وكل موظف تربطه بكفيل يظهر تحته هنا تلقائياً.",
@@ -132,48 +152,39 @@ export default async function EmployersPage({
 
       <Flash error={sp.error} message={sp.message} />
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">{t("الكفلاء", "Sponsors")}</p>
-          <p className="mt-1 text-xl font-bold text-slate-900">{totalEmployers}</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <Stat label={t("الكفلاء", "Sponsors")} value={String(totalEmployers)} icon={Building2} tone="navy" />
+        <Stat label={t("موظفون مرتبطون", "Linked employees")} value={String(linkedCount)} icon={Users} tone="teal" />
+        <div className="col-span-2 sm:col-span-1">
+          <Stat
+            label={t("بدون كفيل", "Without sponsor")}
+            value={String(unlinked)}
+            href="/employees?employerId=none"
+            icon={UserRoundX}
+            tone={unlinked > 0 ? "amber" : "gold"}
+            emphasis={unlinked > 0 ? "amber" : undefined}
+          />
         </div>
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">{t("موظفون مرتبطون", "Linked employees")}</p>
-          <p className="mt-1 text-xl font-bold text-slate-900">{linkedCount}</p>
-        </div>
-        <Link
-          href="/employees?employerId=none"
-          className={cn(
-            "min-w-0 rounded-2xl border bg-white p-4 shadow-sm",
-            unlinked > 0 ? "border-amber-200 hover:border-amber-300" : "border-slate-200",
-          )}
-        >
-          <p className="text-xs text-slate-500">{t("بدون كفيل", "Without sponsor")}</p>
-          <p className={cn("mt-1 text-xl font-bold", unlinked > 0 ? "text-amber-700" : "text-slate-900")}>{unlinked}</p>
-        </Link>
       </div>
 
       {can(user, "employers.create") ? (
-      <details id="new" open={openForm} className="group scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-          <span className="flex items-center gap-2 font-bold text-slate-900">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50 text-teal-800">
-              <Plus size={16} />
+      <details id="new" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
+          <span className="flex items-center gap-3 font-bold text-slate-900">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+              <Plus size={18} />
             </span>
             {t("إضافة كفيل / صاحب عمل", "Add sponsor / employer")}
           </span>
-          <span className="text-xs font-semibold text-teal-800">
-            <span className="group-open:hidden">{t("فتح", "Open")}</span>
-            <span className="hidden group-open:inline">{t("إغلاق", "Close")}</span>
-          </span>
+          <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
         </summary>
-        <div className="border-t border-slate-100 px-4 py-5 sm:px-5">
+        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-5 sm:px-5">
           <EmployerForm action={createEmployer} submitLabel={t("حفظ الكفيل", "Save sponsor")} />
         </div>
       </details>
       ) : null}
 
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-card sm:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <form method="get" className="flex w-full gap-2 md:max-w-md">
             {view !== "cards" ? <input type="hidden" name="view" value={view} /> : null}
@@ -188,30 +199,21 @@ export default async function EmployersPage({
                 placeholder={t("ابحث بالاسم أو الهاتف أو البريد", "Search name, phone or email")}
               />
             </div>
-            <button className={secondaryBtn} type="submit">
+            <button className={primaryBtn} type="submit">
               {t("بحث", "Search")}
             </button>
           </form>
-          <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label={t("طريقة العرض", "View")}>
+          <nav className="segmented grid grid-cols-3" aria-label={t("طريقة العرض", "View")}>
             {views.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
-                  key={item.id}
-                  href={href({ view: item.id })}
-                  role="tab"
-                  aria-selected={view === item.id}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold",
-                    view === item.id ? "bg-white text-teal-800 shadow-sm" : "text-slate-600 hover:text-slate-900",
-                  )}
-                >
+                <Link key={item.id} href={href({ view: item.id })} aria-current={view === item.id ? "page" : undefined}>
                   <Icon size={15} />
                   {item.label}
                 </Link>
               );
             })}
-          </div>
+          </nav>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex gap-1 overflow-x-auto">
@@ -220,8 +222,8 @@ export default async function EmployersPage({
                 key={item.value || "all"}
                 href={href({ kind: item.value })}
                 className={cn(
-                  "whitespace-nowrap rounded-full px-3 py-1.5 text-center text-sm font-semibold ring-1",
-                  kind === item.value ? "bg-teal-800 text-white ring-teal-800" : "text-slate-600 ring-slate-200 hover:bg-slate-50",
+                  "whitespace-nowrap rounded-full px-3.5 py-1.5 text-center text-sm font-semibold ring-1 ring-inset transition",
+                  kind === item.value ? "bg-teal-700 text-white ring-teal-700" : "text-slate-600 ring-slate-200 hover:bg-slate-50 hover:text-slate-900",
                 )}
               >
                 {item.label}
@@ -259,16 +261,15 @@ export default async function EmployersPage({
       </div>
 
       {resultCount === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
-          <p className="font-bold text-slate-800">
-            {filtered ? t("لا توجد نتائج مطابقة", "No matching results") : t("لا يوجد كفلاء بعد", "No sponsors yet")}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            {filtered
+        <EmptyState
+          icon={filtered ? SearchX : BookUser}
+          title={filtered ? t("لا توجد نتائج مطابقة", "No matching results") : t("لا يوجد كفلاء بعد", "No sponsors yet")}
+          text={
+            filtered
               ? t("جرّب كلمة بحث أخرى أو اعرض الكل.", "Try another search or show all.")
-              : t("أضف أول كفيل من النموذج أعلاه، أو من نموذج إضافة موظف مباشرة.", "Add your first sponsor with the form above, or straight from the add-employee form.")}
-          </p>
-        </div>
+              : t("أضف أول كفيل من النموذج أعلاه، أو من نموذج إضافة موظف مباشرة.", "Add your first sponsor with the form above, or straight from the add-employee form.")
+          }
+        />
       ) : null}
 
       {view === "cards" ? (
@@ -417,7 +418,7 @@ export default async function EmployersPage({
             {employers.map((employer) => {
               const active = employer.employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION").length;
               return (
-                <div key={employer.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div key={employer.id} className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-card">
                   <div className="flex items-start gap-3">
                     <SponsorAvatar logoUrl={employer.logoUrl} title={sponsorName(employer)} size="sm" />
                     <div className="min-w-0 flex-1">
@@ -447,10 +448,10 @@ export default async function EmployersPage({
               );
             })}
           </div>
-          <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+          <div className="table-shell hidden md:block">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 text-xs font-semibold text-slate-500">
+                <tr>
                   <th className="px-4 py-3 text-start">{t("الكفيل", "Sponsor")}</th>
                   <th className="px-4 py-3 text-start">{t("النوع", "Type")}</th>
                   <th className="px-4 py-3 text-start">{t("السجل / المدني", "CR / ID")}</th>
@@ -465,7 +466,7 @@ export default async function EmployersPage({
                 {employers.map((employer) => {
                   const activeList = employer.employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION");
                   return (
-                    <tr key={employer.id} className="border-t border-slate-100 hover:bg-slate-50">
+                    <tr key={employer.id} className="align-middle">
                       <td className="px-4 py-3">
                         <Link href={`/employers/${employer.id}`} className="flex items-center gap-2.5 font-semibold text-slate-900 hover:text-teal-800">
                           <SponsorAvatar logoUrl={employer.logoUrl} title={sponsorName(employer)} size="xs" />
@@ -625,7 +626,7 @@ function ContactsDirectory({
     <>
       <div className="space-y-2 md:hidden">
         {rows.map((row) => (
-          <div key={row.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div key={row.key} className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-card">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <Link href={row.href} className="block break-words font-bold text-slate-900">
@@ -658,10 +659,10 @@ function ContactsDirectory({
           </div>
         ))}
       </div>
-      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+      <div className="table-shell hidden md:block">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-xs font-semibold text-slate-500">
+            <tr>
               <th className="px-4 py-3 text-start">{t("الاسم", "Name")}</th>
               <th className="px-4 py-3 text-start">{t("النوع", "Type")}</th>
               <th className="px-4 py-3 text-start">{t("الارتباط", "Relation")}</th>
@@ -672,7 +673,7 @@ function ContactsDirectory({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={row.key} className="align-middle">
                 <td className="px-4 py-3">
                   <Link href={row.href} className="flex items-center gap-1.5 font-semibold text-slate-900 hover:text-teal-800">
                     {row.status ? <StatusDot status={row.status} /> : null}

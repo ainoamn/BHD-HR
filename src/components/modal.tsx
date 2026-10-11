@@ -30,18 +30,23 @@ export function Modal({
           ref.current = node;
           if (node && defaultOpen && !node.open) node.showModal();
         }}
-        className="m-auto w-[min(56rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
+        className="m-auto w-[min(56rem,calc(100vw-1.5rem))] rounded-3xl border border-slate-200 bg-white p-0 text-slate-900 shadow-float backdrop:bg-slate-950/45 backdrop:backdrop-blur-[2px] open:animate-fade-up"
         onClick={(event) => {
           if (event.target === ref.current) ref.current?.close();
         }}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
-          <h2 className="font-bold text-slate-900">{title}</h2>
-          <button type="button" onClick={() => ref.current?.close()} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label={t("إغلاق", "Close")}>
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+          <h2 className="text-base font-bold text-slate-900">{title}</h2>
+          <button
+            type="button"
+            onClick={() => ref.current?.close()}
+            className="flex size-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            aria-label={t("إغلاق", "Close")}
+          >
             <X className="size-5" />
           </button>
         </div>
-        <div className="max-h-[80vh] overflow-y-auto p-5">{children}</div>
+        <div className="max-h-[80dvh] overflow-y-auto p-5 sm:p-6">{children}</div>
       </dialog>
     </>
   );

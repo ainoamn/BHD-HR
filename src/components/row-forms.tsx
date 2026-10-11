@@ -41,7 +41,7 @@ export function DeleteButton({
   );
 }
 
-const summaryClass = "cursor-pointer list-none text-xs font-semibold text-teal-800 hover:underline";
+const summaryClass = "cursor-pointer list-none text-sm font-semibold text-teal-700 underline-offset-4 transition hover:text-teal-900 hover:underline group-open:text-slate-500";
 
 /** Edits a whole leave/absence period; the server re-checks balances and overlaps. */
 export function AttendanceEditForm({
@@ -70,7 +70,7 @@ export function AttendanceEditForm({
   return (
     <details className="group">
       <summary className={summaryClass}>{t("تعديل", "Edit")}</summary>
-      <form action={action} className="mt-2 grid min-w-64 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-start sm:grid-cols-2">
+      <form action={action} className="mt-2 grid w-full min-w-0 gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-start shadow-card sm:w-[26rem] sm:grid-cols-2">
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <label className="space-y-1 text-xs sm:col-span-2">
@@ -124,7 +124,7 @@ export function DocumentEditForm({
   return (
     <details className="group">
       <summary className={summaryClass}>{t("تعديل", "Edit")}</summary>
-      <form action={action} className="mt-2 grid min-w-64 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-start sm:grid-cols-2">
+      <form action={action} className="mt-2 grid w-full min-w-0 gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-start shadow-card sm:w-[26rem] sm:grid-cols-2">
         <input type="hidden" name="id" value={document.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <label className="space-y-1 text-xs">

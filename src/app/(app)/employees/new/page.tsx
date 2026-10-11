@@ -1,3 +1,4 @@
+import { UserPlus } from "lucide-react";
 import { EmployeeForm } from "@/components/employee-form";
 import { Flash } from "@/components/flash";
 import { PageHeader } from "@/components/ui";
@@ -21,7 +22,7 @@ export default async function NewEmployeePage({ searchParams }: { searchParams: 
   ]);
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title={t("إضافة موظف", "Add employee")} description={t("أدخل البيانات والوثائق والراتب. رقم الموظف يُنشأ تلقائياً.", "Enter details, documents and salary. The employee number is generated automatically.")} />
+      <PageHeader icon={UserPlus} title={t("إضافة موظف", "Add employee")} description={t("أدخل البيانات والوثائق والراتب. رقم الموظف يُنشأ تلقائياً.", "Enter details, documents and salary. The employee number is generated automatically.")} />
       <Flash error={sp.error} message={sp.message} />
       <EmployeeForm
         action={createEmployee}

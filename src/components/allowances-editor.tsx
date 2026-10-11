@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { ALLOWANCE_BASES, ALLOWANCE_CALCS, ALLOWANCE_FREQUENCIES, allowanceAmount, payMonths } from "@/lib/allowances";
@@ -89,11 +89,12 @@ export function AllowancesEditor({
         </div>
         <button
           type="button"
-          className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 disabled:opacity-50"
           disabled={types.length === 0}
           onClick={() => setRows((list) => [...list, { key: nextKey(), allowanceTypeId: "", calc: "FIXED", base: "BASIC", value: "0", frequency: "MONTHLY", payMonth: 1, start: defaultStart, active: true, ...fromType(types[0]?.id || "") }])}
         >
-          {t("+ إضافة علاوة", "+ Add allowance")}
+          <Plus size={16} />
+          {t("إضافة علاوة", "Add allowance")}
         </button>
       </div>
       {types.length === 0 ? (
@@ -105,9 +106,9 @@ export function AllowancesEditor({
         const amount = allowanceAmount({ calc: row.calc, base: row.base, value: Number(row.value) || 0 }, pay);
         const months = payMonths(row.frequency, row.payMonth);
         return (
-          <div key={row.key} className={`grid gap-2 rounded-xl border p-3 sm:grid-cols-6 ${row.active ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-slate-100 opacity-70"}`}>
+          <div key={row.key} className={`grid gap-2.5 rounded-2xl border p-3.5 sm:grid-cols-6 ${row.active ? "border-slate-200 bg-slate-50/70" : "border-slate-200 bg-slate-100 opacity-70"}`}>
             <label className="space-y-1 text-xs sm:col-span-2">
-              <span className="text-slate-600">{t("العلاوة", "Allowance")}</span>
+              <span className="block font-medium text-slate-600">{t("العلاوة", "Allowance")}</span>
               <select className={`${fieldClass} w-full`} value={row.allowanceTypeId} onChange={(event) => update(row.key, fromType(event.target.value))}>
                 {types.map((type) => (
                   <option key={type.id} value={type.id}>
@@ -117,7 +118,7 @@ export function AllowancesEditor({
               </select>
             </label>
             <label className="space-y-1 text-xs">
-              <span className="text-slate-600">{t("طريقة الحساب", "Calculation")}</span>
+              <span className="block font-medium text-slate-600">{t("طريقة الحساب", "Calculation")}</span>
               <select className={`${fieldClass} w-full`} value={row.calc} onChange={(event) => update(row.key, { calc: event.target.value })}>
                 {ALLOWANCE_CALCS.map((value) => (
                   <option key={value} value={value}>
@@ -127,12 +128,12 @@ export function AllowancesEditor({
               </select>
             </label>
             <label className="space-y-1 text-xs">
-              <span className="text-slate-600">{row.calc === "PERCENT" ? t("النسبة %", "Percent %") : t("المبلغ", "Amount")}</span>
+              <span className="block font-medium text-slate-600">{row.calc === "PERCENT" ? t("النسبة %", "Percent %") : t("المبلغ", "Amount")}</span>
               <input className={`${fieldClass} w-full`} type="number" min="0" step="0.001" value={row.value} onChange={(event) => update(row.key, { value: event.target.value })} />
             </label>
             {row.calc === "PERCENT" ? (
               <label className="space-y-1 text-xs sm:col-span-2">
-                <span className="text-slate-600">{t("النسبة من", "Percent of")}</span>
+                <span className="block font-medium text-slate-600">{t("النسبة من", "Percent of")}</span>
                 <select className={`${fieldClass} w-full`} value={row.base} onChange={(event) => update(row.key, { base: event.target.value })}>
                   {ALLOWANCE_BASES.map((value) => (
                     <option key={value} value={value}>
@@ -145,7 +146,7 @@ export function AllowancesEditor({
               <div className="hidden sm:col-span-2 sm:block" />
             )}
             <label className="space-y-1 text-xs sm:col-span-2">
-              <span className="text-slate-600">{t("موعد الصرف", "Paid")}</span>
+              <span className="block font-medium text-slate-600">{t("موعد الصرف", "Paid")}</span>
               <select className={`${fieldClass} w-full`} value={row.frequency} onChange={(event) => update(row.key, { frequency: event.target.value })}>
                 {ALLOWANCE_FREQUENCIES.map((value) => (
                   <option key={value} value={value}>
@@ -156,7 +157,7 @@ export function AllowancesEditor({
             </label>
             {row.frequency !== "MONTHLY" ? (
               <label className="space-y-1 text-xs">
-                <span className="text-slate-600">{t("شهر الصرف", "Pay month")}</span>
+                <span className="block font-medium text-slate-600">{t("شهر الصرف", "Pay month")}</span>
                 <select className={`${fieldClass} w-full`} value={row.payMonth} onChange={(event) => update(row.key, { payMonth: Number(event.target.value) })}>
                   {Array.from({ length: 12 }, (_, index) => (
                     <option key={index} value={index + 1}>
@@ -169,7 +170,7 @@ export function AllowancesEditor({
               <div className="hidden sm:block" />
             )}
             <label className="space-y-1 text-xs">
-              <span className="text-slate-600">{t("يبدأ من شهر", "Starts")}</span>
+              <span className="block font-medium text-slate-600">{t("يبدأ من شهر", "Starts")}</span>
               <input className={`${fieldClass} w-full`} type="month" value={row.start} onChange={(event) => update(row.key, { start: event.target.value })} />
             </label>
             <div className="flex flex-wrap items-end justify-between gap-2 sm:col-span-2">
@@ -182,7 +183,7 @@ export function AllowancesEditor({
                 {t("إزالة", "Remove")}
               </button>
             </div>
-            <p className="text-xs text-teal-900 sm:col-span-6">
+            <p className="rounded-lg bg-white px-3 py-2 text-xs text-teal-900 ring-1 ring-inset ring-slate-100 sm:col-span-6">
               {t("المبلغ:", "Amount:")} <strong>{money(amount, currency)}</strong>{" "}
               {months.length
                 ? t(`يُصرف في: ${months.map((month) => monthName(month, "ar")).join("، ")}`, `paid in: ${months.map((month) => monthName(month, "en")).join(", ")}`)

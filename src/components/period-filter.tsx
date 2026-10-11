@@ -1,6 +1,7 @@
+import { CalendarSearch } from "lucide-react";
 import { monthNames } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
-import { fieldClass, secondaryBtn } from "./ui";
+import { fieldClass, primaryBtn } from "./ui";
 
 export async function PeriodFilter({
   year,
@@ -16,9 +17,17 @@ export async function PeriodFilter({
   const { lang, t } = await getI18n();
   const years = Array.from(new Set([year - 2, year - 1, year, year + 1, new Date().getFullYear()])).sort();
   return (
-    <form method="get" className="no-print grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+    <form
+      method="get"
+      className="no-print grid w-full grid-cols-[1fr_1fr_auto] gap-2 rounded-2xl border border-slate-200/90 bg-white p-2 shadow-card sm:flex sm:w-auto sm:flex-wrap sm:items-center"
+    >
       {employers ? (
-        <select name="employerId" defaultValue={employerId || ""} className={`${fieldClass} col-span-2 w-full sm:w-auto sm:min-w-44`}>
+        <select
+          name="employerId"
+          defaultValue={employerId || ""}
+          aria-label={t("صاحب العمل", "Employer")}
+          className={`${fieldClass} col-span-3 w-full sm:w-auto sm:min-w-44`}
+        >
           <option value="">{t("كل أصحاب العمل", "All employers")}</option>
           {employers.map((employer) => (
             <option key={employer.id} value={employer.id}>
@@ -28,21 +37,32 @@ export async function PeriodFilter({
           <option value="none">{t("بدون صاحب عمل", "No employer")}</option>
         </select>
       ) : null}
-      <select name="month" defaultValue={month} className={`${fieldClass} w-full sm:w-auto sm:min-w-32`}>
+      <select
+        name="month"
+        defaultValue={month}
+        aria-label={t("الشهر", "Month")}
+        className={`${fieldClass} w-full sm:w-auto sm:min-w-32`}
+      >
         {monthNames(lang).map((name, index) => (
           <option key={name} value={index + 1}>
             {name}
           </option>
         ))}
       </select>
-      <select name="year" defaultValue={year} className={`${fieldClass} w-full sm:w-auto sm:min-w-28`}>
+      <select
+        name="year"
+        defaultValue={year}
+        aria-label={t("السنة", "Year")}
+        className={`${fieldClass} w-full sm:w-auto sm:min-w-24`}
+      >
         {years.map((item) => (
           <option key={item} value={item}>
             {item}
           </option>
         ))}
       </select>
-      <button className={`${secondaryBtn} col-span-2 sm:col-span-1`} type="submit">
+      <button className={`${primaryBtn} px-3.5`} type="submit">
+        <CalendarSearch size={16} />
         {t("عرض", "Show")}
       </button>
     </form>

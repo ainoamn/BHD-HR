@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { ChevronDown, FilePlus2, Files, Paperclip } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
-import { PageHeader, ToneBadge, fieldClass } from "@/components/ui";
+import { PageHeader, ToneBadge, fieldClass, linkAction } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
 import { collectDocuments } from "@/lib/documents";
@@ -53,18 +54,23 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
+        icon={Files}
         title={t("المستندات", "Documents")}
         description={t("البطاقة والجواز والإقامة وبقية الوثائق، مع حالة الانتهاء.", "ID card, passport, residence and other documents, with expiry status.")}
       />
       <Flash error={sp.error} message={sp.message} />
       {allow.create && employees.length ? (
-        <details className="group mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <summary className="cursor-pointer list-none font-bold text-teal-800">
-            <span className="group-open:hidden">+ </span>
-            <span className="hidden group-open:inline">− </span>
-            {t("إضافة مستند", "Add a document")}
+        <details className="group mb-5 rounded-2xl border border-slate-200/90 bg-white shadow-card">
+          <summary className="flex list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <span className="flex items-center gap-2.5 font-bold text-slate-900">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+                <FilePlus2 size={17} />
+              </span>
+              {t("إضافة مستند", "Add a document")}
+            </span>
+            <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
           </summary>
-          <form action={addDocument} className="mt-3 grid gap-3 sm:grid-cols-3">
+          <form action={addDocument} className="grid gap-3 border-t border-slate-100 px-4 py-5 sm:grid-cols-3 sm:px-5">
             <input type="hidden" name="returnTo" value={returnTo} />
             <label className="space-y-1 text-sm">
               <span className="text-slate-600">{t("الموظف", "Employee")}</span>
@@ -108,55 +114,60 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           </form>
         </details>
       ) : null}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {views.map((item) => (
-          <Link
-            key={item.id}
-            href={`/documents?view=${item.id}`}
-            className={item.id === view ? "rounded-lg bg-teal-800 px-3 py-2 text-sm font-semibold text-white" : "rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200"}
-          >
-            {item.label}
-          </Link>
-        ))}
+      <div className="mb-4 overflow-x-auto pb-1">
+        <nav className="segmented" aria-label={t("تصفية المستندات", "Filter documents")}>
+          {views.map((item) => (
+            <Link key={item.id} href={`/documents?view=${item.id}`} aria-current={item.id === view ? "page" : undefined}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
+      <div className="table-shell">
+        <table className="table-stack min-w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-xs font-semibold text-slate-500">
+            <tr>
               <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
               <th className="px-4 py-3 text-start">{t("المستند", "Document")}</th>
               <th className="px-4 py-3 text-start">{t("الرقم", "Number")}</th>
               <th className="px-4 py-3 text-start">{t("الانتهاء", "Expiry")}</th>
               <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
-              {showActions ? <th className="px-4 py-3 text-start">{t("إجراءات", "Actions")}</th> : null}
+              {showActions ? <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th> : null}
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className="border-t border-slate-100">
-                <td className="px-4 py-3">
-                  <Link href={`/employees/${row.employeeId}?tab=docs`} className="font-semibold hover:text-teal-800">
+              <tr key={row.key}>
+                <td className="cell-title px-4 py-3">
+                  <Link href={`/employees/${row.employeeId}?tab=docs`} className="font-semibold text-slate-900 hover:text-teal-700">
                     {row.employeeName}
                   </Link>
-                  <div className="text-xs text-slate-500">{row.employeeNumber}</div>
+                  <div className="tabular text-xs text-slate-500">{row.employeeNumber}</div>
                 </td>
-                <td className="px-4 py-3">
-                  {row.label}
-                  {row.fileUrl ? (
-                    <a href={row.fileUrl} target="_blank" className="ms-2 text-xs font-semibold text-teal-800">
-                      {t("ملف", "File")}
-                    </a>
-                  ) : null}
+                <td className="px-4 py-3" data-label={t("المستند", "Document")}>
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    {row.label}
+                    {row.fileUrl ? (
+                      <a href={row.fileUrl} target="_blank" className="inline-flex items-center gap-1 rounded-lg bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 hover:bg-teal-100">
+                        <Paperclip size={12} />
+                        {t("ملف", "File")}
+                      </a>
+                    ) : null}
+                  </span>
                 </td>
-                <td className="px-4 py-3">{text(row.number)}</td>
-                <td className="px-4 py-3">{formatDate(row.expiry)}</td>
-                <td className="px-4 py-3">
+                <td className="tabular px-4 py-3" data-label={t("الرقم", "Number")}>
+                  <span dir="ltr">{text(row.number)}</span>
+                </td>
+                <td className="tabular px-4 py-3 whitespace-nowrap" data-label={t("الانتهاء", "Expiry")}>
+                  {formatDate(row.expiry)}
+                </td>
+                <td className="px-4 py-3" data-label={t("الحالة", "Status")}>
                   <ToneBadge tone={row.status.tone}>{row.status.label}</ToneBadge>
                 </td>
                 {showActions ? (
-                  <td className="px-4 py-3">
+                  <td className="cell-actions px-4 py-3">
                     {row.document ? (
-                      <div className="flex flex-wrap items-start gap-3">
+                      <div className="flex flex-wrap items-start gap-4 sm:justify-end">
                         {allow.edit ? <DocumentEditForm action={updateDocument} returnTo={returnTo} document={row.document} /> : null}
                         {allow.remove ? (
                           <DeleteButton
@@ -167,9 +178,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                         ) : null}
                       </div>
                     ) : canEditEmployee ? (
-                      <Link href={`/employees/${row.employeeId}/edit`} className="text-xs font-semibold text-teal-800 hover:underline">
-                        {t("تعديل من بيانات الموظف", "Edit in employee record")}
-                      </Link>
+                      <div className="sm:text-end">
+                        <Link href={`/employees/${row.employeeId}/edit`} className={linkAction}>
+                          {t("تعديل من بيانات الموظف", "Edit in employee record")}
+                        </Link>
+                      </div>
                     ) : null}
                   </td>
                 ) : null}
@@ -177,7 +190,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
             ))}
           </tbody>
         </table>
-        {rows.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-500">{t("لا توجد مستندات في هذا العرض.", "No documents in this view.")}</p> : null}
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center px-4 py-12 text-center">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-inset ring-slate-200">
+              <Files size={22} />
+            </span>
+            <p className="mt-3 text-sm text-slate-500">{t("لا توجد مستندات في هذا العرض.", "No documents in this view.")}</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
