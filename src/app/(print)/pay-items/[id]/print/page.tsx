@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { Bi, HeaderBar, headerFor, sheetClass } from "@/components/salary-docs";
 import { requirePermission } from "@/lib/auth";
-import { PAYMENT_LABEL, bothTerm, monthBoth, monthName } from "@/lib/constants";
+import { PAYMENT_LABEL, termBoth, monthBoth, monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { keyToPeriod, monthKey, payItemProgress } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
@@ -35,7 +35,7 @@ export default async function AdvanceReceiptPage({ params }: { params: Promise<{
   const info: [string, string, string][] = [
     ["اسم الموظف", "Employee name", employee.nameEn ? `${employee.fullName} — ${employee.nameEn}` : employee.fullName],
     ["الرقم الوظيفي", "Employee no.", employee.employeeNumber],
-    ["الوظيفة", "Job title", bothTerm(employee.jobTitle) || "—"],
+    ["الوظيفة", "Job title", termBoth(employee.jobTitle, employee.jobTitleEn) || "—"],
     ["تاريخ التسليم", "Date handed over", formatDate(item.issuedAt)],
     ["البيان", "Description", item.title],
     ["طريقة التسليم", "Handed over by", method ? `${method.ar} / ${method.en}` : "—"],

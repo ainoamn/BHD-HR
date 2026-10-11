@@ -6,7 +6,7 @@ import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
 import { Card, ToneBadge, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
-import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, localizeTerm } from "@/lib/constants";
+import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
@@ -147,7 +147,7 @@ export default async function EmployerPage({
                 <div className="min-w-0">
                   <p className="break-words font-semibold text-slate-900">{employeeName(employee)}</p>
                   <p className="text-xs text-slate-500">
-                    {employee.employeeNumber} · {text(localizeTerm(employee.jobTitle, lang))}
+                    {employee.employeeNumber} · {text(termText(employee.jobTitle, employee.jobTitleEn, lang))}
                   </p>
                 </div>
                 <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
@@ -177,7 +177,7 @@ export default async function EmployerPage({
                         {employeeName(employee)}
                       </Link>
                     </td>
-                    <td className="py-2.5">{text(localizeTerm(employee.jobTitle, lang))}</td>
+                    <td className="py-2.5">{text(termText(employee.jobTitle, employee.jobTitleEn, lang))}</td>
                     <td className="whitespace-nowrap py-2.5">{showPay ? money(packageGross(employee), currency) : "—"}</td>
                     <td className="py-2.5">
                       <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>

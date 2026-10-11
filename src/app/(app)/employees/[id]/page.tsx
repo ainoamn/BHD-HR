@@ -6,22 +6,24 @@ import { SubmitButton } from "@/components/submit-button";
 import { Card, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { AttendanceEditForm, DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { can, requirePermission } from "@/lib/auth";
-import {
-  ATTENDANCE_LABEL,
-  BALANCE_KEYS,
-  BALANCE_LABEL,
-  DOC_LABEL,
-  EXTRA_DOC_TYPES,
-  GENDER_LABEL,
-  STATUS_LABEL,
-  STATUS_TONE,
-  localizeTerm,
-  monthName,
-} from "@/lib/constants";
+import { allowanceAmount, describeAllowance } from "@/lib/allowances";
+import { DOC_LABEL, EXTRA_DOC_TYPES, GENDER_LABEL, STATUS_LABEL, STATUS_TONE, monthName, termText } from "@/lib/constants";
 import { describeExpiry, worstExpiry } from "@/lib/expiry";
+import { getLeaveTypes } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
-import { computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "@/lib/leave";
+import {
+  attendanceChoiceOf,
+  attendanceChoices,
+  attendanceLabel,
+  computeLeaveBalances,
+  groupAttendance,
+  leaveName,
+  leaveWarningText,
+  leaveWarnings,
+  remainingByKey,
+} from "@/lib/leave";
+import { nationalityName } from "@/lib/nationalities";
 import { prisma } from "@/lib/prisma";
 import { monthKey, payItemProgress } from "@/lib/pay-items";
 import { packageGross, totalDeductions, totalEarnings } from "@/lib/salary";
@@ -74,9 +76,11 @@ export default async function EmployeePage({
       attendance: { orderBy: { date: "desc" } },
       leaveCredits: { orderBy: { createdAt: "desc" } },
       salaries: { orderBy: [{ year: "desc" }, { month: "desc" }] },
+      allowances: { include: { allowanceType: true }, orderBy: { createdAt: "asc" } },
     },
   });
   if (!employee) notFound();
+  const leaveTypes = await getLeaveTypes(user.companyId);
   const allow = {
     edit: can(user, "employees.edit"),
     remove: can(user, "employees.delete"),
@@ -90,19 +94,14 @@ export default async function EmployeePage({
     attDelete: can(user, "attendance.delete"),
     salaries: can(user, "salaries.view"),
   };
-  const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits);
+  const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes);
+  const annual = balances.find((item) => item.key === "annual") || balances[0];
   const periods = groupAttendance(employee.attendance);
   const warnDays = user.company.leaveWarningDays;
   const warnings = leaveWarnings(balances, warnDays);
   const warnedKeys = new Set(warnings.map((item) => item.key));
-  const balanceMap = {
-    [employee.id]: {
-      annual: balances.annual.remaining,
-      sick: balances.sick.remaining,
-      compensatory: balances.compensatory.remaining,
-      other: balances.other.remaining,
-    },
-  };
+  const balanceMap = { [employee.id]: remainingByKey(balances) };
+  const choices = attendanceChoices(leaveTypes, lang);
   const tabAllowed: Record<string, boolean> = { info: true, docs: allow.docs, attendance: allow.attendance, salaries: allow.salaries, pay: allow.salaries };
   const now = currentPeriod();
   const nowKey = monthKey(now.year, now.month);
@@ -129,9 +128,9 @@ export default async function EmployeePage({
   const currency = user.company.currency;
   const gross = packageGross(employee);
   const primaryDocs = [
-    { label: pick(DOC_LABEL.ID_CARD, lang), number: employee.idNumber, expiry: employee.idExpiry },
-    { label: pick(DOC_LABEL.PASSPORT, lang), number: employee.passportNumber, expiry: employee.passportExpiry },
-    { label: pick(DOC_LABEL.RESIDENCE, lang), number: employee.residenceNumber, expiry: employee.residenceExpiry },
+    { label: pick(DOC_LABEL.ID_CARD, lang), number: employee.idNumber, expiry: employee.idExpiry, fileUrl: employee.idFileUrl },
+    { label: pick(DOC_LABEL.PASSPORT, lang), number: employee.passportNumber, expiry: employee.passportExpiry, fileUrl: employee.passportFileUrl },
+    { label: pick(DOC_LABEL.RESIDENCE, lang), number: employee.residenceNumber, expiry: employee.residenceExpiry, fileUrl: employee.residenceFileUrl },
   ];
   const docsWorst = worstExpiry(
     [...primaryDocs.map((doc) => doc.expiry), ...employee.documents.map((doc) => doc.expiryDate)],
@@ -141,7 +140,7 @@ export default async function EmployeePage({
   const lastSalary = employee.salaries[0];
   const tabs = [
     { id: "info", label: t("البيانات", "Details"), count: null },
-    { id: "docs", label: t("الوثائق", "Documents"), count: primaryDocs.filter((doc) => doc.number || doc.expiry).length + employee.documents.length },
+    { id: "docs", label: t("الوثائق", "Documents"), count: primaryDocs.filter((doc) => doc.number || doc.expiry || doc.fileUrl).length + employee.documents.length },
     { id: "attendance", label: t("الحضور والإجازات", "Attendance & leave"), count: periods.length },
     { id: "salaries", label: t("الرواتب", "Salaries"), count: employee.salaries.length },
     { id: "pay", label: t("السلف والمكافآت", "Advances & bonuses"), count: openPayItems },
@@ -151,7 +150,8 @@ export default async function EmployeePage({
   const displayName = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
   const otherName = lang === "en" ? employee.fullName : employee.nameEn;
   const secondName = otherName && otherName.trim().toLowerCase() !== displayName.trim().toLowerCase() ? otherName : null;
-  const jobTitle = localizeTerm(employee.jobTitle, lang);
+  const jobTitle = termText(employee.jobTitle, employee.jobTitleEn, lang);
+  const department = termText(employee.department, employee.departmentEn, lang);
   const base = `/employees/${employee.id}`;
 
   const periodActions = (period: (typeof periods)[number]) =>
@@ -162,7 +162,8 @@ export default async function EmployeePage({
             action={updateAttendance}
             id={period.deleteId}
             returnTo={`${base}?tab=attendance`}
-            type={period.row.type}
+            type={attendanceChoiceOf(period.row)}
+            choices={choices}
             start={period.start}
             end={period.end}
             deductsSalary={period.row.deductsSalary}
@@ -247,7 +248,7 @@ export default async function EmployeePage({
         <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 text-xs sm:px-5">
           <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">{employee.employeeNumber}</span>
           {jobTitle ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{jobTitle}</span> : null}
-          {employee.department ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{employee.department}</span> : null}
+          {department ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{department}</span> : null}
           {employerName ? (
             <Link href={`/employers/${employer!.id}`} className="rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-800 ring-1 ring-teal-100">
               {t("الكفيل:", "Sponsor:")} {employerName}
@@ -273,7 +274,7 @@ export default async function EmployeePage({
           <p className="font-bold">{t("تنبيه رصيد الإجازات", "Leave balance alert")}</p>
           <ul className="mt-1 list-disc space-y-0.5 ps-5 text-sm">
             {warnings.map((item) => (
-              <li key={item.key}>{leaveWarningText(item, pick(BALANCE_LABEL[item.key], lang), lang)}</li>
+              <li key={item.key}>{leaveWarningText(item, lang)}</li>
             ))}
           </ul>
           {warnings.some((item) => item.level === "exceeded") ? (
@@ -296,11 +297,13 @@ export default async function EmployeePage({
             <p className="mt-1 truncate text-lg font-bold text-slate-900">{money(gross, currency)}</p>
           </div>
         ) : null}
-        {allow.attendance ? (
-          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-sm", warnedKeys.has("annual") ? "border-red-200 bg-red-50" : "border-slate-200 bg-white")}>
-            <p className={cn("text-xs", warnedKeys.has("annual") ? "text-red-700" : "text-slate-500")}>{t("رصيد السنوية", "Annual leave left")}</p>
-            <p className={cn("mt-1 text-lg font-bold", warnedKeys.has("annual") ? "text-red-700" : "text-slate-900")}>
-              {daysLabel(balances.annual.remaining)} <span className="text-sm font-normal text-slate-500">{t("يوم", "days")}</span>
+        {allow.attendance && annual ? (
+          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-sm", warnedKeys.has(annual.key) ? "border-red-200 bg-red-50" : "border-slate-200 bg-white")}>
+            <p className={cn("truncate text-xs", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-500")}>
+              {t("رصيد", "Left:")} {leaveName(annual, lang)}
+            </p>
+            <p className={cn("mt-1 text-lg font-bold", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-900")}>
+              {daysLabel(annual.remaining)} <span className="text-sm font-normal text-slate-500">{t("يوم", "days")}</span>
             </p>
           </div>
         ) : null}
@@ -358,7 +361,7 @@ export default async function EmployeePage({
                 <dl className="grid gap-2 sm:grid-cols-2">
                   <Info label={t("الاسم الكامل", "Full name")} value={employee.fullName} />
                   <Info label={t("الاسم بالإنجليزية", "Name in English")} value={text(employee.nameEn)} dir="ltr" />
-                  <Info label={t("الجنسية", "Nationality")} value={text(localizeTerm(employee.nationality, lang))} />
+                  <Info label={t("الجنسية", "Nationality")} value={text(nationalityName(employee.nationality, lang))} />
                   <Info label={t("الجنس", "Gender")} value={employee.gender ? pick(GENDER_LABEL[employee.gender], lang, employee.gender) : "—"} />
                   <Info label={t("تاريخ الميلاد", "Date of birth")} value={formatDate(employee.dateOfBirth)} />
                   <Info label={t("الهاتف", "Phone")} value={text(employee.phone)} dir="ltr" />
@@ -382,7 +385,7 @@ export default async function EmployeePage({
                     }
                   />
                   <Info label={t("المسمى الوظيفي", "Job title")} value={text(jobTitle)} />
-                  <Info label={t("القسم", "Department")} value={text(employee.department)} />
+                  <Info label={t("القسم", "Department")} value={text(department)} />
                   <Info label={t("الحالة", "Status")} value={pick(STATUS_LABEL[employee.status], lang, employee.status)} />
                   <Info label={t("تاريخ الالتحاق", "Joining date")} value={formatDate(employee.joiningDate)} />
                   <Info label={t("نهاية العقد", "Contract end")} value={formatDate(employee.contractEnd)} />
@@ -414,6 +417,14 @@ export default async function EmployeePage({
                             ) : (
                               t("غير مسجّل", "Not recorded")
                             )}
+                            {doc.fileUrl ? (
+                              <>
+                                {" · "}
+                                <a className="font-semibold text-teal-800" href={doc.fileUrl} target="_blank">
+                                  {t("عرض المرفق", "View file")}
+                                </a>
+                              </>
+                            ) : null}
                           </p>
                         </div>
                         <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
@@ -447,6 +458,15 @@ export default async function EmployeePage({
                         {t("الانتهاء", "Expiry")}: {formatDate(doc.expiry)}
                       </p>
                       <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
+                      {doc.fileUrl ? (
+                        <a className="block text-sm font-semibold text-teal-800" href={doc.fileUrl} target="_blank">
+                          {t("عرض المرفق", "View file")}
+                        </a>
+                      ) : allow.edit ? (
+                        <Link className="block text-xs text-slate-500 hover:text-teal-800" href={`${base}/edit`}>
+                          {t("لا يوجد مرفق — أرفقه من تعديل البيانات", "No file — attach it from Edit")}
+                        </Link>
+                      ) : null}
                     </Card>
                   );
                 })}
@@ -540,6 +560,7 @@ export default async function EmployeePage({
                     action={markAttendance}
                     employees={[{ id: employee.id, fullName: displayName }]}
                     balances={balanceMap}
+                    choices={choices}
                     returnTo={`${base}?tab=attendance`}
                     defaultType="ABSENT"
                     warnDays={warnDays}
@@ -553,7 +574,7 @@ export default async function EmployeePage({
                   {periods.map((period) => (
                     <div key={period.id} className="rounded-xl border border-slate-100 p-3 text-sm">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold">{pick(ATTENDANCE_LABEL[period.row.type], lang, period.row.type)}</p>
+                        <p className="font-semibold">{attendanceLabel(period.row, leaveTypes, lang)}</p>
                         <ToneBadge tone={period.row.deductsSalary ? "red" : "slate"}>
                           {period.row.deductsSalary ? t("خصم راتب", "Deducted") : t("بدون خصم", "No deduction")}
                         </ToneBadge>
@@ -586,7 +607,7 @@ export default async function EmployeePage({
                             <td className="py-2.5">{formatDate(period.start)}</td>
                             <td>{formatDate(period.end)}</td>
                             <td>{daysLabel(period.days)}</td>
-                            <td>{pick(ATTENDANCE_LABEL[period.row.type], lang, period.row.type)}</td>
+                            <td>{attendanceLabel(period.row, leaveTypes, lang)}</td>
                             <td>
                               <ToneBadge tone={period.row.deductsSalary ? "red" : "slate"}>
                                 {period.row.deductsSalary ? t("نعم", "Yes") : t("لا", "No")}
@@ -772,6 +793,25 @@ export default async function EmployeePage({
                 <dd className="whitespace-nowrap">{money(gross, currency)}</dd>
               </div>
             </dl>
+            {employee.allowances.length ? (
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <h3 className="mb-2 text-sm font-bold text-slate-900">{t("العلاوات", "Allowances")}</h3>
+                <ul className="space-y-2 text-sm">
+                  {employee.allowances.map((allowance) => (
+                    <li key={allowance.id} className={cn(!allowance.active && "opacity-60")}>
+                      <div className="flex justify-between gap-2">
+                        <span className="font-medium text-slate-800">{termText(allowance.allowanceType.nameAr, allowance.allowanceType.nameEn, lang)}</span>
+                        <span className="whitespace-nowrap">{money(allowanceAmount(allowance, employee), currency)}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {describeAllowance(allowance, lang, currency)}
+                        {allowance.active ? "" : t(" — موقوفة", " — stopped")}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <p className="mt-3 text-xs leading-5 text-slate-500">{t("راتب كل شهر يُحفظ وحده عند إنشاء المسير.", "Each month's salary is saved separately when payroll is generated.")}</p>
           </Card>
           ) : null}
@@ -780,15 +820,15 @@ export default async function EmployeePage({
           <Card>
             <SectionTitle>{t("أرصدة الإجازة", "Leave balances")}</SectionTitle>
             <div className="space-y-3">
-              {BALANCE_KEYS.map((key) => {
-                const figure = balances[key];
+              {balances.map((figure) => {
+                const key = figure.key;
                 const total = figure.entitlement + figure.added;
                 const percent = total > 0 ? Math.max(0, Math.min(100, (figure.remaining / total) * 100)) : 0;
                 const warned = warnedKeys.has(key);
                 return (
                   <div key={key} className={cn(warned && "rounded-xl bg-red-50 p-2 ring-1 ring-red-200")}>
                     <div className="flex items-baseline justify-between gap-2 text-sm">
-                      <span className={cn("font-medium", warned ? "text-red-800" : "text-slate-800")}>{pick(BALANCE_LABEL[key], lang)}</span>
+                      <span className={cn("font-medium", warned ? "text-red-800" : "text-slate-800")}>{leaveName(figure, lang)}</span>
                       <span className={cn("whitespace-nowrap font-bold", warned ? "text-red-700" : "text-slate-900")}>
                         {daysLabel(figure.remaining)}
                         <span className="text-xs font-normal text-slate-500"> / {daysLabel(total)}</span>
@@ -817,10 +857,10 @@ export default async function EmployeePage({
               <form action={addLeaveCredit} className="mt-3 space-y-2">
                 <input type="hidden" name="employeeId" value={employee.id} />
                 <input type="hidden" name="returnTo" value={`${base}?tab=attendance`} />
-                <select className={`${fieldClass} w-full`} name="balanceKey" defaultValue="compensatory">
-                  {BALANCE_KEYS.map((key) => (
-                    <option key={key} value={key}>
-                      {pick(BALANCE_LABEL[key], lang)}
+                <select className={`${fieldClass} w-full`} name="balanceKey" defaultValue={balances.some((item) => item.key === "compensatory") ? "compensatory" : balances[0]?.key}>
+                  {balances.map((figure) => (
+                    <option key={figure.key} value={figure.key}>
+                      {leaveName(figure, lang)}
                     </option>
                   ))}
                 </select>

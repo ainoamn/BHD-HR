@@ -1,50 +1,53 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ATTENDANCE_TYPES, BALANCE_LABEL, attendanceType, type BalanceKey } from "@/lib/constants";
-import { pick } from "@/lib/i18n";
-import { countInclusiveDays } from "@/lib/leave";
+import { type AttendanceChoice, countInclusiveDays } from "@/lib/leave";
 import { daysLabel, todayInputValue } from "@/lib/utils";
 import { useLang } from "./lang-provider";
 import { fieldClass, primaryBtn } from "./ui";
 
-export type BalanceSnapshot = Record<BalanceKey, number>;
+/** Remaining days per leave-type key, per employee; a missing key means the type does not apply to that employee. */
+export type BalanceSnapshot = Record<string, number>;
 
 export function LeaveRangeForm({
   action,
   employees,
   balances,
+  choices,
   returnTo,
-  defaultType = "LEAVE",
+  defaultType = "ABSENT",
   warnDays = 5,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employees: { id: string; fullName: string }[];
   balances: Record<string, BalanceSnapshot>;
+  choices: AttendanceChoice[];
   returnTo: string;
   defaultType?: string;
   warnDays?: number;
 }) {
-  const { lang, t } = useLang();
+  const { t } = useLang();
   const today = todayInputValue();
   const [employeeId, setEmployeeId] = useState(employees.length === 1 ? employees[0].id : "");
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const [type, setType] = useState(defaultType);
-  const meta = attendanceType(type);
-  const [deductSalary, setDeductSalary] = useState(Boolean(meta?.deductsSalary));
+  const choice = choices.find((item) => item.value === type);
+  const [deductSalary, setDeductSalary] = useState(Boolean(choice?.deductsSalary));
   const calendarDays = useMemo(() => countInclusiveDays(from, to), [from, to]);
   const reversed = Boolean(from && to && to < from);
   const halfDayRange = type === "HALF_DAY" && calendarDays > 1;
   const days = type === "HALF_DAY" ? (calendarDays === 1 ? 0.5 : 0) : calendarDays;
-  const balanceKey = meta?.balance;
-  const remaining = balanceKey && employeeId ? balances[employeeId]?.[balanceKey] ?? 0 : null;
+  const balanceKey = choice?.balanceKey || null;
+  const employeeBalances = employeeId ? balances[employeeId] : undefined;
+  const notCovered = Boolean(balanceKey && employeeBalances && !(balanceKey in employeeBalances));
+  const remaining = balanceKey && employeeBalances && !notCovered ? employeeBalances[balanceKey] : null;
   const after = remaining === null ? null : remaining - days;
   const insufficient = after !== null && after < 0;
   const nearlyOut = after !== null && !insufficient && after <= warnDays && days > 0;
   const [allowOverdraft, setAllowOverdraft] = useState(false);
-  const blocked = reversed || halfDayRange || (insufficient && !allowOverdraft) || days <= 0 || !employeeId;
-  const balanceName = balanceKey ? pick(BALANCE_LABEL[balanceKey], lang) : "";
+  const blocked = reversed || halfDayRange || notCovered || (insufficient && !allowOverdraft) || days <= 0 || !employeeId;
+  const balanceName = choice?.balanceKey ? choice.label : "";
 
   return (
     <form action={action} className="space-y-3">
@@ -84,12 +87,12 @@ export function LeaveRangeForm({
             onChange={(event) => {
               const next = event.target.value;
               setType(next);
-              setDeductSalary(Boolean(attendanceType(next)?.deductsSalary));
+              setDeductSalary(Boolean(choices.find((item) => item.value === next)?.deductsSalary));
             }}
           >
-            {ATTENDANCE_TYPES.map((item) => (
-              <option key={item.id} value={item.id}>
-                {pick(item.label, lang)}
+            {choices.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
@@ -109,7 +112,11 @@ export function LeaveRangeForm({
         </p>
         {reversed ? <p>{t("تاريخ النهاية قبل تاريخ البداية.", "End date is before start date.")}</p> : null}
         {halfDayRange ? <p>{t("نصف اليوم يُسجل في يوم واحد فقط.", "A half day can only be one date.")}</p> : null}
-        {balanceKey && remaining !== null ? (
+        {notCovered ? (
+          <p className="font-bold">
+            {t(`${balanceName} غير مشمولة لوظيفة هذا الموظف. غيّر ذلك من الضبط ← الموارد البشرية ← أنواع الإجازات.`, `${balanceName} does not apply to this employee's job. Change it in Settings → HR → Leave types.`)}
+          </p>
+        ) : balanceKey && remaining !== null ? (
           <p>
             {t(
               `سيُخصم من ${balanceName}. المتبقي الآن ${daysLabel(remaining)} يوم، وبعد التسجيل ${daysLabel(after ?? 0)} يوم.`,

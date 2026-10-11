@@ -1,5 +1,6 @@
 import { can, type SessionUser } from "./auth";
-import { PAYMENT_LABEL, STATUS_LABEL, localizeTerm, monthName } from "./constants";
+import { PAYMENT_LABEL, STATUS_LABEL, termText, monthName } from "./constants";
+import { nationalityName } from "./nationalities";
 import { collectDocuments } from "./documents";
 import { describeExpiry } from "./expiry";
 import { pick, type Lang } from "./i18n";
@@ -130,8 +131,8 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
         id: employee.id,
         employeeNumber: employee.employeeNumber,
         name: nameOf(employee),
-        nationality: localizeTerm(employee.nationality, lang) || "",
-        jobTitle: localizeTerm(employee.jobTitle, lang) || "",
+        nationality: nationalityName(employee.nationality, lang) || "",
+        jobTitle: termText(employee.jobTitle, employee.jobTitleEn, lang) || "",
         employer: employee.employer ? (lang === "en" && employee.employer.nameEn ? employee.employer.nameEn : employee.employer.name) : "",
         status: pick(STATUS_LABEL[employee.status], lang, employee.status),
         joiningDate: employee.joiningDate,

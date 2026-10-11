@@ -1,31 +1,96 @@
-import type { Employee } from "@prisma/client";
+import type { Employee, EmployeeAllowance } from "@prisma/client";
 import Link from "next/link";
-import { GENDER_LABEL, STATUS_LABEL, jobs, nationalities } from "@/lib/constants";
+import { GENDER_LABEL, STATUS_LABEL, termText } from "@/lib/constants";
+import type { getHrCatalog } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
-import { toDateInput } from "@/lib/utils";
+import { leaveOverrides } from "@/lib/leave";
+import { DEFAULT_NATIONALITY, findNationality, nationalityOptions } from "@/lib/nationalities";
+import { currentPeriod, daysLabel, toDateInput } from "@/lib/utils";
+import { BilingualFields } from "./bilingual-fields";
 import { EmployerPicker } from "./employer-picker";
 import { SalaryFields } from "./salary-fields";
+import { SearchSelect } from "./search-select";
 import { SubmitButton } from "./submit-button";
 import { Card, Field, fieldClass, secondaryBtn } from "./ui";
+
+type Catalog = Awaited<ReturnType<typeof getHrCatalog>>;
+
+const FILE_ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
 
 export async function EmployeeForm({
   action,
   employee,
   currency,
   employers,
+  catalog,
+  allowances = [],
   defaultEmployerId,
   showSalary = true,
+  canManageCatalog = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employee?: Employee;
   currency: string;
   employers: { id: string; name: string; nameEn: string | null }[];
+  catalog: Catalog;
+  allowances?: EmployeeAllowance[];
   defaultEmployerId?: string | null;
-  /** Without `salaries.edit` the salary block is hidden and the server keeps the saved amounts. */
+  /** Without `salaries.edit` the salary block is hidden and the server keeps the saved amounts and allowances. */
   showSalary?: boolean;
+  /** Admins get links to edit the job title, department, leave and allowance lists. */
+  canManageCatalog?: boolean;
 }) {
   const { lang, t } = await getI18n();
+  const now = currentPeriod();
+  const defaultStart = `${now.year}-${String(now.month).padStart(2, "0")}`;
+
+  const nationalities = nationalityOptions(lang);
+  const storedNationality = employee?.nationality || null;
+  const nationalityValue = employee ? findNationality(storedNationality)?.code || storedNationality || "" : DEFAULT_NATIONALITY;
+  if (nationalityValue && !nationalities.some((option) => option.value === nationalityValue)) {
+    nationalities.push({ value: nationalityValue, label: nationalityValue, hint: "" });
+  }
+  const other = lang === "en" ? "ar" : "en";
+  const catalogOptions = (list: { id: string; nameAr: string; nameEn: string | null }[]) =>
+    list
+      .map((item) => ({ value: item.id, label: termText(item.nameAr, item.nameEn, lang) || item.nameAr, hint: other === "en" ? item.nameEn : item.nameAr }))
+      .sort((a, b) => a.label.localeCompare(b.label, lang));
+  const overrides = leaveOverrides(employee?.leaveDays);
+  const manageLink = (tab: string, label: string) =>
+    canManageCatalog ? (
+      <Link href={`/settings/hr?tab=${tab}`} target="_blank" className="text-xs font-semibold text-teal-800 underline">
+        {label}
+      </Link>
+    ) : null;
+
+  const docRow = (prefix: "id" | "passport" | "residence", numberLabel: string, expiryLabel: string, current: string | null | undefined) => (
+    <div className="grid gap-4 rounded-xl border border-slate-100 p-3 md:grid-cols-3">
+      <Field label={numberLabel}>
+        <input className={`${fieldClass} w-full`} name={`${prefix}Number`} defaultValue={(employee?.[`${prefix}Number`] as string | null) || ""} />
+      </Field>
+      <Field label={expiryLabel}>
+        <input className={`${fieldClass} w-full`} type="date" name={`${prefix}Expiry`} defaultValue={toDateInput(employee?.[`${prefix}Expiry`] as Date | null)} />
+      </Field>
+      <div className="space-y-1.5">
+        <Field label={current ? t("استبدال المرفق", "Replace attachment") : t("المرفق (صورة أو PDF)", "Attachment (image or PDF)")} hint={t("حتى 4 ميغابايت", "Up to 4 MB")}>
+          <input className={`${fieldClass} w-full`} type="file" name={`${prefix}File`} accept={FILE_ACCEPT} />
+        </Field>
+        {current ? (
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <a href={current} target="_blank" className="font-semibold text-teal-800 underline">
+              {t("عرض المرفق الحالي", "View current file")}
+            </a>
+            <label className="flex items-center gap-1 text-slate-600">
+              <input type="checkbox" name={`${prefix}FileRemove`} value="1" className="accent-red-700" />
+              {t("حذف المرفق", "Remove file")}
+            </label>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+
   return (
     <form action={action} className="space-y-5">
       {employee ? <input type="hidden" name="id" value={employee.id} /> : null}
@@ -42,23 +107,32 @@ export async function EmployeeForm({
           <p className="mt-1 text-xs text-slate-500">
             {employee
               ? `${t("الرقم الوظيفي:", "Employee no.:")} ${employee.employeeNumber}`
-              : t("سيُنشأ الرقم الوظيفي تلقائياً عند الحفظ.", "The employee number is generated on save.")}
+              : t("سيُنشأ الرقم الوظيفي تلقائياً عند الحفظ.", "The employee number is generated on save.")}{" "}
+            {t(
+              "اكتب الاسم بلغة واحدة فتُكتب الأخرى تلقائياً بالذكاء الاصطناعي، ويمكنك تعديلها.",
+              "Type the name in one language and AI fills in the other; you can still edit it.",
+            )}
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label={t("الاسم الكامل", "Full name")}>
-            <input className={`${fieldClass} w-full`} name="fullName" defaultValue={employee?.fullName || ""} required />
-          </Field>
-          <Field label={t("الاسم بالإنجليزية", "Name in English")}>
-            <input className={`${fieldClass} w-full`} name="nameEn" dir="ltr" defaultValue={employee?.nameEn || ""} />
-          </Field>
+          <BilingualFields
+            arName="fullName"
+            enName="nameEn"
+            arLabel={t("الاسم الكامل (عربي)", "Full name (Arabic)")}
+            enLabel={t("الاسم بالإنجليزية", "Name in English")}
+            arDefault={employee?.fullName}
+            enDefault={employee?.nameEn}
+            kind="name"
+            required
+          />
           <Field label={t("الجنسية", "Nationality")}>
-            <input className={`${fieldClass} w-full`} name="nationality" list="nationalities" defaultValue={employee?.nationality || ""} />
-            <datalist id="nationalities">
-              {nationalities(lang).map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
+            <SearchSelect
+              name="nationality"
+              options={nationalities}
+              defaultValue={nationalityValue}
+              emptyLabel={t("غير محدد", "Not set")}
+              ariaLabel={t("الجنسية", "Nationality")}
+            />
           </Field>
           <Field label={t("الجنس", "Gender")}>
             <select className={`${fieldClass} w-full`} name="gender" defaultValue={employee?.gender || ""}>
@@ -88,44 +162,46 @@ export async function EmployeeForm({
       <Card className="space-y-4">
         <div>
           <h2 className="text-base font-bold text-slate-900">{t("البطاقة والجواز والإقامة", "ID, passport & residence")}</h2>
-          <p className="mt-1 text-xs text-slate-500">{t("تواريخ الانتهاء هنا هي مصدر التنبيهات.", "Expiry dates here drive the alerts.")}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("تواريخ الانتهاء هنا هي مصدر التنبيهات. أرفق نسخة من كل وثيقة بجانب تاريخها.", "Expiry dates here drive the alerts. Attach a copy of each document next to its date.")}
+          </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label={t("رقم البطاقة الشخصية", "ID number")}>
-            <input className={`${fieldClass} w-full`} name="idNumber" defaultValue={employee?.idNumber || ""} />
-          </Field>
-          <Field label={t("انتهاء البطاقة", "ID expiry")}>
-            <input className={`${fieldClass} w-full`} type="date" name="idExpiry" defaultValue={toDateInput(employee?.idExpiry)} />
-          </Field>
-          <Field label={t("رقم الجواز", "Passport number")}>
-            <input className={`${fieldClass} w-full`} name="passportNumber" defaultValue={employee?.passportNumber || ""} />
-          </Field>
-          <Field label={t("انتهاء الجواز", "Passport expiry")}>
-            <input className={`${fieldClass} w-full`} type="date" name="passportExpiry" defaultValue={toDateInput(employee?.passportExpiry)} />
-          </Field>
-          <Field label={t("رقم الإقامة", "Residence number")}>
-            <input className={`${fieldClass} w-full`} name="residenceNumber" defaultValue={employee?.residenceNumber || ""} />
-          </Field>
-          <Field label={t("انتهاء الإقامة", "Residence expiry")}>
-            <input className={`${fieldClass} w-full`} type="date" name="residenceExpiry" defaultValue={toDateInput(employee?.residenceExpiry)} />
-          </Field>
+        <div className="space-y-3">
+          {docRow("id", t("رقم البطاقة الشخصية", "ID number"), t("انتهاء البطاقة", "ID expiry"), employee?.idFileUrl)}
+          {docRow("passport", t("رقم الجواز", "Passport number"), t("انتهاء الجواز", "Passport expiry"), employee?.passportFileUrl)}
+          {docRow("residence", t("رقم الإقامة", "Residence number"), t("انتهاء الإقامة", "Residence expiry"), employee?.residenceFileUrl)}
         </div>
       </Card>
 
       <Card className="space-y-4">
         <h2 className="text-base font-bold text-slate-900">{t("الوظيفة", "Job")}</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label={t("المسمى الوظيفي", "Job title")}>
-            <input className={`${fieldClass} w-full`} name="jobTitle" list="jobs" defaultValue={employee?.jobTitle || ""} />
-            <datalist id="jobs">
-              {jobs(lang).map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          </Field>
-          <Field label={t("القسم", "Department")}>
-            <input className={`${fieldClass} w-full`} name="department" defaultValue={employee?.department || ""} />
-          </Field>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-700">{t("المسمى الوظيفي", "Job title")}</span>
+              {manageLink("jobs", t("إضافة / تعديل المسميات", "Add / edit titles"))}
+            </div>
+            <SearchSelect
+              name="jobTitleId"
+              options={catalogOptions(catalog.jobTitles)}
+              defaultValue={employee?.jobTitleId || ""}
+              emptyLabel={t("غير محدد", "Not set")}
+              ariaLabel={t("المسمى الوظيفي", "Job title")}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-700">{t("القسم", "Department")}</span>
+              {manageLink("departments", t("إضافة / تعديل الأقسام", "Add / edit departments"))}
+            </div>
+            <SearchSelect
+              name="departmentId"
+              options={catalogOptions(catalog.departments)}
+              defaultValue={employee?.departmentId || ""}
+              emptyLabel={t("غير محدد", "Not set")}
+              ariaLabel={t("القسم", "Department")}
+            />
+          </div>
           <Field label={t("تاريخ الالتحاق", "Joining date")}>
             <input className={`${fieldClass} w-full`} type="date" name="joiningDate" defaultValue={toDateInput(employee?.joiningDate)} />
           </Field>
@@ -145,22 +221,40 @@ export async function EmployeeForm({
       </Card>
 
       <Card className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">{t("أرصدة الإجازة", "Leave entitlements")}</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {t("المتبقي = المستحق + الأيام الإضافية − الإجازات المسجّلة من هذا النوع.", "Remaining = entitlement + extra days − leave taken of that type.")}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">{t("أرصدة الإجازة", "Leave entitlements")}</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              {t(
+                "اترك الخانة فارغة ليأخذ الموظف العدد المحدد في الضبط. المتبقي = المستحق + الأيام الإضافية − الإجازات المسجّلة.",
+                "Leave a box empty to use the number set in Settings. Remaining = entitlement + extra days − leave taken.",
+              )}
+            </p>
+          </div>
+          {manageLink("leave", t("إدارة أنواع الإجازات", "Manage leave types"))}
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <Field label={t("إجازة سنوية مستحقة", "Annual leave")} hint={t("بالأيام في السنة", "Days per year")}>
-            <input className={`${fieldClass} w-full`} type="number" min="0" step="0.5" name="annualLeaveDays" defaultValue={employee?.annualLeaveDays ?? 30} />
-          </Field>
-          <Field label={t("إجازة مرضية مستحقة", "Sick leave")} hint={t("بالأيام", "Days")}>
-            <input className={`${fieldClass} w-full`} type="number" min="0" step="0.5" name="sickLeaveDays" defaultValue={employee?.sickLeaveDays ?? 0} />
-          </Field>
-          <Field label={t("إجازات أخرى مستحقة", "Other leave")} hint={t("بالأيام", "Days")}>
-            <input className={`${fieldClass} w-full`} type="number" min="0" step="0.5" name="otherLeaveDays" defaultValue={employee?.otherLeaveDays ?? 0} />
-          </Field>
+          {catalog.leaveTypes.map((type) => (
+            <Field
+              key={type.key}
+              label={termText(type.nameAr, type.nameEn, lang) || type.nameAr}
+              hint={
+                t(`الافتراضي ${daysLabel(type.days)} يوم`, `Default ${daysLabel(type.days)} day(s)`) +
+                (type.allJobs ? "" : t(" — لوظائف محددة فقط", " — selected job titles only"))
+              }
+            >
+              <input
+                className={`${fieldClass} w-full`}
+                type="number"
+                min="0"
+                max="366"
+                step="0.5"
+                name={`leave_${type.key}`}
+                placeholder={daysLabel(type.days)}
+                defaultValue={overrides[type.key] ?? ""}
+              />
+            </Field>
+          ))}
         </div>
       </Card>
 
@@ -174,6 +268,22 @@ export async function EmployeeForm({
               housingAllowance: employee?.housingAllowance || 0,
               transportAllowance: employee?.transportAllowance || 0,
               otherAllowance: employee?.otherAllowance || 0,
+            }}
+            allowances={{
+              types: catalog.allowanceTypes.map(({ id, nameAr, nameEn, calc, base, value, frequency, payMonth }) => ({ id, nameAr, nameEn, calc, base, value, frequency, payMonth })),
+              rows: allowances.map((row) => ({
+                id: row.id,
+                allowanceTypeId: row.allowanceTypeId,
+                calc: row.calc,
+                base: row.base,
+                value: row.value,
+                frequency: row.frequency,
+                payMonth: row.payMonth,
+                start: `${row.startYear}-${String(row.startMonth).padStart(2, "0")}`,
+                active: row.active,
+              })),
+              defaultStart,
+              canManageTypes: canManageCatalog,
             }}
           />
         </Card>

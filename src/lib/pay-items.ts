@@ -1,4 +1,5 @@
 import type { PayItem, Prisma, PrismaClient } from "@prisma/client";
+import { allowanceAmount, allowanceDue } from "./allowances";
 import { payKindDeducts } from "./constants";
 import { buildSalaryAmounts } from "./salary";
 import { round3 } from "./utils";
@@ -28,7 +29,7 @@ export function scheduledAmount(item: Pick<PayItem, "kind" | "amount" | "startYe
   return round3(item.amount);
 }
 
-/** Rebuilds the pay-item lines and totals of one unpaid salary. Paid salaries are left exactly as they were paid. */
+/** Rebuilds the allowance and pay-item lines and totals of one unpaid salary. Paid salaries are left exactly as they were paid. */
 export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: number) {
   const salary = await db.salary.findUnique({ where: { id: salaryId } });
   if (!salary || salary.paid) return salary;
@@ -38,14 +39,29 @@ export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: numb
     include: { lines: { where: { salaryId: { not: salary.id } }, include: { salary: { select: { year: true, month: true, paid: true } } } } },
     orderBy: { createdAt: "asc" },
   });
-  const lines = items
-    .map((item) => {
-      const recovered = item.lines
-        .filter((line) => line.salary.paid || monthKey(line.salary.year, line.salary.month) < key)
-        .reduce((sum, line) => sum + line.amount, 0);
-      return { salaryId, payItemId: item.id, kind: item.kind, title: item.title, amount: scheduledAmount(item, key, recovered), deduct: payKindDeducts(item.kind) };
-    })
-    .filter((line) => line.amount > 0);
+  const allowances = await db.employeeAllowance.findMany({
+    where: { employeeId: salary.employeeId, active: true },
+    include: { allowanceType: { select: { nameAr: true, nameEn: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  const allowanceLines = allowances
+    .filter((allowance) => allowanceDue(allowance, salary.year, salary.month))
+    .map((allowance) => ({
+      salaryId,
+      allowanceId: allowance.id,
+      kind: "RECURRING",
+      title: allowance.allowanceType.nameAr,
+      titleEn: allowance.allowanceType.nameEn,
+      amount: allowanceAmount(allowance, salary),
+      deduct: false,
+    }));
+  const itemLines = items.map((item) => {
+    const recovered = item.lines
+      .filter((line) => line.salary.paid || monthKey(line.salary.year, line.salary.month) < key)
+      .reduce((sum, line) => sum + line.amount, 0);
+    return { salaryId, payItemId: item.id, kind: item.kind, title: item.title, amount: scheduledAmount(item, key, recovered), deduct: payKindDeducts(item.kind) };
+  });
+  const lines = [...allowanceLines, ...itemLines].filter((line) => line.amount > 0);
   await db.salaryLine.deleteMany({ where: { salaryId } });
   if (lines.length) await db.salaryLine.createMany({ data: lines });
   const extraEarnings = round3(lines.filter((line) => !line.deduct).reduce((sum, line) => sum + line.amount, 0));
@@ -57,7 +73,7 @@ export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: numb
   });
 }
 
-/** Re-applies pay items to every unpaid salary of an employee, oldest month first. */
+/** Re-applies allowances and pay items to every unpaid salary of an employee, oldest month first. */
 export async function syncEmployeeSalaries(db: Db, employeeId: string, salaryDays: number) {
   const salaries = await db.salary.findMany({
     where: { employeeId, paid: false },

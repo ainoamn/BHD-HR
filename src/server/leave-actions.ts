@@ -2,10 +2,10 @@
 
 import { writeAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/auth";
-import { BALANCE_LABEL, type BalanceKey } from "@/lib/constants";
+import { getLeaveTypes } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
-import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { leaveName } from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
 import { clip, daysLabel, num, req, safeReturn, str } from "@/lib/utils";
 
@@ -14,9 +14,10 @@ export async function addLeaveCredit(formData: FormData) {
   const { t } = await getI18n();
   const employeeId = req(formData, "employeeId");
   const returnTo = safeReturn(formData.get("returnTo"), `/employees/${employeeId}?tab=attendance`);
-  const balanceKey = req(formData, "balanceKey") as BalanceKey;
+  const balanceKey = req(formData, "balanceKey");
   const days = num(formData, "days");
-  if (!BALANCE_LABEL[balanceKey]) go(returnTo, { error: t("نوع الرصيد غير صحيح", "Invalid balance type") });
+  const type = (await getLeaveTypes(user.companyId)).find((item) => item.key === balanceKey);
+  if (!type) go(returnTo, { error: t("نوع الرصيد غير صحيح", "Invalid balance type") });
   if (days <= 0) go(returnTo, { error: t("اكتب عدد أيام أكبر من صفر", "Enter more than zero days") });
   const employee = await prisma.employee.findFirst({ where: { id: employeeId, companyId: user.companyId } });
   if (!employee) go("/employees", { error: t("الموظف غير موجود", "Employee not found") });
@@ -28,8 +29,8 @@ export async function addLeaveCredit(formData: FormData) {
     employeeId,
     action: "LEAVE_CREDIT",
     message: t(
-      `أضاف ${daysLabel(days)} يوم إلى ${pick(BALANCE_LABEL[balanceKey], "ar")} للموظف ${employee!.fullName}`,
-      `Added ${daysLabel(days)} day(s) to ${pick(BALANCE_LABEL[balanceKey], "en")} for ${employee!.fullName}`,
+      `أضاف ${daysLabel(days)} يوم إلى ${leaveName(type!, "ar")} للموظف ${employee!.fullName}`,
+      `Added ${daysLabel(days)} day(s) to ${leaveName(type!, "en")} for ${employee!.fullName}`,
     ),
   });
   refreshAll();

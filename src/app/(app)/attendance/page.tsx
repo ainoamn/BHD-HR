@@ -5,10 +5,22 @@ import { PeriodFilter } from "@/components/period-filter";
 import { AttendanceEditForm, DeleteButton } from "@/components/row-forms";
 import { Card, PageHeader } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
-import { ATTENDANCE_LABEL, BALANCE_KEYS, BALANCE_LABEL, type BalanceKey } from "@/lib/constants";
-import { pick } from "@/lib/i18n";
+import { getLeaveTypes } from "@/lib/hr-catalog";
 import { getI18n } from "@/lib/lang";
-import { computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings, salaryDayWeight } from "@/lib/leave";
+import {
+  attendanceChoiceOf,
+  attendanceChoices,
+  attendanceLabel,
+  computeLeaveBalances,
+  groupAttendance,
+  leaveName,
+  leaveWarningText,
+  leaveWarnings,
+  remainingByKey,
+  rowBalanceKey,
+  rowDays,
+  salaryDayWeight,
+} from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
 import { calendarDays, daysLabel, formatDate, monthRange, readPeriod, round3 } from "@/lib/utils";
 import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
@@ -23,7 +35,7 @@ export default async function AttendancePage({
   const { lang, t } = await getI18n();
   const { year, month } = readPeriod(sp);
   const { start, end } = monthRange(year, month);
-  const [employees, records] = await Promise.all([
+  const [employees, records, leaveTypes] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: user.companyId, status: { not: "TERMINATED" } },
       include: { attendance: true, leaveCredits: true },
@@ -34,31 +46,24 @@ export default async function AttendancePage({
       include: { employee: true },
       orderBy: { date: "desc" },
     }),
+    getLeaveTypes(user.companyId),
   ]);
   const displayName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const warnDays = user.company.leaveWarningDays;
-  const figuresById = new Map(employees.map((employee) => [employee.id, computeLeaveBalances(employee, employee.attendance, employee.leaveCredits)]));
-  const balances = Object.fromEntries(
-    employees.map((employee) => {
-      const figures = figuresById.get(employee.id)!;
-      return [employee.id, Object.fromEntries(BALANCE_KEYS.map((key) => [key, figures[key].remaining])) as Record<BalanceKey, number>];
-    }),
-  );
+  const figuresById = new Map(employees.map((employee) => [employee.id, computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes)]));
+  const balances = Object.fromEntries(employees.map((employee) => [employee.id, remainingByKey(figuresById.get(employee.id)!)]));
   const leaveAlerts = employees
     .map((employee) => ({ employee, warnings: leaveWarnings(figuresById.get(employee.id)!, warnDays) }))
     .filter((item) => item.warnings.length > 0);
   const summary = employees.map((employee) => {
     const rows = records.filter((row) => row.employeeId === employee.id);
-    const used = (key: BalanceKey) => round3(rows.reduce((sum, row) => sum + (row.balanceKey === key ? (row.type === "HALF_DAY" ? 0.5 : 1) : 0), 0));
     return {
       employee,
       salaryDays: round3(rows.reduce((sum, row) => sum + salaryDayWeight(row), 0)),
-      annual: used("annual"),
-      sick: used("sick"),
-      compensatory: used("compensatory"),
-      other: used("other"),
+      used: Object.fromEntries(leaveTypes.map((type) => [type.key, round3(rows.reduce((sum, row) => (rowBalanceKey(row) === type.key ? sum + rowDays(row) : sum), 0))])),
     };
   });
+  const choices = attendanceChoices(leaveTypes, lang);
   const periods = groupAttendance(records);
   const returnTo = `/attendance?year=${year}&month=${month}`;
 
@@ -84,7 +89,7 @@ export default async function AttendancePage({
                   {displayName(employee)}
                 </Link>
                 {" — "}
-                {warnings.map((item) => leaveWarningText(item, pick(BALANCE_LABEL[item.key], lang), lang)).join(" · ")}
+                {warnings.map((item) => leaveWarningText(item, lang)).join(" · ")}
               </li>
             ))}
           </ul>
@@ -96,6 +101,7 @@ export default async function AttendancePage({
             action={markAttendance}
             employees={employees.map((employee) => ({ id: employee.id, fullName: displayName(employee) }))}
             balances={balances}
+            choices={choices}
             returnTo={returnTo}
             defaultType="ABSENT"
             warnDays={warnDays}
@@ -110,10 +116,11 @@ export default async function AttendancePage({
               <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
               <th className="px-4 py-3 text-start">{t("أيام الشهر", "Month days")}</th>
               <th className="px-4 py-3 text-start">{t("خصم من الراتب", "Salary deduction")}</th>
-              <th className="px-4 py-3 text-start">{t("سنوية", "Annual")}</th>
-              <th className="px-4 py-3 text-start">{t("مرضية", "Sick")}</th>
-              <th className="px-4 py-3 text-start">{t("تعويضية", "Compensatory")}</th>
-              <th className="px-4 py-3 text-start">{t("أخرى", "Other")}</th>
+              {leaveTypes.map((type) => (
+                <th key={type.key} className="px-4 py-3 text-start">
+                  {leaveName(type, lang)}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -126,10 +133,11 @@ export default async function AttendancePage({
                 </td>
                 <td className="px-4 py-3">{calendarDays(year, month)}</td>
                 <td className="px-4 py-3">{daysLabel(row.salaryDays)}</td>
-                <td className="px-4 py-3">{daysLabel(row.annual)}</td>
-                <td className="px-4 py-3">{daysLabel(row.sick)}</td>
-                <td className="px-4 py-3">{daysLabel(row.compensatory)}</td>
-                <td className="px-4 py-3">{daysLabel(row.other)}</td>
+                {leaveTypes.map((type) => (
+                  <td key={type.key} className="px-4 py-3">
+                    {daysLabel(row.used[type.key])}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -147,7 +155,7 @@ export default async function AttendancePage({
                 <span className="text-slate-500">
                   {" "}
                   — {formatDate(period.start)} {t("إلى", "to")} {formatDate(period.end)} — {daysLabel(period.days)} {t("يوم", "day(s)")} —{" "}
-                  {pick(ATTENDANCE_LABEL[period.row.type], lang, period.row.type)}
+                  {attendanceLabel(period.row, leaveTypes, lang)}
                   {period.row.deductsSalary ? t(" — خصم راتب", " — salary deducted") : t(" — بدون خصم راتب", " — no salary deduction")}
                   {period.row.notes ? ` — ${period.row.notes}` : ""}
                 </span>
@@ -158,7 +166,8 @@ export default async function AttendancePage({
                     action={updateAttendance}
                     id={period.deleteId}
                     returnTo={returnTo}
-                    type={period.row.type}
+                    type={attendanceChoiceOf(period.row)}
+                    choices={choices}
                     start={period.start}
                     end={period.end}
                     deductsSalary={period.row.deductsSalary}

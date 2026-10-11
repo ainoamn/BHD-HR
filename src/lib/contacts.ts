@@ -59,6 +59,7 @@ export async function loadContacts(options: {
             nameEn: true,
             employeeNumber: true,
             jobTitle: true,
+            jobTitleEn: true,
             phone: true,
             email: true,
             status: true,

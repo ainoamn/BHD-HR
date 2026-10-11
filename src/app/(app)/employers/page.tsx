@@ -4,7 +4,7 @@ import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
 import { Card, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
-import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, localizeTerm } from "@/lib/constants";
+import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { type ContactKind, loadContacts, readContactKind } from "@/lib/contacts";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -603,7 +603,7 @@ function ContactsDirectory({
         ),
         phone: employee.phone,
         email: employee.email,
-        extra: [employee.employeeNumber, localizeTerm(employee.jobTitle, lang)].filter(Boolean).join(" · "),
+        extra: [employee.employeeNumber, termText(employee.jobTitle, employee.jobTitleEn, lang)].filter(Boolean).join(" · "),
         status: employee.status,
       };
     }),

@@ -2,11 +2,12 @@ import { cache } from "react";
 import { can, getSessionUser } from "./auth";
 import type { Permission } from "./permissions";
 import { reminderDayIn, payDayFor } from "./calendar";
-import { ATTENDANCE_LABEL, BALANCE_LABEL, DOC_LABEL, monthName } from "./constants";
+import { DOC_LABEL, monthName } from "./constants";
 import { daysUntil, describeExpiry } from "./expiry";
+import { getLeaveTypes } from "./hr-catalog";
 import { pick } from "./i18n";
 import { getI18n } from "./lang";
-import { computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "./leave";
+import { attendanceLabel, computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "./leave";
 import { prisma } from "./prisma";
 import { daysLabel, daysPhrase, formatDate, money, monthRange } from "./utils";
 
@@ -45,6 +46,7 @@ export const getAlerts = cache(async () => {
       leaveCredits: { select: { balanceKey: true, days: true } },
     },
   });
+  const leaveTypes = await getLeaveTypes(company.id);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const alerts: AlertItem[] = [];
   const now = new Date();
@@ -77,14 +79,13 @@ export const getAlerts = cache(async () => {
       });
     }
 
-    const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits);
+    const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes);
     for (const warning of leaveWarnings(balances, company.leaveWarningDays)) {
-      const label = pick(BALANCE_LABEL[warning.key], lang);
       alerts.push({
         id: `leave-${employee.id}-${warning.key}`,
         severity: "danger",
         title: warning.level === "low" ? t("اقتراب نفاد الإجازة", "Leave almost used") : t("تجاوز رصيد الإجازة", "Leave limit reached"),
-        message: `${name} — ${leaveWarningText(warning, label, lang)}`,
+        message: `${name} — ${leaveWarningText(warning, lang)}`,
         href: `/employees/${employee.id}?tab=attendance`,
         days: warning.level === "exceeded" ? -900 : warning.level === "exhausted" ? -800 : -700,
       });
@@ -167,7 +168,7 @@ export const getAlerts = cache(async () => {
     orderBy: { date: "desc" },
   });
   for (const period of groupAttendance(absences).slice(0, 8)) {
-    const kind = pick(ATTENDANCE_LABEL[period.row.type], lang, period.row.type);
+    const kind = attendanceLabel(period.row, leaveTypes, lang);
     const when =
       formatDate(period.start) === formatDate(period.end)
         ? formatDate(period.start)

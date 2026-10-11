@@ -54,21 +54,23 @@ export const DOC_LABEL: Record<string, Bi> = {
 
 export const EXTRA_DOC_TYPES = ["DRIVING_LICENSE", "CONTRACT", "INSURANCE", "CERTIFICATE", "ID_CARD", "PASSPORT", "RESIDENCE", "OTHER"];
 
-export const BALANCE_KEYS = ["annual", "sick", "compensatory", "other"] as const;
-export type BalanceKey = (typeof BALANCE_KEYS)[number];
-
-export const BALANCE_LABEL: Record<BalanceKey, Bi> = {
+/** Names of the four leave types every company starts with (src/lib/hr-catalog.ts). */
+export const BALANCE_LABEL: Record<string, Bi> = {
   annual: { ar: "الإجازة السنوية", en: "Annual leave" },
   sick: { ar: "الإجازة المرضية", en: "Sick leave" },
   compensatory: { ar: "الإجازة التعويضية", en: "Compensatory leave" },
   other: { ar: "إجازات أخرى", en: "Other leave" },
 };
 
+/**
+ * Attendance row types. LEAVE, SICK, COMPENSATORY and OTHER_LEAVE are the built-in leave balances; leave of a
+ * company-defined type is stored as CUSTOM_LEAVE with its key in balanceKey.
+ */
 export const ATTENDANCE_TYPES: {
   id: string;
   label: Bi;
   deductsSalary: boolean;
-  balance: BalanceKey | null;
+  balance: string | null;
 }[] = [
   { id: "ABSENT", label: { ar: "غياب", en: "Absence" }, deductsSalary: true, balance: null },
   { id: "UNPAID_LEAVE", label: { ar: "إجازة بخصم راتب", en: "Unpaid leave" }, deductsSalary: true, balance: null },
@@ -78,7 +80,12 @@ export const ATTENDANCE_TYPES: {
   { id: "OTHER_LEAVE", label: { ar: "إجازة أخرى", en: "Other leave" }, deductsSalary: false, balance: "other" },
   { id: "OFFICIAL", label: { ar: "مهمة رسمية", en: "Official duty" }, deductsSalary: false, balance: null },
   { id: "HALF_DAY", label: { ar: "نصف يوم", en: "Half day" }, deductsSalary: true, balance: null },
+  { id: "CUSTOM_LEAVE", label: { ar: "إجازة", en: "Leave" }, deductsSalary: false, balance: null },
 ];
+
+/** Attendance choices that never use a leave balance; leave types are listed between them. */
+export const PLAIN_ATTENDANCE_BEFORE = ["ABSENT", "UNPAID_LEAVE"];
+export const PLAIN_ATTENDANCE_AFTER = ["OFFICIAL", "HALF_DAY"];
 
 export const ATTENDANCE_LABEL: Record<string, Bi> = Object.fromEntries(ATTENDANCE_TYPES.map((item) => [item.id, item.label]));
 
@@ -101,6 +108,7 @@ export const PAY_KIND_LABEL: Record<string, Bi> = {
   ALLOWANCE: { ar: "بدل إضافي", en: "Extra allowance" },
   ENTITLEMENT: { ar: "استحقاق", en: "Entitlement" },
   DEDUCTION: { ar: "خصم", en: "Deduction" },
+  RECURRING: { ar: "علاوة", en: "Allowance" },
 };
 
 export const PAY_KIND_HINT: Record<string, Bi> = {
@@ -123,34 +131,32 @@ export function payKindDeducts(kind: string) {
   return kind === "ADVANCE" || kind === "DEDUCTION";
 }
 
-const NATIONALITIES_AR = ["عماني", "هندي", "بنغلاديشي", "باكستاني", "فلبيني", "مصري", "سوداني", "نيبالي", "سريلانكي", "إندونيسي"];
-const NATIONALITIES_EN = ["Omani", "Indian", "Bangladeshi", "Pakistani", "Filipino", "Egyptian", "Sudanese", "Nepali", "Sri Lankan", "Indonesian"];
-const JOBS_AR = ["عامل", "سائق", "مشرف", "حارس", "فني", "محاسب", "مندوب", "موظف إداري"];
-const JOBS_EN = ["Labourer", "Driver", "Supervisor", "Guard", "Technician", "Accountant", "PRO", "Administrator"];
+export const ALLOWANCE_CALC: Record<string, Bi> = {
+  FIXED: { ar: "مبلغ ثابت", en: "Fixed amount" },
+  PERCENT: { ar: "نسبة مئوية", en: "Percentage" },
+};
 
-export function nationalities(lang: Lang) {
-  return lang === "en" ? NATIONALITIES_EN : NATIONALITIES_AR;
+export const ALLOWANCE_BASE: Record<string, Bi> = {
+  BASIC: { ar: "من الراتب الأساسي", en: "of basic salary" },
+  PACKAGE: { ar: "من إجمالي الراتب", en: "of gross salary" },
+};
+
+export const ALLOWANCE_FREQUENCY: Record<string, Bi> = {
+  MONTHLY: { ar: "شهرياً", en: "Monthly" },
+  QUARTERLY: { ar: "كل 3 أشهر", en: "Quarterly" },
+  SEMI_ANNUAL: { ar: "نصف سنوي", en: "Semi-annual" },
+  ANNUAL: { ar: "سنوياً", en: "Annual" },
+};
+
+export const FREQUENCY_MONTHS: Record<string, number> = { MONTHLY: 1, QUARTERLY: 3, SEMI_ANNUAL: 6, ANNUAL: 12 };
+
+/** Text stored with an Arabic name and an optional English one (job titles, departments, leave and allowance types). */
+export function termText(ar: string | null | undefined, en: string | null | undefined, lang: Lang) {
+  if (!ar) return en || null;
+  return lang === "en" && en ? en : ar;
 }
 
-export function jobs(lang: Lang) {
-  return lang === "en" ? JOBS_EN : JOBS_AR;
-}
-
-export function localizeTerm(value: string | null | undefined, lang: Lang) {
-  if (!value) return value ?? null;
-  for (const [ar, en] of [
-    [NATIONALITIES_AR, NATIONALITIES_EN],
-    [JOBS_AR, JOBS_EN],
-  ]) {
-    const index = lang === "en" ? ar.indexOf(value) : en.indexOf(value);
-    if (index >= 0) return lang === "en" ? en[index] : ar[index];
-  }
-  return value;
-}
-
-export function bothTerm(value: string | null | undefined) {
-  if (!value) return value ?? null;
-  const ar = localizeTerm(value, "ar");
-  const en = localizeTerm(value, "en");
-  return ar && en && ar !== en ? `${ar} / ${en}` : value;
+export function termBoth(ar: string | null | undefined, en: string | null | undefined) {
+  if (!ar) return en || null;
+  return en && en.trim() !== ar.trim() ? `${ar} / ${en}` : ar;
 }

@@ -3,7 +3,7 @@ import { PrintButton } from "@/components/print-button";
 import { Bi, HeaderBar, headerFor, sheetClass } from "@/components/salary-docs";
 import { fieldClass, secondaryBtn } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
-import { EMPLOYER_KIND, STATUS_LABEL, bothTerm } from "@/lib/constants";
+import { EMPLOYER_KIND, STATUS_LABEL, termBoth } from "@/lib/constants";
 import { loadContacts, readContactKind } from "@/lib/contacts";
 import { both } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -243,7 +243,7 @@ export default async function ContactsPrintPage({
                     <td className={`${cell} break-all`}><Ltr value={employee.email} /></td>
                     <td className={cell}>
                       <span dir="ltr">{employee.employeeNumber}</span>
-                      {employee.jobTitle ? <span className="block text-[10px] text-slate-500">{bothTerm(employee.jobTitle)}</span> : null}
+                      {employee.jobTitle ? <span className="block text-[10px] text-slate-500">{termBoth(employee.jobTitle, employee.jobTitleEn)}</span> : null}
                       {employee.status !== "ACTIVE" ? <span className="block text-[10px] text-slate-500">{statusText(employee.status)}</span> : null}
                     </td>
                   </tr>
@@ -299,7 +299,7 @@ export default async function ContactsPrintPage({
                               <td className={cell}><Names ar={employee.fullName} en={employee.nameEn} /></td>
                               <td className={cell}>
                                 <span dir="ltr">{employee.employeeNumber}</span>
-                                {employee.jobTitle ? <span className="block text-[10px] text-slate-500">{bothTerm(employee.jobTitle)}</span> : null}
+                                {employee.jobTitle ? <span className="block text-[10px] text-slate-500">{termBoth(employee.jobTitle, employee.jobTitleEn)}</span> : null}
                               </td>
                               <td className={`${cell} whitespace-nowrap`}><Ltr value={employee.phone} /></td>
                               <td className={`${cell} break-all`}><Ltr value={employee.email} /></td>

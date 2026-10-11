@@ -3,11 +3,10 @@
 import { randomUUID } from "crypto";
 import { writeAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/auth";
-import { ATTENDANCE_LABEL, BALANCE_LABEL, attendanceType } from "@/lib/constants";
+import { getLeaveTypes } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
-import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
-import { computeLeaveBalances, eachUtcDate } from "@/lib/leave";
+import { attendanceLabel, computeLeaveBalances, eachUtcDate, leaveApplies, leaveName, parseAttendanceChoice, rowBalanceKey } from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
 import { clip, daysLabel, formatDate, parseDateInput, req, safeReturn, str } from "@/lib/utils";
 
@@ -25,20 +24,23 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
   const { lang, t } = await getI18n();
   const returnTo = safeReturn(formData.get("returnTo"), "/attendance");
   let replacedIds: string[] = [];
+  let replacedKey: string | null = null;
   let employeeId = req(formData, "employeeId");
   if (replaceId) {
     const old = await prisma.attendance.findFirst({ where: { id: replaceId, employee: { companyId: user.companyId } } });
     if (!old) go(returnTo, { error: t("السجل غير موجود", "Record not found") });
     employeeId = old!.employeeId;
+    replacedKey = rowBalanceKey(old!);
     replacedIds = old!.groupId
       ? (await prisma.attendance.findMany({ where: { groupId: old!.groupId, employeeId }, select: { id: true } })).map((row) => row.id)
       : [old!.id];
   }
-  const type = req(formData, "type");
-  const meta = attendanceType(type);
+  const leaveTypes = await getLeaveTypes(user.companyId);
+  const choice = parseAttendanceChoice(req(formData, "type"), leaveTypes);
+  if (!choice) go(returnTo, { error: t("نوع الحالة غير صحيح", "Invalid type") });
+  const { type, balanceKey, leaveType } = choice!;
   const from = parseDateInput(req(formData, "from")) || parseDateInput(req(formData, "date"));
   const to = parseDateInput(req(formData, "to")) || from;
-  if (!meta) go(returnTo, { error: t("نوع الحالة غير صحيح", "Invalid type") });
   if (!from || !to) go(returnTo, { error: t("حدد تاريخ البداية والنهاية", "Choose start and end dates") });
   if (to! < from!) go(returnTo, { error: t("تاريخ النهاية قبل تاريخ البداية", "End date is before start date") });
   const dates = eachUtcDate(from!, to!);
@@ -50,15 +52,19 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
     include: { attendance: true, leaveCredits: true },
   });
   if (!employee) go(returnTo, { error: t("الموظف غير موجود", "Employee not found") });
-  const balanceKey = meta!.balance;
   let overdraft = 0;
-  if (balanceKey) {
+  if (balanceKey && leaveType) {
+    const name = leaveName(leaveType, lang);
+    if (!leaveApplies(leaveType, employee!.jobTitleId) && replacedKey !== balanceKey) {
+      go(returnTo, {
+        error: t(`${name} غير مشمولة لوظيفة هذا الموظف. غيّر ذلك من الضبط ← الموارد البشرية.`, `${name} does not apply to this employee's job. Change it in Settings → HR.`),
+      });
+    }
     const kept = employee!.attendance.filter((row) => !replacedIds.includes(row.id));
-    const balances = computeLeaveBalances(employee!, kept, employee!.leaveCredits);
-    const remaining = balances[balanceKey].remaining;
+    const balances = computeLeaveBalances(employee!, kept, employee!.leaveCredits, leaveTypes);
+    const remaining = balances.find((item) => item.key === balanceKey)?.remaining ?? 0;
     if (days > remaining) {
       if (req(formData, "allowOverdraft") !== "1") {
-        const name = pick(BALANCE_LABEL[balanceKey], lang);
         go(returnTo, {
           error: t(
             `رصيد ${name} غير كافٍ. المتبقي ${daysLabel(remaining)} يوم والمطلوب ${daysLabel(days)}. أضف أيامًا إضافية أو اختر التسجيل رغم التجاوز.`,
@@ -93,7 +99,8 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
   }
   const period =
     formatDate(from) === formatDate(to) ? formatDate(from) : t(`من ${formatDate(from)} إلى ${formatDate(to)}`, `${formatDate(from)} to ${formatDate(to)}`);
-  const balanceText = balanceKey ? t(` وخُصم من ${pick(BALANCE_LABEL[balanceKey], "ar")}`, `, deducted from ${pick(BALANCE_LABEL[balanceKey], "en")}`) : "";
+  const balanceText = leaveType ? t(` وخُصم من ${leaveName(leaveType, "ar")}`, `, deducted from ${leaveName(leaveType, "en")}`) : "";
+  const row = { type, balanceKey };
   const payText = deductsSalary ? t(" مع خصم من الراتب", ", salary deducted") : t(" بدون خصم من الراتب", ", no salary deduction");
   const overText = overdraft > 0 ? t(` — تجاوز الرصيد بـ ${daysLabel(overdraft)} يوم`, ` — balance exceeded by ${daysLabel(overdraft)} day(s)`) : "";
   await writeAudit({
@@ -101,8 +108,8 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
     employeeId,
     action: replaceId ? "ATTENDANCE_UPDATE" : "ATTENDANCE",
     message: t(
-      `${replaceId ? "عدّل الفترة إلى" : "سجّل"} ${pick(ATTENDANCE_LABEL[type], "ar")} للموظف ${employee!.fullName} ${period} (${daysLabel(days)} يوم)${balanceText}${payText}${overText}`,
-      `${replaceId ? "Changed the period to" : "Recorded"} ${pick(ATTENDANCE_LABEL[type], "en")} for ${employee!.fullName} ${period} (${daysLabel(days)} days)${balanceText}${payText}${overText}`,
+      `${replaceId ? "عدّل الفترة إلى" : "سجّل"} ${attendanceLabel(row, leaveTypes, "ar")} للموظف ${employee!.fullName} ${period} (${daysLabel(days)} يوم)${balanceText}${payText}${overText}`,
+      `${replaceId ? "Changed the period to" : "Recorded"} ${attendanceLabel(row, leaveTypes, "en")} for ${employee!.fullName} ${period} (${daysLabel(days)} days)${balanceText}${payText}${overText}`,
     ),
   });
   refreshAll();
@@ -134,13 +141,14 @@ export async function deleteAttendance(formData: FormData) {
   const first = formatDate(rows[0].date);
   const last = formatDate(rows[rows.length - 1].date);
   const period = first === last ? first : t(`من ${first} إلى ${last}`, `${first} to ${last}`);
+  const leaveTypes = await getLeaveTypes(user.companyId);
   await writeAudit({
     userId: user.id,
     employeeId: row!.employeeId,
     action: "ATTENDANCE_DELETE",
     message: t(
-      `حذف ${pick(ATTENDANCE_LABEL[row!.type], "ar", row!.type)} للموظف ${row!.employee.fullName} ${period}`,
-      `Deleted ${pick(ATTENDANCE_LABEL[row!.type], "en", row!.type)} for ${row!.employee.fullName} ${period}`,
+      `حذف ${attendanceLabel(row!, leaveTypes, "ar")} للموظف ${row!.employee.fullName} ${period}`,
+      `Deleted ${attendanceLabel(row!, leaveTypes, "en")} for ${row!.employee.fullName} ${period}`,
     ),
   });
   refreshAll();

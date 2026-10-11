@@ -41,6 +41,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <Flash error={sp.error} message={sp.message} />
 
       {isAdmin ? (
+        <Link href="/settings/hr" className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-teal-200 bg-white p-4 shadow-sm hover:border-teal-400">
+          <span>
+            <span className="block font-bold text-slate-900">{t("إعدادات الموارد البشرية", "HR settings")}</span>
+            <span className="block text-sm text-slate-500">
+              {t("المسميات الوظيفية، الأقسام، أنواع الإجازات وأيامها، والعلاوات — بالعربية والإنجليزية مع الترجمة بالذكاء الاصطناعي.", "Job titles, departments, leave types and days, and allowances — in Arabic and English with AI translation.")}
+            </span>
+          </span>
+          <span className="text-teal-800">{"›"}</span>
+        </Link>
+      ) : null}
+
+      {isAdmin ? (
         <form action={updateCompanySettings} className="space-y-4">
           <Card className="bg-teal-50 text-sm text-teal-950">
             {t("لتغيير اسم أو شعار شركة أو شخص معيّن تُصرف باسمه الرواتب، افتح", "To change the name or logo of a specific company or person paying salaries, open")}{" "}

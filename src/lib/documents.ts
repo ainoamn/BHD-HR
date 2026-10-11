@@ -26,10 +26,10 @@ function pushDoc(rows: DocView[], row: DocView) {
 export function collectDocuments(employees: EmployeeWithDocs[], lang: Lang = "ar") {
   const rows: DocView[] = [];
   for (const employee of employees) {
-    const base = { employeeId: employee.id, employeeName: employee.fullName, employeeNumber: employee.employeeNumber, fileUrl: null };
-    pushDoc(rows, { ...base, key: `${employee.id}-id`, type: "ID_CARD", label: pick(DOC_LABEL.ID_CARD, lang), number: employee.idNumber, expiry: employee.idExpiry });
-    pushDoc(rows, { ...base, key: `${employee.id}-passport`, type: "PASSPORT", label: pick(DOC_LABEL.PASSPORT, lang), number: employee.passportNumber, expiry: employee.passportExpiry });
-    pushDoc(rows, { ...base, key: `${employee.id}-residence`, type: "RESIDENCE", label: pick(DOC_LABEL.RESIDENCE, lang), number: employee.residenceNumber, expiry: employee.residenceExpiry });
+    const base = { employeeId: employee.id, employeeName: employee.fullName, employeeNumber: employee.employeeNumber };
+    pushDoc(rows, { ...base, key: `${employee.id}-id`, type: "ID_CARD", label: pick(DOC_LABEL.ID_CARD, lang), number: employee.idNumber, expiry: employee.idExpiry, fileUrl: employee.idFileUrl });
+    pushDoc(rows, { ...base, key: `${employee.id}-passport`, type: "PASSPORT", label: pick(DOC_LABEL.PASSPORT, lang), number: employee.passportNumber, expiry: employee.passportExpiry, fileUrl: employee.passportFileUrl });
+    pushDoc(rows, { ...base, key: `${employee.id}-residence`, type: "RESIDENCE", label: pick(DOC_LABEL.RESIDENCE, lang), number: employee.residenceNumber, expiry: employee.residenceExpiry, fileUrl: employee.residenceFileUrl });
     for (const document of employee.documents) {
       pushDoc(rows, {
         ...base,

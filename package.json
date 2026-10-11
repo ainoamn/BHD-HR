@@ -13,6 +13,7 @@
     "@neon/config": "^1.8.4",
     "@neon/env": "^1.5.1",
     "@prisma/client": "^6.16.2",
+    "ai": "^5.0.273",
     "exceljs": "^4.4.0",
     "html2canvas-pro": "^2.5.2",
     "jose": "^6.2.12",

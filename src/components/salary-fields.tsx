@@ -2,15 +2,19 @@
 
 import { useState } from "react";
 import { money, round3 } from "@/lib/utils";
+import { AllowancesEditor, type AllowanceRowValue, type AllowanceTypeOption } from "./allowances-editor";
 import { useLang } from "./lang-provider";
 import { Field, fieldClass } from "./ui";
 
 export function SalaryFields({
   currency,
   defaults,
+  allowances,
 }: {
   currency: string;
   defaults: { basicSalary: number; housingAllowance: number; transportAllowance: number; otherAllowance: number };
+  /** Shown in the employee form; the salary page edits only the four amounts. */
+  allowances?: { types: AllowanceTypeOption[]; rows: AllowanceRowValue[]; defaultStart: string; canManageTypes: boolean };
 }) {
   const { t } = useLang();
   const [basic, setBasic] = useState(String(defaults.basicSalary));
@@ -42,6 +46,21 @@ export function SalaryFields({
           )}
         </span>
       </div>
+      {allowances ? (
+        <AllowancesEditor
+          types={allowances.types}
+          defaults={allowances.rows}
+          defaultStart={allowances.defaultStart}
+          canManageTypes={allowances.canManageTypes}
+          currency={currency}
+          pay={{
+            basicSalary: Number(basic) || 0,
+            housingAllowance: Number(housing) || 0,
+            transportAllowance: Number(transport) || 0,
+            otherAllowance: Number(other) || 0,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

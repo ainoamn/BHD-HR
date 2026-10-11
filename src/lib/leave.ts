@@ -1,5 +1,16 @@
-import { BALANCE_KEYS, type BalanceKey, attendanceType } from "./constants";
+import type { Prisma } from "@prisma/client";
+import { ATTENDANCE_LABEL, PLAIN_ATTENDANCE_AFTER, PLAIN_ATTENDANCE_BEFORE, attendanceType } from "./constants";
+import { pick, type Lang } from "./i18n";
 import { round3 } from "./utils";
+
+export type LeaveTypeInfo = {
+  key: string;
+  nameAr: string;
+  nameEn: string | null;
+  days: number;
+  allJobs: boolean;
+  jobTitleIds: string[];
+};
 
 export type LeaveFigures = {
   entitlement: number;
@@ -7,6 +18,25 @@ export type LeaveFigures = {
   used: number;
   remaining: number;
 };
+
+export type LeaveBalance = LeaveFigures & { key: string; nameAr: string; nameEn: string | null; applies: boolean };
+
+/** Attendance type used when recording leave of each built-in balance; company-defined types use CUSTOM_LEAVE. */
+const BUILT_IN_ATTENDANCE: Record<string, string> = { annual: "LEAVE", sick: "SICK", compensatory: "COMPENSATORY", other: "OTHER_LEAVE" };
+export const LEAVE_CHOICE = "leave:";
+
+export function leaveName(type: { nameAr: string; nameEn: string | null }, lang: Lang) {
+  return lang === "en" && type.nameEn ? type.nameEn : type.nameAr;
+}
+
+export function leaveApplies(type: Pick<LeaveTypeInfo, "allJobs" | "jobTitleIds">, jobTitleId: string | null | undefined) {
+  return type.allJobs || Boolean(jobTitleId && type.jobTitleIds.includes(jobTitleId));
+}
+
+export function leaveOverrides(value: Prisma.JsonValue | null | undefined): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] >= 0));
+}
 
 export function countInclusiveDays(from: string, to: string) {
   const start = parseInputUtc(from);
@@ -27,14 +57,9 @@ export function eachUtcDate(from: Date, to: Date) {
   return dates;
 }
 
-export function inferredBalance(type: string): BalanceKey | null {
-  return attendanceType(type)?.balance || null;
-}
-
-export function balanceDayWeight(row: { type: string; balanceKey: string | null }) {
-  const key = (row.balanceKey || inferredBalance(row.type)) as BalanceKey | null;
-  if (!key || !(BALANCE_KEYS as readonly string[]).includes(key)) return { key: null as BalanceKey | null, days: 0 };
-  return { key, days: row.type === "HALF_DAY" ? 0.5 : 1 };
+/** The balance a row uses: its stored key, or the built-in one implied by older rows that have none. */
+export function rowBalanceKey(row: { type: string; balanceKey: string | null }) {
+  return row.balanceKey || attendanceType(row.type)?.balance || null;
 }
 
 export function salaryDayWeight(row: { type: string; deductsSalary: boolean }) {
@@ -42,56 +67,68 @@ export function salaryDayWeight(row: { type: string; deductsSalary: boolean }) {
   return row.type === "HALF_DAY" ? 0.5 : 1;
 }
 
+export function rowDays(row: { type: string }) {
+  return row.type === "HALF_DAY" ? 0.5 : 1;
+}
+
+/**
+ * Balances of the types that apply to the employee's job, plus any other type the employee already used or was
+ * credited (so nothing recorded disappears from view). Entitlement = the employee's own days or the type's default.
+ */
 export function computeLeaveBalances(
-  employee: { annualLeaveDays: number; sickLeaveDays: number; otherLeaveDays: number },
+  employee: { jobTitleId: string | null; leaveDays: Prisma.JsonValue | null },
   attendance: { type: string; balanceKey: string | null }[],
   credits: { balanceKey: string; days: number }[],
-) {
-  const entitlement: Record<BalanceKey, number> = {
-    annual: employee.annualLeaveDays,
-    sick: employee.sickLeaveDays,
-    compensatory: 0,
-    other: employee.otherLeaveDays,
-  };
-  const result = {} as Record<BalanceKey, LeaveFigures>;
-  for (const key of BALANCE_KEYS) {
-    const added = round3(credits.filter((item) => item.balanceKey === key).reduce((sum, item) => sum + item.days, 0));
-    const used = round3(
-      attendance.reduce((sum, row) => {
-        const item = balanceDayWeight(row);
-        return item.key === key ? sum + item.days : sum;
-      }, 0),
-    );
-    result[key] = {
-      entitlement: entitlement[key],
-      added,
-      used,
-      remaining: round3(entitlement[key] + added - used),
-    };
-  }
-  return result;
+  types: LeaveTypeInfo[],
+): LeaveBalance[] {
+  const overrides = leaveOverrides(employee.leaveDays);
+  return types
+    .map((type) => {
+      const added = round3(credits.filter((item) => item.balanceKey === type.key).reduce((sum, item) => sum + item.days, 0));
+      const used = round3(attendance.reduce((sum, row) => (rowBalanceKey(row) === type.key ? sum + rowDays(row) : sum), 0));
+      const applies = leaveApplies(type, employee.jobTitleId);
+      const entitlement = applies ? (overrides[type.key] ?? type.days) : 0;
+      return {
+        key: type.key,
+        nameAr: type.nameAr,
+        nameEn: type.nameEn,
+        applies,
+        entitlement,
+        added,
+        used,
+        remaining: round3(entitlement + added - used),
+      };
+    })
+    .filter((item) => item.applies || item.added > 0 || item.used > 0);
+}
+
+export function remainingByKey(balances: LeaveBalance[]) {
+  return Object.fromEntries(balances.map((item) => [item.key, item.remaining])) as Record<string, number>;
 }
 
 export type LeaveWarning = {
-  key: BalanceKey;
+  key: string;
+  nameAr: string;
+  nameEn: string | null;
   level: "exceeded" | "exhausted" | "low";
   remaining: number;
   total: number;
 };
 
-export function leaveWarnings(balances: Record<BalanceKey, LeaveFigures>, warnDays: number) {
+export function leaveWarnings(balances: LeaveBalance[], warnDays: number) {
   const warnings: LeaveWarning[] = [];
-  for (const key of BALANCE_KEYS) {
-    const figure = balances[key];
+  for (const figure of balances) {
+    const base = { key: figure.key, nameAr: figure.nameAr, nameEn: figure.nameEn };
     const total = round3(figure.entitlement + figure.added);
-    if (figure.remaining < 0) warnings.push({ key, level: "exceeded", remaining: figure.remaining, total });
-    else if (figure.remaining === 0 && figure.used > 0) warnings.push({ key, level: "exhausted", remaining: 0, total });
-    else if (figure.remaining > 0 && figure.remaining <= warnDays && total > warnDays) warnings.push({ key, level: "low", remaining: figure.remaining, total });
+    if (figure.remaining < 0) warnings.push({ ...base, level: "exceeded", remaining: figure.remaining, total });
+    else if (figure.remaining === 0 && figure.used > 0) warnings.push({ ...base, level: "exhausted", remaining: 0, total });
+    else if (figure.remaining > 0 && figure.remaining <= warnDays && total > warnDays) warnings.push({ ...base, level: "low", remaining: figure.remaining, total });
   }
   return warnings;
 }
 
-export function leaveWarningText(warning: LeaveWarning, name: string, lang: "ar" | "en") {
+export function leaveWarningText(warning: LeaveWarning, lang: Lang) {
+  const name = leaveName(warning, lang);
   const days = Math.abs(warning.remaining);
   const count = Number.isInteger(days) ? String(days) : days.toFixed(1);
   if (warning.level === "exceeded") {
@@ -99,6 +136,50 @@ export function leaveWarningText(warning: LeaveWarning, name: string, lang: "ar"
   }
   if (warning.level === "exhausted") return lang === "en" ? `${name} fully used` : `نفد رصيد ${name}`;
   return lang === "en" ? `${name} almost used — ${count} day(s) left` : `اقترب من نفاد ${name} — متبقٍ ${count} يوم`;
+}
+
+/** Label of an attendance row: the leave type's current name, or the fixed label for absence and the like. */
+export function attendanceLabel(row: { type: string; balanceKey: string | null }, types: LeaveTypeInfo[], lang: Lang) {
+  const key = rowBalanceKey(row);
+  const type = key ? types.find((item) => item.key === key) : null;
+  return type ? leaveName(type, lang) : pick(ATTENDANCE_LABEL[row.type], lang, row.type);
+}
+
+export type AttendanceChoice = { value: string; label: string; balanceKey: string | null; deductsSalary: boolean };
+
+/** Options for recording a period: absence and unpaid leave, then every leave type, then official duty and half day. */
+export function attendanceChoices(types: LeaveTypeInfo[], lang: Lang): AttendanceChoice[] {
+  const plain = (ids: string[]) =>
+    ids.map((id) => {
+      const meta = attendanceType(id)!;
+      return { value: id, label: pick(meta.label, lang), balanceKey: null, deductsSalary: meta.deductsSalary };
+    });
+  return [
+    ...plain(PLAIN_ATTENDANCE_BEFORE),
+    ...types.map((type) => ({ value: `${LEAVE_CHOICE}${type.key}`, label: leaveName(type, lang), balanceKey: type.key, deductsSalary: false })),
+    ...plain(PLAIN_ATTENDANCE_AFTER),
+  ];
+}
+
+export function attendanceChoiceOf(row: { type: string; balanceKey: string | null }) {
+  const key = rowBalanceKey(row);
+  return key ? `${LEAVE_CHOICE}${key}` : row.type;
+}
+
+/** Turns a submitted choice into the stored type and balance key; null when it is not a valid choice. */
+export function parseAttendanceChoice(value: string, types: LeaveTypeInfo[]) {
+  if (value.startsWith(LEAVE_CHOICE)) {
+    const key = value.slice(LEAVE_CHOICE.length);
+    const type = types.find((item) => item.key === key);
+    if (!type) return null;
+    return { type: BUILT_IN_ATTENDANCE[key] || "CUSTOM_LEAVE", balanceKey: key, leaveType: type };
+  }
+  const meta = attendanceType(value);
+  if (!meta || value === "CUSTOM_LEAVE") return null;
+  const key = meta.balance;
+  const leaveType = key ? types.find((item) => item.key === key) || null : null;
+  if (key && !leaveType) return null;
+  return { type: value, balanceKey: key, leaveType };
 }
 
 export function groupAttendance<T extends { id: string; date: Date | string; type: string; groupId: string | null }>(rows: T[]) {
@@ -112,7 +193,7 @@ export function groupAttendance<T extends { id: string; date: Date | string; typ
   return Array.from(groups.values())
     .map((list) => {
       const sorted = [...list].sort((a, b) => +new Date(a.date) - +new Date(b.date));
-      const days = round3(sorted.reduce((sum, row) => sum + (row.type === "HALF_DAY" ? 0.5 : 1), 0));
+      const days = round3(sorted.reduce((sum, row) => sum + rowDays(row), 0));
       return {
         id: sorted[0].groupId || sorted[0].id,
         deleteId: sorted[0].id,

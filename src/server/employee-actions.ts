@@ -1,15 +1,73 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, NEW_EMPLOYER } from "@/lib/constants";
-import { readEmployeeInput } from "@/lib/employee-input";
+import { readAllowanceRows, readEmployeeInput, readLeaveDays } from "@/lib/employee-input";
+import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
+import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
-import { removeUpload } from "@/lib/uploads";
+import { removeUpload, saveUpload } from "@/lib/uploads";
 import { clip, money, req, str } from "@/lib/utils";
+
+type Catalog = Awaited<ReturnType<typeof getHrCatalog>>;
+
+function jobFields(formData: FormData, catalog: Catalog) {
+  const find = <T extends { id: string }>(list: T[], id: string) => (id ? list.find((item) => item.id === id) || null : null);
+  const job = find(catalog.jobTitles, req(formData, "jobTitleId"));
+  const department = find(catalog.departments, req(formData, "departmentId"));
+  return {
+    jobTitleId: job?.id ?? null,
+    jobTitle: job?.nameAr ?? null,
+    jobTitleEn: job?.nameEn ?? null,
+    departmentId: department?.id ?? null,
+    department: department?.nameAr ?? null,
+    departmentEn: department?.nameEn ?? null,
+  };
+}
+
+const DOC_FILES = ["id", "passport", "residence"] as const;
+type DocFileField = `${(typeof DOC_FILES)[number]}FileUrl`;
+
+/** Saves new ID / passport / residence copies; returns the new URLs and the replaced or removed ones to delete after saving. */
+async function readDocFiles(formData: FormData, current: Partial<Record<DocFileField, string | null>>, companyId: string, errorPath: string) {
+  const { lang, t } = await getI18n();
+  const data = {} as Record<DocFileField, string | null>;
+  const replaced: string[] = [];
+  const uploaded: string[] = [];
+  for (const doc of DOC_FILES) {
+    const field: DocFileField = `${doc}FileUrl`;
+    const old = current[field] ?? null;
+    let next = req(formData, `${doc}FileRemove`) === "1" ? null : old;
+    const file = formData.get(`${doc}File`);
+    if (file instanceof File && file.size > 0) {
+      try {
+        next = await saveUpload(file, companyId, lang);
+        if (next) uploaded.push(next);
+      } catch (error) {
+        for (const url of uploaded) await removeUpload(url);
+        go(errorPath, { error: error instanceof Error ? error.message : t("تعذر رفع المرفق", "Could not upload the file") });
+      }
+    }
+    data[field] = next;
+    if (old && old !== next) replaced.push(old);
+  }
+  return { data, replaced };
+}
+
+async function saveAllowances(tx: Prisma.TransactionClient, employeeId: string, companyId: string, rows: ReturnType<typeof readAllowanceRows>) {
+  const existing = await tx.employeeAllowance.findMany({ where: { employeeId }, select: { id: true } });
+  const keep = new Set(rows.map((row) => row.id).filter((id): id is string => Boolean(id && existing.some((item) => item.id === id))));
+  await tx.employeeAllowance.deleteMany({ where: { employeeId, id: { notIn: [...keep] } } });
+  for (const { id, ...data } of rows) {
+    if (id && keep.has(id)) await tx.employeeAllowance.update({ where: { id }, data });
+    else await tx.employeeAllowance.create({ data: { ...data, employeeId, companyId } });
+  }
+}
 
 async function nextEmployeeNumber(companyId: string) {
   const rows = await prisma.employee.findMany({ where: { companyId }, select: { employeeNumber: true } });
@@ -50,13 +108,29 @@ async function resolveEmployer(formData: FormData, user: { companyId: string; pe
 export async function createEmployee(formData: FormData) {
   const user = await requirePermission("employees.create", "/employees");
   const { t } = await getI18n();
+  const catalog = await getHrCatalog(user.companyId);
   const input = readEmployeeInput(formData);
-  if (!can(user, "salaries.edit")) Object.assign(input, { basicSalary: 0, housingAllowance: 0, transportAllowance: 0, otherAllowance: 0 });
+  const salaryAccess = can(user, "salaries.edit");
+  if (!salaryAccess) Object.assign(input, { basicSalary: 0, housingAllowance: 0, transportAllowance: 0, otherAllowance: 0 });
   if (input.fullName.length < 2) go("/employees/new", { error: t("الاسم الكامل مطلوب", "Full name is required") });
+  const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : [];
   const employerId = await resolveEmployer(formData, user, "/employees/new");
+  const files = await readDocFiles(formData, {}, user.companyId, "/employees/new");
   const employeeNumber = await nextEmployeeNumber(user.companyId);
-  const employee = await prisma.employee.create({
-    data: { ...input, employerId, employeeNumber, companyId: user.companyId },
+  const employee = await prisma.$transaction(async (tx) => {
+    const created = await tx.employee.create({
+      data: {
+        ...input,
+        ...jobFields(formData, catalog),
+        ...files.data,
+        leaveDays: readLeaveDays(formData, catalog.leaveTypes),
+        employerId,
+        employeeNumber,
+        companyId: user.companyId,
+      },
+    });
+    if (allowances.length) await saveAllowances(tx, created.id, user.companyId, allowances);
+    return created;
   });
   await writeAudit({
     userId: user.id,
@@ -74,16 +148,34 @@ export async function updateEmployee(formData: FormData) {
   const id = req(formData, "id");
   const existing = await prisma.employee.findFirst({ where: { id, companyId: user.companyId } });
   if (!existing) go("/employees", { error: t("الموظف غير موجود", "Employee not found") });
+  const catalog = await getHrCatalog(user.companyId);
   const input = readEmployeeInput(formData);
-  if (!can(user, "salaries.edit")) {
+  const salaryAccess = can(user, "salaries.edit") && req(formData, "allowancesPresent") === "1";
+  if (!salaryAccess) {
     input.basicSalary = existing!.basicSalary;
     input.housingAllowance = existing!.housingAllowance;
     input.transportAllowance = existing!.transportAllowance;
     input.otherAllowance = existing!.otherAllowance;
   }
-  if (input.fullName.length < 2) go(`/employees/${id}/edit`, { error: t("الاسم الكامل مطلوب", "Full name is required") });
-  const employerId = await resolveEmployer(formData, user, `/employees/${id}/edit`);
-  await prisma.employee.update({ where: { id }, data: { ...input, employerId } });
+  const errorPath = `/employees/${id}/edit`;
+  if (input.fullName.length < 2) go(errorPath, { error: t("الاسم الكامل مطلوب", "Full name is required") });
+  const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : null;
+  const employerId = await resolveEmployer(formData, user, errorPath);
+  const files = await readDocFiles(formData, existing!, user.companyId, errorPath);
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.employee.update({
+        where: { id },
+        data: { ...input, ...jobFields(formData, catalog), ...files.data, leaveDays: readLeaveDays(formData, catalog.leaveTypes), employerId },
+      });
+      if (allowances) {
+        await saveAllowances(tx, id, user.companyId, allowances);
+        await syncEmployeeSalaries(tx, id, user.company.salaryDays);
+      }
+    },
+    { maxWait: 10000, timeout: 30000 },
+  );
+  for (const url of files.replaced) await removeUpload(url);
   const before = packageGross(existing!);
   const after = packageGross(input);
   const currency = user.company.currency;
@@ -122,6 +214,7 @@ export async function deleteEmployee(formData: FormData) {
     prisma.employee.delete({ where: { id } }),
   ]);
   for (const document of employee!.documents) await removeUpload(document.fileUrl);
+  for (const url of [employee!.idFileUrl, employee!.passportFileUrl, employee!.residenceFileUrl]) await removeUpload(url);
   await writeAudit({
     userId: user.id,
     action: "EMPLOYEE_DELETE",

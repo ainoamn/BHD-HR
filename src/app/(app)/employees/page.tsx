@@ -3,11 +3,14 @@ import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
 import { EmptyState, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
-import { BALANCE_LABEL, STATUS_LABEL, STATUS_TONE, localizeTerm } from "@/lib/constants";
+import { STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { worstExpiry } from "@/lib/expiry";
+import { getLeaveTypes } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { computeLeaveBalances, leaveWarningText, leaveWarnings } from "@/lib/leave";
+import { NATIONALITIES, nationalityName } from "@/lib/nationalities";
+import { normalizeSearchText } from "@/lib/search";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { money, text } from "@/lib/utils";
@@ -37,7 +40,11 @@ export default async function EmployeesPage({
     warning: user.company.alertWarningDays,
     early: user.company.alertEarlyDays,
   };
-  const [employees, employers] = await Promise.all([
+  const needle = normalizeSearchText(q);
+  const nationalityCodes = q
+    ? NATIONALITIES.filter((item) => normalizeSearchText(item.ar).includes(needle) || item.en.toLowerCase().includes(needle)).map((item) => item.code)
+    : [];
+  const [employees, employers, leaveTypes] = await Promise.all([
     prisma.employee.findMany({
       where: {
         companyId: user.companyId,
@@ -51,7 +58,11 @@ export default async function EmployeesPage({
                 { employeeNumber: { contains: q, mode: "insensitive" } },
                 { phone: { contains: q, mode: "insensitive" } },
                 { nationality: { contains: q, mode: "insensitive" } },
+                ...(nationalityCodes.length ? [{ nationality: { in: nationalityCodes } }] : []),
                 { jobTitle: { contains: q, mode: "insensitive" } },
+                { jobTitleEn: { contains: q, mode: "insensitive" } },
+                { department: { contains: q, mode: "insensitive" } },
+                { departmentEn: { contains: q, mode: "insensitive" } },
                 { idNumber: { contains: q, mode: "insensitive" } },
               ],
             }
@@ -66,6 +77,7 @@ export default async function EmployeesPage({
       orderBy: { fullName: "asc" },
     }),
     prisma.employer.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true }, orderBy: { name: "asc" } }),
+    getLeaveTypes(user.companyId),
   ]);
   const employerName = (employer: { name: string; nameEn: string | null } | null) =>
     employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : "—";
@@ -128,7 +140,7 @@ export default async function EmployeesPage({
                   limits,
                   lang,
                 );
-                const leave = leaveWarnings(computeLeaveBalances(employee, employee.attendance, employee.leaveCredits), user.company.leaveWarningDays);
+                const leave = leaveWarnings(computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes), user.company.leaveWarningDays);
                 const leaveText = leave.some((item) => item.level === "exceeded")
                   ? t("تجاوز رصيد الإجازة", "Leave exceeded")
                   : leave.some((item) => item.level === "exhausted")
@@ -139,9 +151,9 @@ export default async function EmployeesPage({
                     <td className="px-4 py-3 font-medium text-slate-500">{employee.employeeNumber}</td>
                     <td className="px-4 py-3">
                       <Link href={`/employees/${employee.id}`} className="font-semibold text-slate-900 hover:text-teal-800">
-                        {employee.fullName}
+                        {lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName}
                       </Link>
-                      <div className="text-xs text-slate-500">{text(localizeTerm(employee.nationality, lang))}</div>
+                      <div className="text-xs text-slate-500">{text(nationalityName(employee.nationality, lang))}</div>
                     </td>
                     <td className="px-4 py-3">
                       {employee.employer ? (
@@ -152,13 +164,13 @@ export default async function EmployeesPage({
                         "—"
                       )}
                     </td>
-                    <td className="px-4 py-3">{text(localizeTerm(employee.jobTitle, lang))}</td>
+                    <td className="px-4 py-3">{text(termText(employee.jobTitle, employee.jobTitleEn, lang))}</td>
                     {allow.salaries ? <td className="px-4 py-3 whitespace-nowrap">{money(packageGross(employee), user.company.currency)}</td> : null}
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
                         <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
                         {allow.attendance && leave.length ? (
-                          <Link href={`/employees/${employee.id}?tab=attendance`} title={leave.map((item) => leaveWarningText(item, pick(BALANCE_LABEL[item.key], lang), lang)).join(" · ")}>
+                          <Link href={`/employees/${employee.id}?tab=attendance`} title={leave.map((item) => leaveWarningText(item, lang)).join(" · ")}>
                             <ToneBadge tone="red">{leaveText}</ToneBadge>
                           </Link>
                         ) : null}

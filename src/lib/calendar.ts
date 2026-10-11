@@ -1,6 +1,8 @@
-import { ATTENDANCE_LABEL, DOC_LABEL, attendanceType, monthName } from "./constants";
+import { DOC_LABEL, monthName } from "./constants";
 import { daysUntil } from "./expiry";
+import { getLeaveTypes } from "./hr-catalog";
 import { type Bi, type Lang, makeT, pick } from "./i18n";
+import { attendanceLabel, rowBalanceKey } from "./leave";
 import { prisma } from "./prisma";
 import { daysLabel, formatDate, monthRange } from "./utils";
 
@@ -165,6 +167,7 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
       where: { employee: { companyId }, OR: [{ groupId: { in: groupIds } }, { id: { in: singleIds } }] },
       include: { employee: { select: { id: true, fullName: true, nameEn: true } } },
     });
+    const leaveTypes = await getLeaveTypes(companyId);
     const groups = new Map<string, typeof rows>();
     for (const row of rows) {
       const key = row.groupId || row.id;
@@ -173,12 +176,11 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
     for (const [key, list] of groups) {
       const sorted = [...list].sort((a, b) => +a.date - +b.date);
       const first = sorted[0];
-      const meta = attendanceType(first.type);
-      const isLeave = Boolean(meta?.balance) || first.type === "UNPAID_LEAVE" || first.type === "OFFICIAL";
+      const isLeave = Boolean(rowBalanceKey(first)) || first.type === "UNPAID_LEAVE" || first.type === "OFFICIAL";
       if (!isLeave) continue;
       const last = sorted[sorted.length - 1];
       const days = sorted.reduce((sum, row) => sum + (row.type === "HALF_DAY" ? 0.5 : 1), 0);
-      const label = pick(ATTENDANCE_LABEL[first.type], lang, first.type);
+      const label = attendanceLabel(first, leaveTypes, lang);
       const name = nameOf(first.employee);
       const href = `/employees/${first.employeeId}?tab=attendance`;
       if (inMonth(first.date)) {

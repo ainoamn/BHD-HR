@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { Bi, HeaderBar, SalaryDocsList, headerFor, readDocsMode, sheetClass } from "@/components/salary-docs";
 import { requirePermission } from "@/lib/auth";
-import { bothTerm, monthBoth } from "@/lib/constants";
+import { termBoth, monthBoth } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { totalDeductions, totalEarnings } from "@/lib/salary";
@@ -65,7 +65,7 @@ export default async function SalaryStatementPage({
   const info: [string, string, string][] = [
     ["الموظف", "Employee", employee.nameEn ? `${employee.fullName} — ${employee.nameEn}` : employee.fullName],
     ["الرقم الوظيفي", "Employee no.", employee.employeeNumber],
-    ["الوظيفة", "Job title", text(bothTerm(employee.jobTitle))],
+    ["الوظيفة", "Job title", text(termBoth(employee.jobTitle, employee.jobTitleEn))],
     ["تاريخ الالتحاق", "Joining date", formatDate(employee.joiningDate)],
     ["نهاية العقد", "Contract end", formatDate(employee.contractEnd)],
     ["الفترة", "Period", from && to && !periodError ? `${formatDate(from)} — ${formatDate(to)}` : "—"],

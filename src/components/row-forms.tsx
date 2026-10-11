@@ -1,7 +1,8 @@
 "use client";
 
-import { ATTENDANCE_TYPES, DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
+import { DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
+import type { AttendanceChoice } from "@/lib/leave";
 import { useLang } from "./lang-provider";
 import { SubmitButton } from "./submit-button";
 import { fieldClass } from "./ui";
@@ -48,6 +49,7 @@ export function AttendanceEditForm({
   id,
   returnTo,
   type,
+  choices,
   start,
   end,
   deductsSalary,
@@ -56,13 +58,15 @@ export function AttendanceEditForm({
   action: Action;
   id: string;
   returnTo: string;
+  /** The row's current choice (see attendanceChoiceOf). */
   type: string;
+  choices: AttendanceChoice[];
   start: Date | string;
   end: Date | string;
   deductsSalary: boolean;
   notes: string | null;
 }) {
-  const { lang, t } = useLang();
+  const { t } = useLang();
   return (
     <details className="group">
       <summary className={summaryClass}>{t("تعديل", "Edit")}</summary>
@@ -72,9 +76,9 @@ export function AttendanceEditForm({
         <label className="space-y-1 text-xs sm:col-span-2">
           <span className="text-slate-600">{t("النوع", "Type")}</span>
           <select className={`${fieldClass} w-full`} name="type" defaultValue={type}>
-            {ATTENDANCE_TYPES.map((item) => (
-              <option key={item.id} value={item.id}>
-                {pick(item.label, lang)}
+            {choices.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>

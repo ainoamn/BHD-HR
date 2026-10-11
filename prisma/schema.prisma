@@ -9,45 +9,52 @@ datasource db {
 }
 
 model Company {
-  id               String     @id @default(cuid())
-  name             String
-  nameEn           String?
-  crNumber         String?
-  phone            String?
-  email            String?
-  address          String?
-  logoUrl          String?
-  currency         String     @default("ر.ع")
-  salaryDays       Int        @default(30)
-  alertUrgentDays  Int        @default(7)
-  alertWarningDays Int        @default(30)
-  alertEarlyDays   Int        @default(60)
-  payDay           Int        @default(0)
-  leaveWarningDays Int        @default(5)
-  employees        Employee[]
-  employers        Employer[]
-  memberships      Membership[]
-  reminders        Reminder[]
-  salaries         Salary[]
-  payItems         PayItem[]
-  files            StoredFile[]
-  auditLogs        AuditLog[]
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id                 String              @id @default(cuid())
+  name               String
+  nameEn             String?
+  crNumber           String?
+  phone              String?
+  email              String?
+  address            String?
+  logoUrl            String?
+  currency           String              @default("ر.ع")
+  salaryDays         Int                 @default(30)
+  alertUrgentDays    Int                 @default(7)
+  alertWarningDays   Int                 @default(30)
+  alertEarlyDays     Int                 @default(60)
+  payDay             Int                 @default(0)
+  leaveWarningDays   Int                 @default(5)
+  /// 0 until the built-in job titles, departments and leave types are seeded (src/lib/hr-catalog.ts).
+  catalogVersion     Int                 @default(0)
+  employees          Employee[]
+  jobTitles          JobTitle[]
+  departments        Department[]
+  leaveTypes         LeaveType[]
+  allowanceTypes     AllowanceType[]
+  employeeAllowances EmployeeAllowance[]
+  employers          Employer[]
+  memberships        Membership[]
+  reminders          Reminder[]
+  salaries           Salary[]
+  payItems           PayItem[]
+  files              StoredFile[]
+  auditLogs          AuditLog[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model User {
-  id                   String       @id @default(cuid())
-  name                 String
-  email                String       @unique
-  password             String
-  mustChangePassword   Boolean      @default(true)
-  bhdSub               String?      @unique
-  picture              String?
-  lastLoginAt          DateTime?
-  memberships          Membership[]
-  auditLogs            AuditLog[]
-  createdAt            DateTime     @default(now())
+  id                 String       @id @default(cuid())
+  name               String
+  email              String       @unique
+  password           String
+  mustChangePassword Boolean      @default(true)
+  bhdSub             String?      @unique
+  picture            String?
+  lastLoginAt        DateTime?
+  memberships        Membership[]
+  auditLogs          AuditLog[]
+  createdAt          DateTime     @default(now())
 }
 
 /// Access to one company (workspace). userId stays empty for an invitation until that email signs in.
@@ -92,10 +99,11 @@ model Employer {
 }
 
 model Employee {
-  id                 String             @id @default(cuid())
+  id                 String              @id @default(cuid())
   employeeNumber     String
   fullName           String
   nameEn             String?
+  /// ISO country code (src/lib/nationalities.ts); older rows may still hold a nationality name.
   nationality        String?
   gender             String?
   dateOfBirth        DateTime?
@@ -104,38 +112,137 @@ model Employee {
   address            String?
   idNumber           String?
   idExpiry           DateTime?
+  idFileUrl          String?
   passportNumber     String?
   passportExpiry     DateTime?
+  passportFileUrl    String?
   residenceNumber    String?
   residenceExpiry    DateTime?
+  residenceFileUrl   String?
+  /// Names copied from the chosen JobTitle / Department so lists and prints need no join.
   jobTitle           String?
+  jobTitleEn         String?
+  jobTitleId         String?
+  jobTitleRef        JobTitle?           @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
   department         String?
+  departmentEn       String?
+  departmentId       String?
+  departmentRef      Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   joiningDate        DateTime?
   contractEnd        DateTime?
-  status             String             @default("ACTIVE")
-  annualLeaveDays    Float              @default(30)
-  sickLeaveDays      Float              @default(0)
-  otherLeaveDays     Float              @default(0)
-  basicSalary        Float              @default(0)
-  housingAllowance   Float              @default(0)
-  transportAllowance Float              @default(0)
-  otherAllowance     Float              @default(0)
+  status             String              @default("ACTIVE")
+  annualLeaveDays    Float               @default(30)
+  sickLeaveDays      Float               @default(0)
+  otherLeaveDays     Float               @default(0)
+  /// Days per leave-type key that differ from the type's default; the three columns above are pre-leave-type values.
+  leaveDays          Json?
+  basicSalary        Float               @default(0)
+  housingAllowance   Float               @default(0)
+  transportAllowance Float               @default(0)
+  otherAllowance     Float               @default(0)
   notes              String?
   companyId          String
-  company            Company            @relation(fields: [companyId], references: [id])
+  company            Company             @relation(fields: [companyId], references: [id])
   employerId         String?
-  employer           Employer?          @relation(fields: [employerId], references: [id])
+  employer           Employer?           @relation(fields: [employerId], references: [id])
   documents          EmployeeDocument[]
   attendance         Attendance[]
   leaveCredits       LeaveCredit[]
   salaries           Salary[]
   payItems           PayItem[]
+  allowances         EmployeeAllowance[]
   auditLogs          AuditLog[]
   reminders          Reminder[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([companyId, employeeNumber])
+}
+
+model JobTitle {
+  id        String     @id @default(cuid())
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id])
+  nameAr    String
+  nameEn    String?
+  employees Employee[]
+  createdAt DateTime   @default(now())
+
+  @@unique([companyId, nameAr])
+}
+
+model Department {
+  id        String     @id @default(cuid())
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id])
+  nameAr    String
+  nameEn    String?
+  employees Employee[]
+  createdAt DateTime   @default(now())
+
+  @@unique([companyId, nameAr])
+}
+
+/// A leave balance. `key` is what Attendance.balanceKey and LeaveCredit.balanceKey store (annual, sick, … or a generated key).
+model LeaveType {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  key         String
+  nameAr      String
+  nameEn      String?
+  days        Float    @default(0)
+  /// false = only employees whose job title is in jobTitleIds.
+  allJobs     Boolean  @default(true)
+  jobTitleIds String[] @default([])
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, key])
+}
+
+/// A named allowance (علاوة) with its default calculation and payment frequency.
+model AllowanceType {
+  id         String              @id @default(cuid())
+  companyId  String
+  company    Company             @relation(fields: [companyId], references: [id])
+  nameAr     String
+  nameEn     String?
+  /// FIXED amount or PERCENT of `base` (BASIC salary or the whole PACKAGE).
+  calc       String              @default("FIXED")
+  base       String              @default("BASIC")
+  value      Float               @default(0)
+  /// MONTHLY, QUARTERLY, SEMI_ANNUAL or ANNUAL; non-monthly ones are paid in payMonth and every interval after it.
+  frequency  String              @default("MONTHLY")
+  payMonth   Int                 @default(1)
+  allowances EmployeeAllowance[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+}
+
+/// An allowance given to one employee; applied to each unpaid salary month it falls due in (src/lib/pay-items.ts).
+model EmployeeAllowance {
+  id              String        @id @default(cuid())
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id])
+  employeeId      String
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  allowanceTypeId String
+  allowanceType   AllowanceType @relation(fields: [allowanceTypeId], references: [id])
+  calc            String        @default("FIXED")
+  base            String        @default("BASIC")
+  value           Float         @default(0)
+  frequency       String        @default("MONTHLY")
+  payMonth        Int           @default(1)
+  startYear       Int
+  startMonth      Int
+  active          Boolean       @default(true)
+  lines           SalaryLine[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([allowanceTypeId])
 }
 
 model Reminder {
@@ -167,9 +274,9 @@ model EmployeeDocument {
 }
 
 model Attendance {
-  id         String   @id @default(cuid())
-  employeeId String
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   date          DateTime
   type          String
   notes         String?
@@ -192,43 +299,45 @@ model LeaveCredit {
 }
 
 model Salary {
-  id                 String    @id @default(cuid())
+  id                 String       @id @default(cuid())
   companyId          String
-  company            Company   @relation(fields: [companyId], references: [id])
+  company            Company      @relation(fields: [companyId], references: [id])
   employeeId         String
-  employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee           Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   year               Int
   month              Int
   employerId         String?
-  employer           Employer? @relation(fields: [employerId], references: [id])
+  employer           Employer?    @relation(fields: [employerId], references: [id])
   employerName       String?
   employerNameEn     String?
   employeeName       String
   employeeNameEn     String?
   employeeNumber     String
   jobTitle           String?
+  jobTitleEn         String?
   department         String?
-  basicSalary        Float     @default(0)
-  housingAllowance   Float     @default(0)
-  transportAllowance Float     @default(0)
-  otherAllowance     Float     @default(0)
-  absenceDays        Float     @default(0)
-  absenceDeduction   Float     @default(0)
-  otherDeduction     Float     @default(0)
+  departmentEn       String?
+  basicSalary        Float        @default(0)
+  housingAllowance   Float        @default(0)
+  transportAllowance Float        @default(0)
+  otherAllowance     Float        @default(0)
+  absenceDays        Float        @default(0)
+  absenceDeduction   Float        @default(0)
+  otherDeduction     Float        @default(0)
   /// Sums of the pay-item lines below (bonuses, allowances, entitlements / advances, deductions).
-  extraEarnings      Float     @default(0)
-  extraDeductions    Float     @default(0)
-  netSalary          Float     @default(0)
+  extraEarnings      Float        @default(0)
+  extraDeductions    Float        @default(0)
+  netSalary          Float        @default(0)
   notes              String?
-  paid               Boolean   @default(false)
+  paid               Boolean      @default(false)
   paidAt             DateTime?
   paymentMethod      String?
   paymentReference   String?
   paidByName         String?
   receiptNo          String?
   lines              SalaryLine[]
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   @@unique([employeeId, year, month])
   @@unique([companyId, receiptNo])
@@ -262,20 +371,24 @@ model PayItem {
   @@index([employeeId])
 }
 
-/// A pay item applied to one monthly salary. Lines of a paid salary never change.
+/// A pay item or allowance applied to one monthly salary. Lines of a paid salary never change.
 model SalaryLine {
-  id        String   @id @default(cuid())
-  salaryId  String
-  salary    Salary   @relation(fields: [salaryId], references: [id], onDelete: Cascade)
-  payItemId String?
-  payItem   PayItem? @relation(fields: [payItemId], references: [id], onDelete: SetNull)
-  kind      String
-  title     String
-  amount    Float
-  deduct    Boolean
+  id          String             @id @default(cuid())
+  salaryId    String
+  salary      Salary             @relation(fields: [salaryId], references: [id], onDelete: Cascade)
+  payItemId   String?
+  payItem     PayItem?           @relation(fields: [payItemId], references: [id], onDelete: SetNull)
+  allowanceId String?
+  allowance   EmployeeAllowance? @relation(fields: [allowanceId], references: [id], onDelete: SetNull)
+  kind        String
+  title       String
+  titleEn     String?
+  amount      Float
+  deduct      Boolean
 
   @@index([salaryId])
   @@index([payItemId])
+  @@index([allowanceId])
 }
 
 /// Uploaded documents and logos. Kept in the database because serverless hosting has no persistent disk.

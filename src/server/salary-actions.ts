@@ -49,7 +49,9 @@ function snapshot(employee: Employee & { employer: Employer | null }) {
     employeeNameEn: employee.nameEn,
     employeeNumber: employee.employeeNumber,
     jobTitle: employee.jobTitle,
+    jobTitleEn: employee.jobTitleEn,
     department: employee.department,
+    departmentEn: employee.departmentEn,
   };
 }
 

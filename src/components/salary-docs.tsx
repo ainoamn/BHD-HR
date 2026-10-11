@@ -1,5 +1,5 @@
 import type { Company, Employer } from "@prisma/client";
-import { PAYMENT_LABEL, PAY_KIND_LABEL, bothTerm, monthName } from "@/lib/constants";
+import { PAYMENT_LABEL, PAY_KIND_LABEL, termBoth, monthName } from "@/lib/constants";
 import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { daysLabel, formatDate, money } from "@/lib/utils";
 
@@ -20,7 +20,9 @@ export type DocSalary = {
   employeeNameEn?: string | null;
   employeeNumber: string;
   jobTitle?: string | null;
+  jobTitleEn?: string | null;
   department?: string | null;
+  departmentEn?: string | null;
   month: number;
   year: number;
   paid: boolean;
@@ -34,7 +36,7 @@ export type DocSalary = {
   otherDeduction: number;
   extraEarnings?: number;
   extraDeductions?: number;
-  lines?: { id: string; kind: string; title: string; amount: number; deduct: boolean }[];
+  lines?: { id: string; kind: string; title: string; titleEn?: string | null; amount: number; deduct: boolean }[];
   netSalary: number;
   paymentMethod?: string | null;
   paymentReference?: string | null;
@@ -113,8 +115,8 @@ function InfoGrid({ salary }: { salary: DocSalary }) {
   const rows: [string, string, string][] = [
     ["اسم الموظف", "Employee name", salary.employeeNameEn && salary.employeeNameEn !== salary.employeeName ? `${salary.employeeName} — ${salary.employeeNameEn}` : salary.employeeName],
     ["الرقم الوظيفي", "Employee no.", salary.employeeNumber],
-    ["الوظيفة", "Job title", bothTerm(salary.jobTitle) || "—"],
-    ["القسم", "Department", salary.department || "—"],
+    ["الوظيفة", "Job title", termBoth(salary.jobTitle, salary.jobTitleEn) || "—"],
+    ["القسم", "Department", termBoth(salary.department, salary.departmentEn) || "—"],
     ["الشهر", "Month", `${monthName(salary.month, "ar")} / ${monthName(salary.month, "en")} ${salary.year}`],
     ["تاريخ الصرف", "Pay date", salary.paid ? formatDate(salary.paidAt) : "—"],
   ];
@@ -210,7 +212,7 @@ export function Payslip({ header, salary, currency }: { header: DocHeader; salar
             {lines
               .filter((line) => !line.deduct)
               .map((line) => (
-                <AmountRow key={line.id} ar={line.title} en={PAY_KIND_LABEL[line.kind]?.en || line.kind} value={line.amount} currency={currency} />
+                <AmountRow key={line.id} ar={line.title} en={line.titleEn || PAY_KIND_LABEL[line.kind]?.en || line.kind} value={line.amount} currency={currency} />
               ))}
             <AmountRow ar="إجمالي الاستحقاقات" en="Total earnings" value={gross} currency={currency} strong />
           </tbody>

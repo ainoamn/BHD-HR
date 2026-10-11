@@ -12,8 +12,14 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
   const file = await prisma.storedFile.findFirst({ where: { name: safeName, companyId: user.companyId } });
   if (!file) return new NextResponse("Not found", { status: 404 });
   if (!can(user, "documents.view")) {
-    const isDocument = await prisma.employeeDocument.count({ where: { fileUrl: `/files/${safeName}`, employee: { companyId: user.companyId } } });
-    if (isDocument) return new NextResponse("Forbidden", { status: 403 });
+    const url = `/files/${safeName}`;
+    const [isDocument, isIdentityCopy] = await Promise.all([
+      prisma.employeeDocument.count({ where: { fileUrl: url, employee: { companyId: user.companyId } } }),
+      prisma.employee.count({
+        where: { companyId: user.companyId, OR: [{ idFileUrl: url }, { passportFileUrl: url }, { residenceFileUrl: url }] },
+      }),
+    ]);
+    if (isDocument || isIdentityCopy) return new NextResponse("Forbidden", { status: 403 });
   }
   return new NextResponse(new Uint8Array(file.data), {
     headers: {
