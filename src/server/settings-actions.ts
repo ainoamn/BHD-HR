@@ -9,7 +9,8 @@ import { getI18n } from "@/lib/lang";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { normalizePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { removeLogoIfUnused, saveUpload } from "@/lib/uploads";
+import { sealImageInUse } from "@/lib/letter-issue";
+import { removeLogoIfUnused, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
 import { clip, intValue, req, str } from "@/lib/utils";
 
@@ -71,6 +72,41 @@ export async function updateCompanySettings(formData: FormData) {
   await writeAudit({ userId: user.id, action: "SETTINGS", message: t("حدّث إعدادات المنشأة", "Updated company settings") });
   refreshAll();
   go("/settings", { message: t("تم حفظ إعدادات المنشأة", "Company settings saved") });
+}
+
+/** Name, title, signature and stamp printed on every e-signed letter. Old images stay while any issued letter still shows them. */
+export async function updateSignatureSettings(formData: FormData) {
+  const user = await requireAdmin();
+  const { lang, t } = await getI18n();
+  const back = "/settings#signature";
+  const company = user.company;
+  const images: Record<"signatureUrl" | "stampUrl", string | null> = { signatureUrl: company.signatureUrl, stampUrl: company.stampUrl };
+  for (const [input, field] of [
+    ["signature", "signatureUrl"],
+    ["stamp", "stampUrl"],
+  ] as const) {
+    if (req(formData, `remove${input}`) === "1") images[field] = null;
+    const file = formData.get(input);
+    if (!(file instanceof File) || file.size === 0) continue;
+    if (!/\.(png|jpe?g|webp)$/i.test(file.name)) go(back, { error: t("الصورة يجب أن تكون PNG أو JPG", "The image must be PNG or JPG") });
+    let saved: string | null = null;
+    try {
+      saved = await saveUpload(file, user.companyId, lang);
+    } catch (error) {
+      go(back, { error: error instanceof Error ? error.message : t("تعذر رفع الصورة", "Could not upload the image") });
+    }
+    if (saved) images[field] = saved;
+  }
+  await prisma.company.update({
+    where: { id: user.companyId },
+    data: { signatoryName: clip(str(formData, "signatoryName"), 120), signatoryTitle: clip(str(formData, "signatoryTitle"), 120), ...images },
+  });
+  for (const previous of [company.signatureUrl, company.stampUrl]) {
+    if (previous && previous !== images.signatureUrl && previous !== images.stampUrl && !(await sealImageInUse(previous))) await removeUpload(previous);
+  }
+  await writeAudit({ userId: user.id, action: "SETTINGS", message: t("حدّث التوقيع الإلكتروني والختم", "Updated the e-signature and stamp") });
+  refreshAll();
+  go(back, { message: t("تم حفظ التوقيع والختم", "Signature and stamp saved") });
 }
 
 export async function updateProfile(formData: FormData) {

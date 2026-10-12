@@ -1,9 +1,9 @@
 "use client";
 
-import { FileText, LoaderCircle, Mail, MessageCircle, Sparkles, TriangleAlert } from "lucide-react";
+import { BadgeCheck, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
-import { fillTemplate, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, type LetterKind } from "@/lib/letters";
+import { fillTemplate, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
 import { cn } from "@/lib/utils";
 import { draftLetter } from "@/server/letter-actions";
 import { EmployeeMultiSelect } from "./employee-multi-select";
@@ -20,7 +20,10 @@ export function LetterForm({
   defaultKind,
   today,
   signatoryName,
+  signatoryTitle,
   channels,
+  allowSalary,
+  request,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employees: LetterEmployee[];
@@ -28,14 +31,20 @@ export function LetterForm({
   defaultKind: LetterKind;
   today: string;
   signatoryName: string;
+  signatoryTitle: string;
   channels: { EMAIL: boolean; WHATSAPP: boolean };
+  allowSalary: boolean;
+  /** Writing the letter an employee asked for from the portal; issuing it approves the request. */
+  request?: { id: string; subject: string; details: string; addressee: string } | null;
 }) {
   const { lang, t } = useLang();
   const [selected, setSelected] = useState<string[]>(defaultEmployeeIds);
   const [kind, setKind] = useState<LetterKind>(defaultKind);
-  const [reason, setReason] = useState("");
-  const [subject, setSubject] = useState(LETTER_TEMPLATES[defaultKind].subject);
+  const [reason, setReason] = useState(request?.details || "");
+  const [subject, setSubject] = useState(request?.subject || LETTER_TEMPLATES[defaultKind].subject);
   const [subjectEn, setSubjectEn] = useState(LETTER_TEMPLATES[defaultKind].subjectEn);
+  const auto = Boolean(LETTER_KIND[kind].auto);
+  const autoKinds = LETTER_KINDS.filter((option) => LETTER_KIND[option].auto);
   const [body, setBody] = useState("");
   const [bodyEn, setBodyEn] = useState("");
   const [note, setNote] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
@@ -89,6 +98,7 @@ export function LetterForm({
 
   return (
     <form action={action} className="space-y-6">
+      {request ? <input type="hidden" name="requestId" value={request.id} /> : null}
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-slate-800">{t("١. الموظف ونوع الخطاب", "1. Employee and letter type")}</h2>
         <div className="min-w-0 space-y-1.5">
@@ -97,26 +107,40 @@ export function LetterForm({
           <span className="block text-xs leading-5 text-slate-500">{t("عند اختيار أكثر من موظف يُصدر لكل منهم خطاب مستقل برقم خاص.", "With several employees, each one gets a separate letter with its own number.")}</span>
         </div>
         <input type="hidden" name="kind" value={kind} />
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {LETTER_KINDS.map((option) => {
-            const meta = LETTER_KIND[option];
-            return (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={kind === option}
-                onClick={() => chooseKind(option)}
-                className={cn(
-                  "flex min-h-12 items-center gap-2 rounded-xl px-3 py-2 text-start text-sm font-semibold ring-1 ring-inset transition",
-                  kind === option ? "bg-teal-700 text-white ring-teal-700" : "bg-surface text-slate-700 ring-slate-200 hover:bg-slate-50",
-                )}
-              >
-                {meta.warning || option === "NOTICE" ? <TriangleAlert size={16} className={kind === option ? "text-white" : "text-orange-500"} /> : <FileText size={16} className={kind === option ? "text-white" : "text-teal-700"} />}
-                {pick(meta.label, lang)}
-              </button>
-            );
-          })}
-        </div>
+        {(
+          [
+            [t("خطابات وإنذارات", "Letters and warnings"), WRITTEN_KINDS],
+            [t("شهادات ومستندات جاهزة (تُكتب تلقائياً من ملف الموظف)", "Ready certificates and documents (written from the employee's file)"), autoKinds],
+          ] as const
+        ).map(([heading, options]) => (
+          <div key={heading} className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500">{heading}</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {options.map((option) => {
+                const meta = LETTER_KIND[option];
+                const locked = Boolean(meta.salary) && !allowSalary;
+                const Icon = meta.warning || option === "NOTICE" ? TriangleAlert : meta.auto ? ScrollText : FileText;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={kind === option}
+                    disabled={locked}
+                    title={locked ? t("يحتاج صلاحية عرض الرواتب", "Needs the view-salaries permission") : undefined}
+                    onClick={() => chooseKind(option)}
+                    className={cn(
+                      "flex min-h-12 items-center gap-2 rounded-xl px-3 py-2 text-start text-sm font-semibold ring-1 ring-inset transition disabled:cursor-not-allowed disabled:opacity-50",
+                      kind === option ? "bg-teal-700 text-white ring-teal-700" : "bg-surface text-slate-700 ring-slate-200 hover:bg-slate-50",
+                    )}
+                  >
+                    <Icon size={16} className={cn("shrink-0", kind === option ? "text-white" : meta.warning || option === "NOTICE" ? "text-orange-500" : "text-teal-700")} />
+                    {pick(meta.label, lang)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
         {single && (LETTER_KIND[kind].warning || kind === "NOTICE") ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
             <span>
@@ -138,6 +162,45 @@ export function LetterForm({
         </div>
       </section>
 
+      {auto ? (
+        <section className="space-y-3 border-t border-slate-100 pt-5">
+          <h2 className="text-sm font-bold text-slate-800">{t("٢. المحتوى", "2. Content")}</h2>
+          <p className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3.5 py-3 text-sm leading-6 text-emerald-800 ring-1 ring-inset ring-emerald-200">
+            <BadgeCheck size={17} className="mt-0.5 shrink-0" />
+            <span>
+              {kind === "RESIGNATION_ACCEPTANCE"
+                ? t(
+                    "يُكتب الخطاب بالعربية والإنجليزية، وآخر يوم عمل يؤخذ من «تاريخ انتهاء العقد» في ملف الموظف. لقبول استقالة قدّمها الموظف من بوابته استخدم صفحة الاعتمادات.",
+                    "The letter is written in Arabic and English, and the last working day comes from the contract end date in the employee's file. To accept a resignation sent from the portal, use the approvals page.",
+                  )
+                : t(
+                    "يُكتب النص بالعربية والإنجليزية من ملف كل موظف (الاسم، الجنسية، رقم الهوية، الوظيفة، تاريخ الالتحاق، والراتب إن لزم)، ويصدر موقّعاً إلكترونياً مع رمز QR للتحقق.",
+                    "The text is written in Arabic and English from each employee's file (name, nationality, ID number, job, joining date, and pay where needed), and issued e-signed with a QR code for verification.",
+                  )}
+            </span>
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {LETTER_KIND[kind].document ? (
+              <Field
+                label={kind === "SALARY_TRANSFER" ? t("اسم البنك (إن لم يُحدد في ملف الموظف)", "Bank name (if not in the employee's file)") : t("الجهة المقدَّمة إليها", "Addressed to")}
+                hint={kind === "SALARY_TRANSFER" ? undefined : t("اتركه فارغاً لـ «إلى من يهمه الأمر».", "Leave empty for “To whom it may concern”.")}
+              >
+                <input className={`${fieldClass} w-full`} name="addressee" defaultValue={request?.addressee || ""} maxLength={160} />
+              </Field>
+            ) : null}
+            {kind === "NOC" ? (
+              <Field label={t("الغرض من عدم الممانعة *", "No objection to *")} hint={t("مثل: السفر خارج السلطنة، أو استخراج رخصة قيادة.", "e.g. travelling abroad, or getting a driving licence.")}>
+                <input className={`${fieldClass} w-full`} name="purpose" defaultValue={request?.details || ""} maxLength={400} required />
+              </Field>
+            ) : null}
+            {kind === "EXPERIENCE_CERTIFICATE" ? (
+              <Field label={t("تاريخ انتهاء العمل (اختياري)", "End of service (optional)")} hint={t("اتركه فارغاً إن كان الموظف لا يزال على رأس عمله.", "Leave empty if the employee still works here.")}>
+                <input className={`${fieldClass} w-full`} type="date" name="endDate" />
+              </Field>
+            ) : null}
+          </div>
+        </section>
+      ) : (
       <section className="space-y-3 border-t border-slate-100 pt-5">
         <h2 className="text-sm font-bold text-slate-800">{t("٢. المحتوى", "2. Content")}</h2>
         <Field
@@ -181,6 +244,7 @@ export function LetterForm({
         </div>
         <p className="text-xs text-slate-500">{t("الترويسة واسم الموظف والتاريخ والرقم والتوقيع تُطبع تلقائياً، فلا تكتبها في النص.", "The letterhead, employee name, date, number and signature are printed automatically; don't type them in the text.")}</p>
       </section>
+      )}
 
       <section className="space-y-3 border-t border-slate-100 pt-5">
         <h2 className="text-sm font-bold text-slate-800">{t("٣. التوقيع والإرسال", "3. Signature and delivery")}</h2>
@@ -189,9 +253,21 @@ export function LetterForm({
             <input className={`${fieldClass} w-full`} name="signatoryName" defaultValue={signatoryName} maxLength={120} />
           </Field>
           <Field label={t("صفته", "Title")}>
-            <input className={`${fieldClass} w-full`} name="signatoryTitle" defaultValue={t("الإدارة", "Management")} maxLength={120} />
+            <input className={`${fieldClass} w-full`} name="signatoryTitle" defaultValue={signatoryTitle} maxLength={120} />
           </Field>
         </div>
+        <p className="flex items-start gap-2 text-xs leading-5 text-slate-500">
+          <BadgeCheck size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+          {t(
+            "يصدر الخطاب موقّعاً إلكترونياً باسمك مع رمز QR وبصمة رقمية؛ من يمسح الرمز يرى أنه أصلي ويحمّل نسخته. صورة التوقيع والختم تُضاف من الإعدادات.",
+            "The letter is issued e-signed in your name with a QR code and digital fingerprint; whoever scans it sees it is authentic and can download it. Signature and stamp images are set in Settings.",
+          )}
+        </p>
+        {request ? (
+          <Field label={t("ملاحظة للموظف (اختياري)", "Note to the employee (optional)")}>
+            <input className={`${fieldClass} w-full`} name="decisionNote" maxLength={500} />
+          </Field>
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-2">
           {(
             [
@@ -220,7 +296,9 @@ export function LetterForm({
       </section>
 
       <div className="border-t border-slate-100 pt-4">
-        <SubmitButton pendingLabel={t("جارٍ الإصدار...", "Issuing...")}>{t("إصدار الخطاب", "Issue letter")}</SubmitButton>
+        <SubmitButton pendingLabel={t("جارٍ الإصدار...", "Issuing...")}>
+          {request ? t("اعتماد الطلب وإصدار الخطاب", "Approve the request and issue") : t("إصدار الخطاب موقّعاً", "Issue signed letter")}
+        </SubmitButton>
       </div>
     </form>
   );

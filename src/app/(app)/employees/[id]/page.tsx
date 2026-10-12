@@ -8,10 +8,13 @@ import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, linkAction
 import {
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   BriefcaseBusiness,
   CalendarCheck2,
+  DoorOpen,
   ExternalLink,
   FileBadge,
+  Inbox,
   Mail,
   Pencil,
   Phone,
@@ -47,7 +50,7 @@ import { nationalityName } from "@/lib/nationalities";
 import { prisma } from "@/lib/prisma";
 import { monthKey, payItemProgress } from "@/lib/pay-items";
 import { packageGross, totalDeductions, totalEarnings } from "@/lib/salary";
-import { cn, currentPeriod, daysLabel, formatDate, money, round3, text, todayInputValue } from "@/lib/utils";
+import { cn, currentPeriod, daysLabel, formatDate, money, round3, text, toDateInput, todayInputValue } from "@/lib/utils";
 import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
 import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
 import { DocumentScan } from "@/components/document-scan";
@@ -62,7 +65,7 @@ import { PayItemForm } from "@/components/pay-item-form";
 import { PayItemsList } from "@/components/pay-items-list";
 import { EmployeeHrTab } from "@/components/employee-hr-tab";
 import { EmployeeLettersTab, EmployeeNotesTab, EmployeeTasksTab, PinnedNotes } from "@/components/employee-workspace";
-import { WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
+import { LETTER_KIND, WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
 import { employeeOptions, loadBoardTasks } from "@/lib/task-data";
 import { ShareLetter } from "@/components/share-letter";
 import { muscatTime, workedLabel } from "@/lib/clock";
@@ -121,7 +124,7 @@ export default async function EmployeePage({
     expenses: can(user, "expenses.view"),
   };
   const warningSince = new Date(Date.now() - WARNING_LOOKBACK_DAYS * 86400000);
-  const [notes, employeeTasks, taskEmployees, letters] = await Promise.all([
+  const [notes, employeeTasks, taskEmployees, letters, openRequests] = await Promise.all([
     allow.tasks
       ? prisma.employeeNote.findMany({
           where: { employeeId: employee.id, companyId: user.companyId },
@@ -138,7 +141,14 @@ export default async function EmployeePage({
           orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
         })
       : [],
+    prisma.employeeRequest.findMany({
+      where: { employeeId: employee.id, companyId: user.companyId, OR: [{ status: "PENDING" }, { type: "RESIGNATION", status: "APPROVED" }] },
+      select: { id: true, type: true, status: true, lastDay: true, letterId: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
+  const acceptedResignation = employee.status === "TERMINATED" ? null : openRequests.find((request) => request.type === "RESIGNATION" && request.status === "APPROVED");
+  const pendingRequests = openRequests.filter((request) => request.status === "PENDING").length;
   const activeWarnings = letters.filter((letter) => !letter.cancelledAt && WARNING_KINDS.includes(letter.kind as LetterKind) && letter.issuedAt >= warningSince).length;
   const openTasks = employeeTasks.filter((task) => task.status !== "DONE").length;
   const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes);
@@ -376,6 +386,39 @@ export default async function EmployeePage({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {acceptedResignation ? (
+        <div className="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 sm:flex-row sm:items-center sm:justify-between" role="status">
+          <p className="flex items-start gap-2 text-sm">
+            <DoorOpen size={18} className="mt-0.5 shrink-0" />
+            <span>
+              <span className="font-bold">{t("استقالة مقبولة", "Resignation accepted")}</span> —{" "}
+              {t(`آخر يوم عمل ${formatDate(acceptedResignation.lastDay)}. أنهِ الخدمة من «تعديل» بعد إخلاء الطرف وصرف المستحقات.`, `last working day ${formatDate(acceptedResignation.lastDay)}. End the service from “Edit” after clearance and settlement.`)}
+            </span>
+          </p>
+          <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 text-sm font-bold">
+            {allow.salaries ? (
+              <Link href={`${base}/hr-doc?type=settlement&end=${toDateInput(acceptedResignation.lastDay)}`} className="underline underline-offset-4">
+                {t("تسوية نهاية الخدمة", "Final settlement")}
+              </Link>
+            ) : null}
+            {acceptedResignation.letterId && allow.letters ? (
+              <Link href={`/letters/${acceptedResignation.letterId}`} className="underline underline-offset-4">
+                {t("خطاب القبول", "Acceptance letter")}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {pendingRequests ? (
+        <Link href="/approvals#requests" className="flex items-center justify-between gap-2 rounded-2xl border border-aqua-100 bg-aqua-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-aqua-100">
+          <span className="flex items-center gap-2">
+            <Inbox size={17} className="text-aqua-700" />
+            {t(`لدى الموظف ${pendingRequests} طلب بانتظار الاعتماد`, `${pendingRequests} request(s) from this employee awaiting approval`)}
+          </span>
+          <span className="text-teal-800">{t("فتح الطلبات", "Open requests")}</span>
+        </Link>
       ) : null}
 
       <Flash error={sp.error} message={sp.message} />
@@ -1096,6 +1139,23 @@ export default async function EmployeePage({
                 </Link>
               ))}
             </div>
+            {allow.letterAdd ? (
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                  <BadgeCheck size={14} className="text-emerald-600" />
+                  {t("إصدار رسمي موقّع إلكترونياً مع QR:", "Official e-signed issue with QR:")}
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                  {(["SALARY_CERTIFICATE", "EMPLOYMENT_CERTIFICATE", "EXPERIENCE_CERTIFICATE", "SALARY_TRANSFER", "NOC"] as const)
+                    .filter((kind) => !LETTER_KIND[kind].salary || allow.salaries)
+                    .map((kind) => (
+                      <Link key={kind} href={`/letters/new?employeeId=${employee.id}&kind=${kind}`} className="font-semibold text-teal-800 underline-offset-4 hover:underline">
+                        {pick(LETTER_KIND[kind].label, lang)}
+                      </Link>
+                    ))}
+                </div>
+              </div>
+            ) : null}
             {allow.salaries ? (
               <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600 ring-1 ring-inset ring-slate-100">
                 {accrued.eligible

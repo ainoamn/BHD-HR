@@ -18,15 +18,39 @@ export const HR_DOC_LABEL: Record<HrDocType, Bi> = {
 /** Certificates that reveal pay need salaries.view; the experience certificate only needs employees.view. */
 export const HR_DOC_NEEDS_SALARY: Record<HrDocType, boolean> = { salary: true, experience: false, bank: true, settlement: true };
 
-type DocEmployee = Pick<
+export type DocEmployee = Pick<
   Employee,
-  "fullName" | "nameEn" | "gender" | "nationality" | "idNumber" | "residenceNumber" | "passportNumber" | "jobTitle" | "jobTitleEn" | "department" | "departmentEn" | "joiningDate" | "bankBic" | "bankAccount" | "basicSalary" | "housingAllowance" | "transportAllowance" | "otherAllowance"
+  | "fullName"
+  | "nameEn"
+  | "employeeNumber"
+  | "gender"
+  | "nationality"
+  | "idNumber"
+  | "residenceNumber"
+  | "passportNumber"
+  | "jobTitle"
+  | "jobTitleEn"
+  | "department"
+  | "departmentEn"
+  | "joiningDate"
+  | "bankBic"
+  | "bankAccount"
+  | "basicSalary"
+  | "housingAllowance"
+  | "transportAllowance"
+  | "otherAllowance"
 >;
 
 type Issuer = { name: string; nameEn: string | null };
 
-/** Arabic and English paragraphs of a certificate; the letterhead, date, number and signature are printed around them. */
-export function certificateText(type: Exclude<HrDocType, "settlement">, input: { employee: DocEmployee; issuer: Issuer; to: string; endDate: Date | null; gross: number; currency: string }) {
+/**
+ * Arabic and English paragraphs of a certificate; the letterhead, date, number and signature are printed around them.
+ * `employment` is the employee data certificate (no pay); `noc` needs `purpose`.
+ */
+export function certificateText(
+  type: Exclude<HrDocType, "settlement"> | "employment" | "noc",
+  input: { employee: DocEmployee; issuer: Issuer; to: string; endDate: Date | null; gross: number; currency: string; purpose?: string },
+) {
   const { employee, issuer, currency } = input;
   const female = employee.gender === "FEMALE";
   const g = (male: string, fem: string) => (female ? fem : male);
@@ -82,6 +106,32 @@ export function certificateText(type: Exclude<HrDocType, "settlement">, input: {
       en: [
         `This is to certify that ${whoEn}, has been employed by ${issuerEn}${jobEn}${deptEn} since ${joined}, and receives a gross monthly salary of ${money(input.gross, currencyEn)}${breakdownEn ? ` (${breakdownEn})` : ""}.`,
         closingEn,
+      ],
+    };
+  }
+  if (type === "employment") {
+    const number = employee.employeeNumber ? `، ${g("ورقمه", "ورقمها")} الوظيفي ${employee.employeeNumber}` : "";
+    const numberEn = employee.employeeNumber ? `, employee no. ${employee.employeeNumber}` : "";
+    return {
+      ar: [
+        `تشهد ${issuer.name} بأن ${who}، ${g("يعمل", "تعمل")} لديها${job}${dept} منذ ${joined}${number}، ولا ${g("يزال", "تزال")} على رأس ${g("عمله", "عملها")} حتى تاريخه.`,
+        closingAr,
+      ],
+      en: [`This is to certify that ${whoEn}, has been employed by ${issuerEn}${jobEn}${deptEn} since ${joined}${numberEn}, and is still in service as of the date of this certificate.`, closingEn],
+    };
+  }
+  if (type === "noc") {
+    const purpose = (input.purpose || "").trim() || "…";
+    return {
+      ar: [
+        `تفيد ${issuer.name} بأن ${who}، ${g("يعمل", "تعمل")} لديها${job}${dept} منذ ${joined}.`,
+        `ولا تمانع ${issuer.name} من: ${purpose}.`,
+        `وقد أُعطيت هذه الشهادة بناءً على ${g("طلبه", "طلبها")}${toAr}، دون أدنى مسؤولية على ${issuer.name} تجاه الغير.`,
+      ],
+      en: [
+        `This is to certify that ${whoEn}, has been employed by ${issuerEn}${jobEn}${deptEn} since ${joined}.`,
+        `${issuerEn} has no objection to the following: ${purpose}.`,
+        `This certificate is issued at ${his} request${toEn}, without any liability on the part of ${issuerEn} towards third parties.`,
       ],
     };
   }

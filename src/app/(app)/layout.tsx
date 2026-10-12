@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { can, homePath, isStaffRole, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { MODULES, MODULE_HREF } from "@/lib/permissions";
+import { decidableTypes } from "@/lib/requests";
 import { SIDEBAR_COOKIE, THEME_COOKIE, formatLongDate, normalizeTheme } from "@/lib/utils";
 import { logout, switchCompany } from "@/server/auth-actions";
 
@@ -38,7 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const allowed = MODULES.filter((module) => can(user, `${module}.view`)).map((module) => MODULE_HREF[module]);
   if (can(user, "salaries.view")) allowed.push("/pay-items");
   if (can(user, "employees.view")) allowed.push("/org");
-  if (can(user, "attendance.view") || can(user, "documents.view") || can(user, "expenses.view")) allowed.push("/approvals");
+  if (can(user, "attendance.view") || can(user, "documents.view") || can(user, "expenses.view") || decidableTypes(user).length) allowed.push("/approvals");
   if (can(user, "reports.view")) allowed.push("/analytics");
   const companyName = (company: { name: string; nameEn: string | null }) => (lang === "en" && company.nameEn ? company.nameEn : company.name);
 

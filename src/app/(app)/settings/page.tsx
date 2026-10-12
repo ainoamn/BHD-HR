@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound } from "lucide-react";
+import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound } from "lucide-react";
 import { WorkSitePicker } from "@/components/work-site-picker";
 import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
@@ -25,7 +25,7 @@ import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
 import { sendPendingLetterCopies } from "@/server/letter-actions";
-import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateMemberAccess, updateProfile } from "@/server/settings-actions";
+import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateMemberAccess, updateProfile, updateSignatureSettings } from "@/server/settings-actions";
 
 function SectionHead({ icon: Icon, title, text, children }: { icon: LucideIcon; title: string; text?: string; children?: React.ReactNode }) {
   return (
@@ -137,6 +137,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     { id: "profile", label: t("بياناتي", "My details"), icon: UserCog },
     ...(isAdmin
       ? [
+          { id: "signature", label: t("التوقيع والختم", "Signature & stamp"), icon: PenLine },
           { id: "channels", label: t("إرسال الخطابات", "Letter delivery"), icon: Send },
           { id: "roles", label: t("الأدوار والحسابات", "Roles & accounts"), icon: UsersRound },
           { id: "members", label: t("المستخدمون والصلاحيات", "Users & permissions"), icon: ShieldCheck },
@@ -443,6 +444,54 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </div>
             </Card>
           </form>
+
+          {isAdmin ? (
+            <form action={updateSignatureSettings}>
+              <Card id="signature" className="grid scroll-mt-24 gap-4 md:grid-cols-2">
+                <SectionHead
+                  icon={PenLine}
+                  title={t("التوقيع الإلكتروني والختم", "E-signature and stamp")}
+                  text={t(
+                    "يُطبع على كل خطاب وشهادة تصدر من النظام مع رمز QR للتحقق. الصورتان تُنسخان على الخطاب لحظة توقيعه، فتغييرهما لاحقاً لا يغيّر الخطابات السابقة.",
+                    "Printed on every letter and certificate the system issues, with a QR code for verification. Both images are copied onto the letter when it is signed, so changing them later doesn't alter earlier letters.",
+                  )}
+                />
+                <Field label={t("اسم المفوّض بالتوقيع", "Authorised signatory")} hint={t("فارغ = اسم من يعتمد الخطاب", "Empty = whoever approves the letter")}>
+                  <input className={`${fieldClass} w-full`} name="signatoryName" defaultValue={company.signatoryName || ""} maxLength={120} />
+                </Field>
+                <Field label={t("صفته", "Title")}>
+                  <input className={`${fieldClass} w-full`} name="signatoryTitle" defaultValue={company.signatoryTitle || ""} placeholder={t("مدير الموارد البشرية", "HR manager")} maxLength={120} />
+                </Field>
+                {(
+                  [
+                    ["signature", t("صورة التوقيع", "Signature image"), company.signatureUrl, t("PNG بخلفية شفافة أفضل.", "A PNG with a transparent background works best.")],
+                    ["stamp", t("صورة الختم", "Stamp image"), company.stampUrl, t("PNG أو JPG مربّع تقريباً.", "A roughly square PNG or JPG.")],
+                  ] as const
+                ).map(([input, label, current, hint]) => (
+                  <div key={input} className="space-y-2">
+                    <Field label={label} hint={hint}>
+                      <input className={`${fieldClass} w-full`} type="file" name={input} accept="image/png,image/jpeg,image/webp" />
+                    </Field>
+                    {current ? (
+                      <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-100">
+                        <img src={current} alt="" className="h-16 w-28 rounded-lg border border-slate-200 bg-white object-contain p-1" />
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                          <input type="checkbox" name={`remove${input}`} value="1" />
+                          {t("حذف", "Remove")}
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                <div className="flex items-end justify-end md:col-span-2">
+                  <SubmitButton className="w-full sm:w-auto">
+                    <Save size={16} />
+                    {t("حفظ التوقيع والختم", "Save signature and stamp")}
+                  </SubmitButton>
+                </div>
+              </Card>
+            </form>
+          ) : null}
 
           {isAdmin ? (
             <Card id="channels" className="scroll-mt-24">

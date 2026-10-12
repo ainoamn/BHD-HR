@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, Clock3, FileUp, Files, IdCard, KeyRound, LayoutDashboard, LogOut, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { CalendarCheck2, Clock3, FileUp, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { PortalRequests } from "@/components/portal-requests";
+import { LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { getSessionUser, isStaffRole } from "@/lib/auth";
 import { isTeamRole } from "@/lib/permissions";
 import { logout } from "@/server/auth-actions";
@@ -61,7 +63,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const signedIn = session && session.employeeId === employee.id ? session : null;
   const headerPill = "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20";
   const today = muscatDay();
-  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims] = await Promise.all([
+  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests] = await Promise.all([
     getLeaveTypes(company.id),
     prisma.attendance.findMany({ where: { employeeId: employee.id }, select: { type: true, balanceKey: true } }),
     prisma.leaveCredit.findMany({ where: { employeeId: employee.id }, select: { balanceKey: true, days: true } }),
@@ -75,7 +77,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     prisma.employeeDocument.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" } }),
     prisma.letter.findMany({
       where: { employeeId: employee.id, cancelledAt: null },
-      select: { token: true, refNo: true, subject: true, subjectEn: true, issuedAt: true, acknowledgedAt: true },
+      select: { token: true, kind: true, refNo: true, subject: true, subjectEn: true, issuedAt: true, acknowledgedAt: true },
       orderBy: { issuedAt: "desc" },
       take: 20,
     }),
@@ -88,6 +90,12 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
       take: 6,
     }),
     prisma.expenseClaim.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" }, take: 15 }),
+    prisma.employeeRequest.findMany({
+      where: { employeeId: employee.id },
+      include: { letter: { select: { token: true, refNo: true, cancelledAt: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
   ]);
   const balances = computeLeaveBalances(employee, attendance, credits, leaveTypes).filter((item) => item.applies || item.remaining !== 0);
   const choices = portalLeaveChoices(leaveTypes, employee.jobTitleId, lang);
@@ -116,6 +124,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     { id: "payslips", label: t("الرواتب", "Payslips") },
     { id: "documents", label: t("المستندات", "Documents") },
     { id: "expenses", label: t("المصروفات", "Expenses") },
+    { id: "requests", label: t("الطلبات", "Requests") },
     letters.length ? { id: "letters", label: t("الخطابات", "Letters") } : null,
     reviews.length ? { id: "reviews", label: t("التقييم", "Reviews") } : null,
     { id: "badge", label: t("بطاقتي", "My ID card") },
@@ -489,6 +498,15 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           ) : null}
         </Card>
 
+        <Card id="requests" className="scroll-mt-16">
+          {sectionTitle(
+            Inbox,
+            t("الطلبات والخطابات", "Requests and letters"),
+            t("اطلب شهادة راتب أو تعريف أو تحويل راتب أو أي خطاب، أو سلفة، أو قدّم استقالتك. تعتمدها الإدارة إلكترونياً وتظهر النتيجة هنا.", "Ask for a salary, employment or salary-transfer letter or any other letter, an advance, or submit your resignation. Management approves electronically and the result shows here."),
+          )}
+          <PortalRequests token={token} requests={employeeRequests} currency={company.currency} lang={lang} t={t} />
+        </Card>
+
         {letters.length ? (
           <Card id="letters" className="scroll-mt-16">
             {sectionTitle(ScrollText, t("الخطابات", "Letters"))}
@@ -502,7 +520,13 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                         <span className="tabular">{letter.refNo}</span> · {formatDate(letter.issuedAt)}
                       </span>
                     </span>
-                    {letter.acknowledgedAt ? <ToneBadge tone="green">{t("تم التأكيد", "Confirmed")}</ToneBadge> : <ToneBadge tone="amber">{t("بانتظار تأكيدك", "Please confirm")}</ToneBadge>}
+                    {LETTER_KIND[letter.kind as LetterKind]?.document ? (
+                      <ToneBadge tone="teal">{t("موقّع إلكترونياً", "E-signed")}</ToneBadge>
+                    ) : letter.acknowledgedAt ? (
+                      <ToneBadge tone="green">{t("تم التأكيد", "Confirmed")}</ToneBadge>
+                    ) : (
+                      <ToneBadge tone="amber">{t("بانتظار تأكيدك", "Please confirm")}</ToneBadge>
+                    )}
                   </Link>
                 </li>
               ))}

@@ -45,8 +45,14 @@ model Company {
   workStart            String?
   /// Permission lists the admin set per role (src/lib/permissions.ts); a role that is missing uses the built-in preset.
   rolePermissions      Json?
+  /// Electronic signature on issued letters (src/lib/letter-seal.ts). Images are copied onto each letter when it is signed.
+  signatoryName        String?
+  signatoryTitle       String?
+  signatureUrl         String?
+  stampUrl             String?
   employees            Employee[]
   leaveRequests        LeaveRequest[]
+  employeeRequests     EmployeeRequest[]
   clockEntries         ClockEntry[]
   jobTitles            JobTitle[]
   departments          Department[]
@@ -228,6 +234,7 @@ model Employee {
   noteEntries        EmployeeNote[]
   letters            Letter[]
   leaveRequests      LeaveRequest[]
+  requests           EmployeeRequest[]
   clockEntries       ClockEntry[]
   hiredFrom          Candidate[]
   reviews            PerformanceReview[]
@@ -379,6 +386,43 @@ model LeaveRequest {
   attendanceGroupId String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId])
+}
+
+/// Something an employee asks for from the portal (src/lib/requests.ts): an official letter, a resignation, a salary advance or anything else.
+/// Approving a letter request issues the signed letter (letterId); approving an advance creates the pay item (payItemId).
+model EmployeeRequest {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// LETTER, RESIGNATION, ADVANCE or OTHER.
+  type          String
+  /// LETTER: the letter kind asked for (REQUEST_LETTER_KINDS).
+  letterKind    String?
+  subject       String?
+  details       String?
+  /// LETTER: who the letter is addressed to.
+  addressee     String?
+  /// RESIGNATION: the last working day the employee proposes.
+  lastDay       DateTime?
+  /// ADVANCE: amount and number of monthly instalments.
+  amount        Float?
+  installments  Int?
+  /// PENDING, APPROVED, REJECTED or CANCELLED (by the employee).
+  status        String    @default("PENDING")
+  decidedById   String?
+  decidedByName String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  letterId      String?   @unique
+  letter        Letter?   @relation(fields: [letterId], references: [id], onDelete: SetNull)
+  payItemId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([companyId, status])
   @@index([employeeId])
@@ -626,6 +670,8 @@ model EmployeeNote {
 
 /// Warning, notice or letter from management to an employee (src/lib/letters.ts).
 /// `token` opens the read-only copy at /letter/<token> that email and WhatsApp copies link to.
+/// `verifyToken` is the public check behind the QR code (/verify/<verifyToken>); it can't acknowledge the letter.
+/// `fingerprint` is a SHA-256 of the signed content (src/lib/letter-seal.ts), so any change after signing shows on the check page.
 model Letter {
   id             String           @id @default(cuid())
   companyId      String
@@ -647,6 +693,16 @@ model Letter {
   viewedAt       DateTime?
   acknowledgedAt DateTime?
   cancelledAt    DateTime?
+  /// Certificates: who the letter is addressed to (empty = to whom it may concern).
+  addressee      String?
+  addresseeEn    String?
+  verifyToken    String?          @unique
+  signedAt       DateTime?
+  signedByName   String?
+  fingerprint    String?
+  signatureUrl   String?
+  stampUrl       String?
+  request        EmployeeRequest?
   deliveries     LetterDelivery[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

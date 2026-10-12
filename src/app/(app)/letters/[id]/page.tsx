@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, Ban, Mail, MessageCircle, Printer, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Ban, Mail, MessageCircle, Printer, RotateCcw, ShieldCheck } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LetterSheet } from "@/components/letter-sheet";
 import { DeleteButton } from "@/components/row-forms";
@@ -13,6 +13,7 @@ import { channelReady, type Channel } from "@/lib/delivery";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { LETTER_KIND, letterMessage, letterState, letterUrl, type LetterKind } from "@/lib/letters";
+import { sealedLetter } from "@/lib/letter-seal";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
@@ -30,15 +31,17 @@ export default async function LetterPage({ params, searchParams }: { params: Pro
   const sp = await searchParams;
   const user = await requirePermission("letters.view");
   const { lang, t } = await getI18n();
-  const letter = await prisma.letter.findFirst({
+  const found = await prisma.letter.findFirst({
     where: { id, companyId: user.companyId },
-    include: { employee: { include: { employer: true } }, deliveries: { orderBy: { createdAt: "asc" } } },
+    include: { employee: { include: { employer: true } }, deliveries: { orderBy: { createdAt: "asc" } }, request: true },
   });
-  if (!letter) notFound();
+  if (!found) notFound();
+  const origin = await requestOrigin();
+  const { letter, seal } = await sealedLetter(found, origin, false);
   const allow = { edit: can(user, "letters.edit"), remove: can(user, "letters.delete") };
   const employee = letter.employee;
   const header = headerFor({ employerName: employee.employer?.name, employerNameEn: employee.employer?.nameEn, employer: employee.employer }, user.company);
-  const url = letterUrl(await requestOrigin(), letter.token);
+  const url = letterUrl(origin, letter.token);
   const kind = LETTER_KIND[letter.kind as LetterKind] || LETTER_KIND.GENERAL;
   const message = letterMessage({ kind: letter.kind, refNo: letter.refNo, issuedAt: letter.issuedAt, employeeName: employee.fullName, employeeNameEn: employee.nameEn, companyName: header.name, url });
   const status = letterState(letter);
@@ -56,7 +59,7 @@ export default async function LetterPage({ params, searchParams }: { params: Pro
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
-          <LetterSheet letter={letter} header={header} />
+          <LetterSheet letter={letter} header={header} seal={seal} />
         </div>
 
         <aside className="min-w-0 space-y-4">
@@ -113,6 +116,49 @@ export default async function LetterPage({ params, searchParams }: { params: Pro
                 </div>
               ) : null}
             </div>
+          </Card>
+
+          <Card>
+            <SectionTitle hint={t("يمسح أي طرف الرمز ليتأكد أن المستند أصلي ويحمّل نسخته الأصلية. إلغاء الخطاب يُظهره غير معتمد فوراً.", "Anyone can scan the code to confirm the document is authentic and download the original. Cancelling shows it as invalid right away.")}>
+              {t("التوقيع الإلكتروني والتحقق", "E-signature and verification")}
+            </SectionTitle>
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">{t("وقّعه", "Signed by")}</dt>
+                <dd className="text-end">{seal.signedByName || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">{t("وقت التوقيع", "Signed at")}</dt>
+                <dd className="tabular text-end">{formatDateTime(seal.signedAt)}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">{t("رمز التحقق", "Verification code")}</dt>
+                <dd className="font-mono text-xs font-bold tracking-wider text-slate-900" dir="ltr">
+                  {seal.code}
+                </dd>
+              </div>
+              {letter.request ? (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">{t("بناءً على طلب", "Requested by")}</dt>
+                  <dd className="text-end">
+                    {t("الموظف", "the employee")} · {formatDateTime(letter.request.createdAt)}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            <a href={seal.url} target="_blank" rel="noreferrer" className={`${secondaryBtn} mt-4 w-full`}>
+              <ShieldCheck size={16} />
+              {t("فتح صفحة التحقق", "Open the verification page")}
+            </a>
+            {user.company.signatureUrl || user.company.stampUrl || !can(user, "letters.create") ? null : (
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                {t("لإظهار صورة التوقيع والختم على الخطابات الجديدة أضفها من", "To print a signature and stamp image on new letters, add them in")}{" "}
+                <Link href="/settings#signature" className="font-bold text-teal-800 underline underline-offset-2">
+                  {t("الإعدادات", "Settings")}
+                </Link>
+                .
+              </p>
+            )}
           </Card>
 
           <Card>

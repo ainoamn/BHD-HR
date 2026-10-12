@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarCheck2, Check, FileCheck2, Inbox, Receipt, X } from "lucide-react";
+import { CalendarCheck2, Check, FileCheck2, Inbox, Receipt, ScrollText, X } from "lucide-react";
+import { EmployeeRequestCard } from "@/components/employee-request-card";
 import { ExpenseClaimCard } from "@/components/expense-claim";
+import { REQUEST_STATUS, decidableTypes, requestTitle } from "@/lib/requests";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, EmptyState, PageHeader, SectionTitle, ToneBadge, fieldClass, linkAction } from "@/components/ui";
@@ -26,10 +28,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     docs: can(user, "documents.view"),
     review: can(user, "documents.edit"),
     expenses: can(user, "expenses.view"),
+    requests: decidableTypes(user).length > 0,
   };
-  if (!allow.leave && !allow.docs && !allow.expenses) redirect(`/?error=${encodeURIComponent(t("ليست لديك صلاحية لهذه الصفحة", "You cannot open this page"))}`);
+  if (!allow.leave && !allow.docs && !allow.expenses && !allow.requests) redirect(`/?error=${encodeURIComponent(t("ليست لديك صلاحية لهذه الصفحة", "You cannot open this page"))}`);
   const claimAllow = { decide: can(user, "expenses.edit"), pay: false, salaryPay: false, remove: false };
-  const [pending, decided, documents, leaveTypes, claims] = await Promise.all([
+  const [pending, decided, documents, leaveTypes, claims, openRequests, decidedRequests] = await Promise.all([
     allow.leave
       ? prisma.leaveRequest.findMany({
           where: { companyId: user.companyId, status: "PENDING" },
@@ -61,6 +64,22 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
           take: 50,
         })
       : [],
+    allow.requests
+      ? prisma.employeeRequest.findMany({
+          where: { companyId: user.companyId, status: "PENDING" },
+          include: { employee: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true, joiningDate: true, bankAccount: true } } },
+          orderBy: { createdAt: "asc" },
+          take: 100,
+        })
+      : [],
+    allow.requests
+      ? prisma.employeeRequest.findMany({
+          where: { companyId: user.companyId, status: { in: ["APPROVED", "REJECTED"] } },
+          include: { employee: { select: { id: true, fullName: true, nameEn: true } }, letter: { select: { id: true, refNo: true } } },
+          orderBy: { decidedAt: "desc" },
+          take: 15,
+        })
+      : [],
   ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const labelOf = (choice: string) =>
@@ -72,11 +91,50 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         icon={Inbox}
         title={t("طلبات الموظفين", "Employee requests")}
         description={t(
-          "طلبات الإجازة والمستندات وتعويض المصروفات التي أرسلها الموظفون من بوابتهم. الموافقة على الإجازة تسجّلها في الحضور وتخصمها من الرصيد.",
-          "Leave requests, documents and expense claims employees sent from their portal. Approving leave records it in attendance and uses the balance.",
+          "كل ما أرسله الموظفون من بوابتهم: الخطابات والشهادات، الاستقالات، السلف، الإجازات، المستندات وتعويض المصروفات. الاعتماد إلكتروني، واعتماد الخطاب يصدره موقّعاً مع رمز تحقق.",
+          "Everything employees sent from their portal: letters and certificates, resignations, advances, leave, documents and expense claims. Approval is electronic, and approving a letter issues it signed with a verification code.",
         )}
       />
       <Flash error={sp.error} message={sp.message} />
+
+      {allow.requests ? (
+        <Card className="mb-5" id="requests">
+          <SectionTitle hint={t(`${openRequests.length} بانتظار القرار`, `${openRequests.length} awaiting a decision`)}>{t("الخطابات والاستقالات والطلبات الأخرى", "Letters, resignations and other requests")}</SectionTitle>
+          {openRequests.length === 0 ? (
+            <EmptyState icon={ScrollText} title={t("لا طلبات معلّقة", "No pending requests")} text={t("طلبات الخطابات والشهادات والسلف والاستقالات من بوابة الموظف تظهر هنا.", "Letter, certificate, advance and resignation requests from the employee portal appear here.")} />
+          ) : null}
+          <ul className="space-y-3">
+            {openRequests.map((request) => (
+              <EmployeeRequestCard key={request.id} request={request} user={user} lang={lang} t={t} currency={user.company.currency} />
+            ))}
+          </ul>
+          {decidedRequests.length ? (
+            <details className="group mt-5 border-t border-slate-100 pt-3">
+              <summary className="cursor-pointer list-none text-sm font-bold text-teal-800">{t("آخر القرارات", "Recent decisions")}</summary>
+              <ul className="mt-2 divide-y divide-slate-100 text-sm">
+                {decidedRequests.map((request) => (
+                  <li key={request.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span className="min-w-0">
+                      <span className="font-medium text-slate-900">{nameOf(request.employee)}</span>
+                      <span className="text-slate-500">
+                        {" "}
+                        · {pick(requestTitle(request), lang)}
+                        {request.decidedByName ? ` · ${request.decidedByName}` : ""}
+                      </span>
+                      {request.letter ? (
+                        <Link href={`/letters/${request.letter.id}`} className="tabular ms-2 font-semibold text-teal-800 hover:underline" dir="ltr">
+                          {request.letter.refNo}
+                        </Link>
+                      ) : null}
+                    </span>
+                    <ToneBadge tone={REQUEST_STATUS[request.status]?.tone || "slate"}>{pick(REQUEST_STATUS[request.status]?.label, lang, request.status)}</ToneBadge>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </Card>
+      ) : null}
 
       {allow.leave ? (
         <Card className="mb-5" id="leave">

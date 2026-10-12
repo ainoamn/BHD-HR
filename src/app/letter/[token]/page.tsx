@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CheckCircle2 } from "lucide-react";
+import { BadgeCheck, CheckCircle2 } from "lucide-react";
 import { LetterSheet } from "@/components/letter-sheet";
 import { PrintButton } from "@/components/print-button";
 import { headerFor } from "@/components/salary-docs";
 import { SubmitButton } from "@/components/submit-button";
 import { inlineLogo } from "@/lib/inline-logo";
 import { getI18n } from "@/lib/lang";
+import { LETTER_KIND, type LetterKind } from "@/lib/letters";
+import { sealedLetter } from "@/lib/letter-seal";
 import { prisma } from "@/lib/prisma";
+import { requestOrigin } from "@/lib/request-origin";
 import { formatDateTime } from "@/lib/utils";
 import { acknowledgeLetter } from "@/server/letter-actions";
 
@@ -19,9 +22,11 @@ export const metadata: Metadata = { robots: { index: false, follow: false }, ref
 export default async function EmployeeLetterPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const { t } = await getI18n();
-  const letter = token.length >= 20 ? await prisma.letter.findUnique({ where: { token }, include: { employee: { include: { employer: true } }, company: true } }) : null;
-  if (!letter) notFound();
-  if (!letter.viewedAt) await prisma.letter.update({ where: { id: letter.id }, data: { viewedAt: new Date() } });
+  const found = token.length >= 20 ? await prisma.letter.findUnique({ where: { token }, include: { employee: { include: { employer: true } }, company: true } }) : null;
+  if (!found) notFound();
+  if (!found.viewedAt) await prisma.letter.update({ where: { id: found.id }, data: { viewedAt: new Date() } });
+  const { letter, seal } = await sealedLetter(found, await requestOrigin(), true);
+  const document = Boolean(LETTER_KIND[letter.kind as LetterKind]?.document);
   const employer = letter.employee.employer;
   const header = headerFor({ employerName: employer?.name, employerNameEn: employer?.nameEn, employer }, letter.company);
   header.logoUrl = await inlineLogo(header.logoUrl, letter.companyId);
@@ -33,6 +38,11 @@ export default async function EmployeeLetterPage({ params }: { params: Promise<{
         <div className="no-print mb-4 flex flex-col gap-3 rounded-2xl bg-surface p-4 shadow-card ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
           {letter.cancelledAt ? (
             <p className="font-semibold text-red-700">{t("ألغت الإدارة هذا الخطاب.", "Management has cancelled this letter.")}</p>
+          ) : document ? (
+            <p className="flex items-start gap-2 text-sm font-semibold text-emerald-700">
+              <BadgeCheck size={18} className="mt-0.5 shrink-0" />
+              {t("مستند موقّع إلكترونياً. احفظه PDF أو اطبعه، ويمكن لأي جهة التحقق منه بمسح الرمز.", "E-signed document. Save it as PDF or print it; anyone can verify it by scanning the code.")}
+            </p>
           ) : letter.acknowledgedAt ? (
             <p className="flex items-center gap-2 font-semibold text-emerald-700">
               <CheckCircle2 size={18} />
@@ -50,7 +60,7 @@ export default async function EmployeeLetterPage({ params }: { params: Promise<{
           )}
           <PrintButton label={t("طباعة / حفظ PDF", "Print / Save PDF")} />
         </div>
-        <LetterSheet letter={letter} header={header} />
+        <LetterSheet letter={letter} header={header} seal={seal} />
       </div>
     </div>
   );

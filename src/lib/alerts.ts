@@ -11,6 +11,7 @@ import { type Lang, makeT, pick } from "./i18n";
 import { getI18n } from "./lang";
 import { attendanceLabel, computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "./leave";
 import { prisma } from "./prisma";
+import { REQUEST_TYPE, decidableTypes, type RequestType } from "./requests";
 import { TASK_ALERT_DAYS } from "./tasks";
 import { daysLabel, daysPhrase, formatDate, money, monthRange } from "./utils";
 
@@ -52,7 +53,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
   const thisMonth = now.getMonth() + 1;
   const { start, end } = monthRange(thisYear, thisMonth);
   const taskHorizon = new Date(Date.UTC(thisYear, now.getMonth(), now.getDate() + TASK_ALERT_DAYS + 1));
-  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles] = await Promise.all([
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles, employeeRequests] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
@@ -119,6 +120,14 @@ export async function computeAlerts(company: Company, permissions: readonly stri
       ? prisma.reviewCycle.findMany({
           where: { companyId: company.id, status: "OPEN", dueDate: { not: null, lt: new Date(now.getTime() + (limits.urgent + 1) * 86_400_000) } },
           select: { id: true, name: true, dueDate: true, _count: { select: { reviews: { where: { status: { not: "DONE" } } } } } },
+        })
+      : [],
+    decidableTypes(user).length
+      ? prisma.employeeRequest.findMany({
+          where: { companyId: company.id, status: "PENDING", type: { in: decidableTypes(user) } },
+          select: { id: true, type: true, lastDay: true, employee: { select: { fullName: true, nameEn: true } } },
+          orderBy: { createdAt: "asc" },
+          take: 50,
         })
       : [],
   ]);
@@ -259,6 +268,37 @@ export async function computeAlerts(company: Company, permissions: readonly stri
       days: Math.min(starts, 0) - 50,
     });
   }
+  const requestGroups = new Map<string, string[]>();
+  for (const request of employeeRequests) {
+    if (request.type === "RESIGNATION") {
+      alerts.push({
+        id: `emp-requests-RESIGNATION-${request.id}`,
+        severity: "danger",
+        title: t("استقالة بانتظار القرار", "Resignation awaiting a decision"),
+        message: `${nameOf(request.employee)} — ${t("آخر يوم مقترح", "proposed last day")} ${formatDate(request.lastDay)}`,
+        href: "/approvals#requests",
+        days: -45,
+      });
+      continue;
+    }
+    requestGroups.set(request.type, [...(requestGroups.get(request.type) || []), nameOf(request.employee)]);
+  }
+  for (const [type, names] of requestGroups) {
+    alerts.push({
+      id: `emp-requests-${type}`,
+      severity: "warning",
+      title:
+        type === "LETTER"
+          ? t("طلبات خطابات وشهادات بانتظار الاعتماد", "Letter requests awaiting approval")
+          : type === "ADVANCE"
+            ? t("طلبات سلف بانتظار الاعتماد", "Advance requests awaiting approval")
+            : t("طلبات موظفين بانتظار الاعتماد", "Employee requests awaiting approval"),
+      message: `${names.length} — ${names.length > 3 ? `${names.slice(0, 3).join("، ")} +${names.length - 3}` : names.join(lang === "en" ? ", " : "، ")}`,
+      href: "/approvals#requests",
+      days: -42,
+    });
+  }
+
   if (portalDocs) {
     alerts.push({
       id: "review-documents",
@@ -377,6 +417,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
 }
 
 function alertPermission(id: string): Permission {
+  if (id.startsWith("emp-requests-")) return REQUEST_TYPE[id.split("-")[2] as RequestType]?.perm || "employees.edit";
   if (id.endsWith("-contract") || id.startsWith("birthday-")) return "employees.view";
   if (id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
   if (id.startsWith("leave-") || id.startsWith("att-") || id.startsWith("request-")) return "attendance.view";
