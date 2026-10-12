@@ -673,6 +673,25 @@ textarea:focus-visible {
   .footer-links { justify-content: center; }
 }
 
+.app-shell[data-banner] {
+  --banner-height: 2.25rem;
+}
+
+/* Calendar fits one screen: viewport minus top bar, page padding and (on phones) the bottom bar. */
+@layer components {
+  .screen-fit {
+    height: calc(100dvh - var(--banner-height, 0px) - 4rem - 1.5rem - var(--bottom-nav-height) - env(safe-area-inset-bottom) - 1rem);
+    min-height: 27rem;
+  }
+
+  @media (min-width: 1024px) {
+    .screen-fit {
+      height: calc(100dvh - var(--banner-height, 0px) - 4rem - 2rem - 1.5rem);
+      min-height: 32rem;
+    }
+  }
+}
+
 @media print {
   .app-shell {
     display: block !important;

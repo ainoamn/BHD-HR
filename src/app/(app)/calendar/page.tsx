@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BellPlus, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, Field, PageHeader, SectionTitle, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { Card, Field, SectionTitle, ToneBadge, fieldClass, primaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { EVENT_KINDS, type EventKind, REMINDER_REPEAT, getCalendarEvents, lastDayOf } from "@/lib/calendar";
 import { monthName } from "@/lib/constants";
@@ -14,8 +14,12 @@ import { cn, readPeriod, todayInputValue } from "@/lib/utils";
 import { createReminder, deleteReminder, toggleReminder } from "@/server/reminder-actions";
 
 const WEEKDAYS_AR = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const WEEKDAYS_AR_SHORT = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_EN_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_PREVIEW = 3;
+const monthBtn =
+  "flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-card transition duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.96] sm:size-10";
 
 export default async function CalendarPage({
   searchParams,
@@ -85,86 +89,96 @@ export default async function CalendarPage({
   const openForm = sp.new === "1" || Boolean(sp.error);
   const urgentCount = events.filter((event) => event.urgent && !event.done).length;
   const weekdays = lang === "en" ? WEEKDAYS_EN : WEEKDAYS_AR;
+  const weekdaysShort = lang === "en" ? WEEKDAYS_EN_SHORT : WEEKDAYS_AR_SHORT;
   const employeeName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        icon={CalendarClock}
-        title={t("التقويم", "Calendar")}
-        description={t(
-          "استحقاق الرواتب، وانتهاء البطاقات والجوازات والإقامات والعقود، وأعياد الميلاد، والإجازات، وتذكيراتك — في مكان واحد.",
-          "Pay days, ID/passport/residence/contract expiries, birthdays, leave and your own reminders — all in one place.",
-        )}
-      >
-        <Link href={`${link({ extra: { new: "1" } })}#reminder`} className={primaryBtn}>
-          <BellPlus size={16} />
-          {t("تذكير جديد", "New reminder")}
-        </Link>
-      </PageHeader>
-
-      <Flash error={sp.error} message={sp.message} />
-
-      <Card className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Link href={link(prev)} className={cn(secondaryBtn, "size-10 px-0")} aria-label={t("الشهر السابق", "Previous month")}>
-              {lang === "en" ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-            </Link>
-            <h2 className="tabular whitespace-nowrap text-center text-lg font-bold text-slate-900 sm:min-w-40 sm:text-xl">
-              {monthName(month, lang)} {year}
-            </h2>
-            <Link href={link(next)} className={cn(secondaryBtn, "size-10 px-0")} aria-label={t("الشهر التالي", "Next month")}>
-              {lang === "en" ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            </Link>
-            {!isCurrentMonth ? (
-              <Link
-                href={link({ year: now.getFullYear(), month: now.getMonth() + 1 })}
-                className="ms-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-teal-700 ring-1 ring-inset ring-teal-200 transition hover:bg-teal-50"
-              >
-                {t("اليوم", "Today")}
-              </Link>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <ToneBadge tone="slate">{t(`${events.length} حدث`, `${events.length} event(s)`)}</ToneBadge>
-            {urgentCount ? <ToneBadge tone="red">{t(`${urgentCount} عاجل`, `${urgentCount} urgent`)}</ToneBadge> : null}
-          </div>
-        </div>
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:px-0">
-          {EVENT_KINDS.map((kind) => {
-            const active = shown.has(kind.id);
-            const count = allEvents.filter((event) => event.kind === kind.id).length;
-            return (
-              <Link
-                key={kind.id}
-                href={toggleKind(kind.id)}
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition",
-                  active ? kind.chip : "bg-white text-slate-400 ring-slate-200 line-through",
+    <div className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="screen-fit flex min-w-0 flex-col gap-3">
+        <div className="flex animate-fade-up items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="hidden size-11 shrink-0 items-center justify-center rounded-2xl bg-white text-teal-700 shadow-card ring-1 ring-slate-200 sm:flex">
+              <CalendarClock size={21} strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{t("التقويم", "Calendar")}</h1>
+              <p className="hidden truncate text-sm text-slate-500 md:block">
+                {t(
+                  "الرواتب، وانتهاء الوثائق والعقود، وأعياد الميلاد، والإجازات، وتذكيراتك — في مكان واحد.",
+                  "Pay days, document and contract expiries, birthdays, leave and your reminders — in one place.",
                 )}
-              >
-                <span className={cn("h-2 w-2 rounded-full", active ? kind.dot : "bg-slate-300")} />
-                {pick(kind.label, lang)}
-                <span className="opacity-70">{count}</span>
-              </Link>
-            );
-          })}
+              </p>
+            </div>
+          </div>
+          {allow.create ? (
+            <Link href={`${link({ extra: { new: "1" } })}#reminder`} className={cn(primaryBtn, "shrink-0")}>
+              <BellPlus size={16} />
+              <span className="sm:hidden">{t("تذكير", "Reminder")}</span>
+              <span className="hidden sm:inline">{t("تذكير جديد", "New reminder")}</span>
+            </Link>
+          ) : null}
         </div>
-      </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="p-2 sm:p-4">
-          <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500 sm:gap-1.5 sm:text-xs">
+        <Flash error={sp.error} message={sp.message} />
+
+        <Card className="flex min-h-0 flex-1 flex-col gap-2.5 p-2 sm:gap-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-1 pt-1 sm:p-0">
+            <div className="flex items-center gap-1.5">
+              <Link href={link(prev)} className={monthBtn} aria-label={t("الشهر السابق", "Previous month")}>
+                {lang === "en" ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+              </Link>
+              <h2 className="tabular min-w-32 whitespace-nowrap text-center text-base font-bold text-slate-900 sm:min-w-40 sm:text-xl">
+                {monthName(month, lang)} {year}
+              </h2>
+              <Link href={link(next)} className={monthBtn} aria-label={t("الشهر التالي", "Next month")}>
+                {lang === "en" ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </Link>
+              {!isCurrentMonth ? (
+                <Link
+                  href={link({ year: now.getFullYear(), month: now.getMonth() + 1 })}
+                  className="ms-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-teal-700 ring-1 ring-inset ring-teal-200 transition hover:bg-teal-50"
+                >
+                  {t("اليوم", "Today")}
+                </Link>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1.5 text-sm">
+              <ToneBadge tone="slate">{t(`${events.length} حدث`, `${events.length} event(s)`)}</ToneBadge>
+              {urgentCount ? <ToneBadge tone="red">{t(`${urgentCount} عاجل`, `${urgentCount} urgent`)}</ToneBadge> : null}
+            </div>
+          </div>
+          <div className="-mx-2 flex shrink-0 gap-1.5 overflow-x-auto px-2 pb-0.5 sm:mx-0 sm:flex-wrap sm:px-0">
+            {EVENT_KINDS.map((kind) => {
+              const active = shown.has(kind.id);
+              const count = allEvents.filter((event) => event.kind === kind.id).length;
+              return (
+                <Link
+                  key={kind.id}
+                  href={toggleKind(kind.id)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition sm:px-3",
+                    active ? kind.chip : "bg-white text-slate-400 ring-slate-200 line-through",
+                  )}
+                >
+                  <span className={cn("h-2 w-2 rounded-full", active ? kind.dot : "bg-slate-300")} />
+                  {pick(kind.label, lang)}
+                  <span className="opacity-70">{count}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="grid shrink-0 grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500 sm:gap-1.5 sm:text-xs">
             {weekdays.map((name, index) => (
-              <div key={name} className={cn("truncate py-1.5", index >= 5 && "text-slate-400")}>
-                {name}
+              <div key={name} className={cn("truncate py-0.5", index >= 5 && "text-slate-400")}>
+                <span className="sm:hidden">{weekdaysShort[index]}</span>
+                <span className="hidden sm:inline">{name}</span>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+          <div className="grid min-h-0 flex-1 grid-cols-7 gap-1 sm:gap-1.5" style={{ gridTemplateRows: `repeat(${cells.length / 7}, minmax(0, 1fr))` }}>
             {cells.map((day, index) => {
-              if (!day) return <div key={`blank-${index}`} className="min-h-14 rounded-xl bg-slate-50/60 sm:min-h-24" />;
+              if (!day) return <div key={`blank-${index}`} className="min-h-0 rounded-xl bg-slate-50/60" />;
               const list = byDay.get(day) || [];
               const weekend = index % 7 >= 5;
               const hasUrgent = list.some((event) => event.urgent && !event.done);
@@ -172,26 +186,27 @@ export default async function CalendarPage({
                 <a
                   key={day}
                   href={list.length ? `#day-${day}` : `${link({ extra: { new: "1", date: `${year}-${pad(month)}-${pad(day)}` } })}#reminder`}
+                  title={list.length ? list.map((event) => event.title).join("\n") : undefined}
                   className={cn(
-                    "group flex min-h-14 min-w-0 flex-col rounded-xl border p-1 text-start transition duration-150 hover:border-teal-300 hover:shadow-card sm:min-h-24 sm:p-1.5",
+                    "group flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border p-1 text-start transition duration-150 hover:border-teal-300 hover:shadow-card sm:p-1.5",
                     weekend ? "bg-sand-50" : "bg-white",
                     day === todayDay ? "border-teal-600 ring-2 ring-teal-100" : hasUrgent ? "border-red-200" : "border-slate-200/70",
                   )}
                 >
                   <span
                     className={cn(
-                      "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
+                      "inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
                       day === todayDay ? "bg-teal-700 text-white" : hasUrgent ? "bg-red-100 text-red-700" : "text-slate-700",
                     )}
                   >
                     {day}
                   </span>
-                  <span className="mt-auto flex flex-wrap gap-0.5 pt-1 sm:hidden">
+                  <span className="mt-auto flex flex-wrap gap-0.5 pt-0.5 sm:hidden">
                     {list.slice(0, 4).map((event) => (
                       <span key={event.id} className={cn("h-1.5 w-1.5 rounded-full", event.urgent && !event.done ? "bg-red-500" : kindMeta(event.kind).dot)} />
                     ))}
                   </span>
-                  <span className="mt-1 hidden min-w-0 space-y-0.5 sm:block">
+                  <span className="mt-1 hidden min-h-0 min-w-0 space-y-0.5 overflow-hidden sm:block">
                     {list.slice(0, DAY_PREVIEW).map((event) => (
                       <span
                         key={event.id}
@@ -200,7 +215,6 @@ export default async function CalendarPage({
                           event.urgent && !event.done ? "bg-red-50 text-red-700 ring-red-200" : kindMeta(event.kind).chip,
                           event.done && "line-through opacity-60",
                         )}
-                        title={`${event.title}${event.detail ? ` — ${event.detail}` : ""}`}
                       >
                         {event.title}
                       </span>
@@ -216,54 +230,56 @@ export default async function CalendarPage({
             })}
           </div>
         </Card>
+      </div>
 
-        <div className="space-y-4">
+      <div className="min-w-0 xl:relative">
+        <div className="thin-scroll space-y-4 xl:absolute xl:inset-0 xl:overflow-y-auto xl:overscroll-contain xl:pb-1">
           {allow.create ? (
-          <details id="reminder" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
-            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70">
-              <span className="flex items-center gap-3 font-bold text-slate-900">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-gold-50 text-gold-600 ring-1 ring-inset ring-gold-100">
-                  <BellPlus size={18} />
+            <details id="reminder" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70">
+                <span className="flex items-center gap-3 font-bold text-slate-900">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-gold-50 text-gold-600 ring-1 ring-inset ring-gold-100">
+                    <BellPlus size={18} />
+                  </span>
+                  {t("إضافة تذكير", "Add reminder")}
                 </span>
-                {t("إضافة تذكير", "Add reminder")}
-              </span>
-              <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
-            </summary>
-            <form action={createReminder} className="space-y-3 border-t border-slate-100 px-4 py-4">
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <Field label={t("العنوان *", "Title *")}>
-                <input className={`${fieldClass} w-full`} name="title" required placeholder={t("مثال: تجديد عقد الإيجار", "e.g. Renew the lease")} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={t("التاريخ *", "Date *")}>
-                  <input className={`${fieldClass} w-full`} type="date" name="date" defaultValue={defaultDate} required />
+                <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
+              </summary>
+              <form action={createReminder} className="space-y-3 border-t border-slate-100 px-4 py-4">
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <Field label={t("العنوان *", "Title *")}>
+                  <input className={`${fieldClass} w-full`} name="title" required placeholder={t("مثال: تجديد عقد الإيجار", "e.g. Renew the lease")} />
                 </Field>
-                <Field label={t("التكرار", "Repeat")}>
-                  <select className={`${fieldClass} w-full`} name="repeat" defaultValue="NONE">
-                    {Object.entries(REMINDER_REPEAT).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {pick(label, lang)}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={t("التاريخ *", "Date *")}>
+                    <input className={`${fieldClass} w-full`} type="date" name="date" defaultValue={defaultDate} required />
+                  </Field>
+                  <Field label={t("التكرار", "Repeat")}>
+                    <select className={`${fieldClass} w-full`} name="repeat" defaultValue="NONE">
+                      {Object.entries(REMINDER_REPEAT).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {pick(label, lang)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                <Field label={t("مرتبط بموظف (اختياري)", "Linked employee (optional)")}>
+                  <select className={`${fieldClass} w-full`} name="employeeId" defaultValue="">
+                    <option value="">{t("بدون", "None")}</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employeeName(employee)}
                       </option>
                     ))}
                   </select>
                 </Field>
-              </div>
-              <Field label={t("مرتبط بموظف (اختياري)", "Linked employee (optional)")}>
-                <select className={`${fieldClass} w-full`} name="employeeId" defaultValue="">
-                  <option value="">{t("بدون", "None")}</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employeeName(employee)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t("ملاحظات", "Notes")}>
-                <textarea className={`${fieldClass} w-full`} name="notes" rows={2} />
-              </Field>
-              <SubmitButton className="w-full">{t("حفظ التذكير", "Save reminder")}</SubmitButton>
-            </form>
-          </details>
+                <Field label={t("ملاحظات", "Notes")}>
+                  <textarea className={`${fieldClass} w-full`} name="notes" rows={2} />
+                </Field>
+                <SubmitButton className="w-full">{t("حفظ التذكير", "Save reminder")}</SubmitButton>
+              </form>
+            </details>
           ) : null}
 
           <Card>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Banknote,
@@ -127,6 +127,21 @@ export function AppFrame({
     setOpen(false);
   }, [pathname]);
 
+  const hasBanner = Boolean(banner);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const shell = shellRef.current;
+    const element = bannerRef.current;
+    if (!shell || !element) return;
+    const observer = new ResizeObserver(() => shell.style.setProperty("--banner-height", `${element.offsetHeight}px`));
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      shell.style.removeProperty("--banner-height");
+    };
+  }, [hasBanner]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -143,8 +158,10 @@ export function AppFrame({
 
   return (
     <div
+      ref={shellRef}
       className="app-shell min-h-dvh transition-[padding] duration-200 ease-out motion-reduce:transition-none lg:ps-[var(--sidebar-width)]"
       data-sidebar={collapsed ? "collapsed" : "expanded"}
+      data-banner={hasBanner ? "" : undefined}
     >
       <NavSpeed sections={flat.map((item) => item.href)} />
       <aside
@@ -190,7 +207,7 @@ export function AppFrame({
       </aside>
 
       <div className="flex min-h-dvh min-w-0 flex-col">
-        {banner}
+        {banner ? <div ref={bannerRef}>{banner}</div> : null}
         <header className="app-header no-print sticky top-0 z-30 border-b border-slate-200/70 bg-sand-50/85 backdrop-blur-md supports-[backdrop-filter]:bg-sand-50/70">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-10">
             <button
