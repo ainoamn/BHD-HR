@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
+import { EmployeeAvatar } from "@/components/employee-avatar";
 import { DeleteButton } from "@/components/row-forms";
 import { EmptyState, PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
@@ -192,9 +193,7 @@ export default async function EmployeesPage({
                   <tr key={employee.id}>
                     <td className="cell-title px-4 py-3">
                       <Link href={`/employees/${employee.id}`} className="group flex min-w-0 items-center gap-3">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-sm font-bold text-teal-800 ring-1 ring-inset ring-teal-100">
-                          {name.trim().slice(0, 1)}
-                        </span>
+                        <EmployeeAvatar name={name} photo={employee.photoUrl} className="size-10 rounded-full bg-teal-50 text-sm text-teal-800 ring-1 ring-inset ring-teal-100" />
                         <span className="min-w-0">
                           <span className="block truncate font-semibold text-slate-900 group-hover:text-teal-700">{name}</span>
                           <span className="block truncate text-xs text-slate-500">

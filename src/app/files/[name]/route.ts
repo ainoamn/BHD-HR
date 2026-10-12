@@ -17,16 +17,17 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
   const team = isTeamRole(user.role);
   const scope = team ? await teamScope(user) : null;
   const inScope = scope ? { id: { in: scope } } : {};
-  const [isDocument, isIdentityCopy, isCv, isReceipt] = await Promise.all([
+  const [isDocument, isIdentityCopy, isCv, isReceipt, isTeamPhoto] = await Promise.all([
     prisma.employeeDocument.count({ where: { fileUrl: url, employee: { companyId: user.companyId, ...inScope } } }),
     prisma.employee.count({
       where: { companyId: user.companyId, ...inScope, OR: [{ idFileUrl: url }, { passportFileUrl: url }, { residenceFileUrl: url }] },
     }),
     team ? 0 : prisma.candidate.count({ where: { companyId: user.companyId, cvUrl: url } }),
     prisma.expenseClaim.count({ where: { companyId: user.companyId, receiptUrl: url, ...(scope ? { employeeId: { in: scope } } : {}) } }),
+    team ? prisma.employee.count({ where: { companyId: user.companyId, ...inScope, photoUrl: url } }) : 0,
   ]);
   const allowed = team
-    ? (isDocument + isIdentityCopy > 0 && canTeam(user, "team.documents.view")) || (isReceipt > 0 && canTeam(user, "team.expenses.approve"))
+    ? isTeamPhoto > 0 || (isDocument + isIdentityCopy > 0 && canTeam(user, "team.documents.view")) || (isReceipt > 0 && canTeam(user, "team.expenses.approve"))
     : (!(isDocument || isIdentityCopy) || can(user, "documents.view")) &&
       (!isCv || can(user, "recruitment.view") || (isDocument > 0 && can(user, "documents.view"))) &&
       (!isReceipt || can(user, "expenses.view"));

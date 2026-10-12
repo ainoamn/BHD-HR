@@ -5,6 +5,7 @@ import { openAndSend, sendSummary } from "@/lib/accounts";
 import { aiScreenCandidate, isRateLimited } from "@/lib/ai";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
+import { newBadgeToken } from "@/lib/badge";
 import { nextEmployeeNumber } from "@/lib/employee-number";
 import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
@@ -353,6 +354,7 @@ export async function hireCandidate(formData: FormData) {
       data: {
         companyId: user.companyId,
         employeeNumber,
+        badgeToken: newBadgeToken(),
         fullName: candidate!.fullName,
         email: candidate!.email,
         phone: candidate!.phone,

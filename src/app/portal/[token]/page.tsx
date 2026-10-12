@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, Clock3, FileUp, Files, KeyRound, LayoutDashboard, LogOut, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { CalendarCheck2, Clock3, FileUp, Files, IdCard, KeyRound, LayoutDashboard, LogOut, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
 import { getSessionUser, isStaffRole } from "@/lib/auth";
 import { isTeamRole } from "@/lib/permissions";
 import { logout } from "@/server/auth-actions";
@@ -17,6 +17,7 @@ import { DOC_LABEL, EXTRA_DOC_TYPES, monthName, termText } from "@/lib/constants
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, EXPENSE_PAY_LABEL, EXPENSE_STATUS_LABEL, EXPENSE_STATUS_TONE } from "@/lib/expenses";
 import { describeExpiry } from "@/lib/expiry";
 import { getLeaveTypes } from "@/lib/hr-catalog";
+import { badgeUrl, ensureBadgeToken, qrSvg } from "@/lib/badge";
 import { pick } from "@/lib/i18n";
 import { inlineLogo } from "@/lib/inline-logo";
 import { getI18n } from "@/lib/lang";
@@ -24,6 +25,7 @@ import { attendanceLabel, computeLeaveBalances, leaveName } from "@/lib/leave";
 import { SCORE_LABEL, criterionName, overallBand, overallTone, parseCriteria, parseScores } from "@/lib/performance";
 import { LEAVE_REQUEST_LABEL, LEAVE_REQUEST_TONE, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
+import { requestOrigin } from "@/lib/request-origin";
 import { THEME_COOKIE, daysLabel, formatDate, money, normalizeTheme, todayInputValue } from "@/lib/utils";
 import { cancelExpense, cancelLeaveRequest, requestLeave, submitExpense, submitPortalDocument } from "@/server/portal-actions";
 
@@ -90,7 +92,13 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const balances = computeLeaveBalances(employee, attendance, credits, leaveTypes).filter((item) => item.applies || item.remaining !== 0);
   const choices = portalLeaveChoices(leaveTypes, employee.jobTitleId, lang);
   const header = headerFor({ employerName: employee.employer?.name, employerNameEn: employee.employer?.nameEn, employer: employee.employer }, company);
-  const logo = await inlineLogo(header.logoUrl, company.id);
+  const [logo, photo, badgeToken, origin] = await Promise.all([
+    inlineLogo(header.logoUrl, company.id),
+    inlineLogo(employee.photoUrl, company.id),
+    ensureBadgeToken(employee),
+    requestOrigin(),
+  ]);
+  const badgeSvg = await qrSvg(badgeUrl(origin, badgeToken));
   const issuer = lang === "en" && header.nameEn ? header.nameEn : header.name;
   const name = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
   const job = termText(employee.jobTitle, employee.jobTitleEn, lang);
@@ -110,6 +118,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     { id: "expenses", label: t("المصروفات", "Expenses") },
     letters.length ? { id: "letters", label: t("الخطابات", "Letters") } : null,
     reviews.length ? { id: "reviews", label: t("التقييم", "Reviews") } : null,
+    { id: "badge", label: t("بطاقتي", "My ID card") },
   ].filter((item): item is { id: string; label: string } => Boolean(item));
   const sectionTitle = (Icon: typeof Clock3, title: string, hint?: string) => (
     <div className="mb-4 flex items-start gap-3">
@@ -129,7 +138,11 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
         <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
         <div className="relative mx-auto flex max-w-3xl items-start justify-between gap-3 px-4 pb-6 pt-5">
           <div className="flex min-w-0 items-center gap-3">
-            {logo ? <img src={logo} alt="" className="size-12 shrink-0 rounded-xl bg-white object-contain p-1" /> : null}
+            {photo ? (
+              <img src={photo} alt="" className="size-14 shrink-0 rounded-2xl object-cover ring-2 ring-white/30" />
+            ) : logo ? (
+              <img src={logo} alt="" className="size-12 shrink-0 rounded-xl bg-white object-contain p-1" />
+            ) : null}
             <div className="min-w-0">
               <p className="truncate text-xs text-white/70">{issuer}</p>
               <h1 className="break-words text-xl font-bold leading-tight">{name}</h1>
@@ -546,6 +559,25 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             </div>
           </Card>
         ) : null}
+
+        <Card id="badge" className="scroll-mt-16">
+          {sectionTitle(
+            IdCard,
+            t("بطاقتي", "My ID card"),
+            t("اعرض هذا الرمز عند الطلب. مسحه يُظهر اسمك ووظيفتك وجهة عملك وصورتك فقط.", "Show this code when asked. Scanning it shows only your name, job, workplace and photo."),
+          )}
+          <div className="flex flex-col items-center gap-4 sm:flex-row">
+            <div className="size-44 shrink-0 rounded-2xl bg-white p-2 ring-1 ring-slate-200 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: badgeSvg }} />
+            <div className="min-w-0 text-center sm:text-start">
+              <p className="font-bold text-slate-900">{name}</p>
+              <p className="mt-0.5 text-sm text-slate-500">
+                <span className="tabular">{employee.employeeNumber}</span>
+                {job ? ` · ${job}` : ""}
+              </p>
+              <p className="mt-0.5 text-sm text-slate-500">{issuer}</p>
+            </div>
+          </div>
+        </Card>
 
         <p className="px-2 pb-6 text-center text-xs leading-5 text-slate-500">
           {t("هذا الرابط خاص بك. لا تشاركه مع أحد.", "This link is personal. Do not share it.")}

@@ -184,6 +184,10 @@ model Employee {
   reports            Employee[]          @relation("ReportsTo")
   /// Key of the employee's personal portal link /portal/<token>; null = no portal.
   portalToken        String?             @unique
+  /// Profile photo (/files/<name>, a square JPEG resized in the browser).
+  photoUrl           String?
+  /// Key of the public badge page /id/<token> behind the employee's QR code; separate from the portal key.
+  badgeToken         String?             @unique
   /// Names copied from the chosen JobTitle / Department so lists and prints need no join.
   jobTitle           String?
   jobTitleEn         String?

@@ -14,7 +14,8 @@ import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { packageGross } from "@/lib/salary";
-import { removeUpload, saveUpload } from "@/lib/uploads";
+import { newBadgeToken } from "@/lib/badge";
+import { mimeFor, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
 import { clip, money, req, str } from "@/lib/utils";
 
@@ -34,21 +35,29 @@ function jobFields(formData: FormData, catalog: Catalog) {
   };
 }
 
-const DOC_FILES = ["id", "passport", "residence"] as const;
-type DocFileField = `${(typeof DOC_FILES)[number]}FileUrl`;
+const DOC_FILES = [
+  { input: "idFile", field: "idFileUrl", image: false },
+  { input: "passportFile", field: "passportFileUrl", image: false },
+  { input: "residenceFile", field: "residenceFileUrl", image: false },
+  { input: "photo", field: "photoUrl", image: true },
+] as const;
+type DocFileField = (typeof DOC_FILES)[number]["field"];
 
-/** Saves new ID / passport / residence copies; returns the new URLs and the replaced or removed ones to delete after saving. */
+/** Saves new ID / passport / residence copies and the photo; returns the new URLs and the replaced or removed ones to delete after saving. */
 async function readDocFiles(formData: FormData, current: Partial<Record<DocFileField, string | null>>, companyId: string, errorPath: string) {
   const { lang, t } = await getI18n();
   const data = {} as Record<DocFileField, string | null>;
   const replaced: string[] = [];
   const uploaded: string[] = [];
-  for (const doc of DOC_FILES) {
-    const field: DocFileField = `${doc}FileUrl`;
+  for (const { input, field, image } of DOC_FILES) {
     const old = current[field] ?? null;
-    let next = req(formData, `${doc}FileRemove`) === "1" ? null : old;
-    const file = formData.get(`${doc}File`);
+    let next = req(formData, `${input}Remove`) === "1" ? null : old;
+    const file = formData.get(input);
     if (file instanceof File && file.size > 0) {
+      if (image && !mimeFor(file.name).startsWith("image/")) {
+        for (const url of uploaded) await removeUpload(url);
+        go(errorPath, { error: t("الصورة الشخصية يجب أن تكون JPG أو PNG أو WebP", "The photo must be JPG, PNG or WebP") });
+      }
       try {
         next = await saveUpload(file, companyId, lang);
         if (next) uploaded.push(next);
@@ -150,6 +159,7 @@ export async function createEmployee(formData: FormData) {
         managerId,
         terminatedAt: input.status === "TERMINATED" ? new Date() : null,
         employeeNumber,
+        badgeToken: newBadgeToken(),
         companyId: user.companyId,
       },
     });
@@ -249,6 +259,19 @@ export async function updateEmployee(formData: FormData) {
   go(`/employees/${id}`, { message: t("تم حفظ البيانات", "Saved") });
 }
 
+/** Retires the QR code on the employee's current card (lost or stolen); the old code then opens "not valid". */
+export async function renewBadgeToken(formData: FormData) {
+  const user = await requirePermission("employees.edit", "/employees");
+  const { t } = await getI18n();
+  const id = req(formData, "id");
+  const employee = await prisma.employee.findFirst({ where: { id, companyId: user.companyId }, select: { id: true, fullName: true } });
+  if (!employee) go("/employees", { error: t("الموظف غير موجود", "Employee not found") });
+  await prisma.employee.update({ where: { id }, data: { badgeToken: newBadgeToken() } });
+  await writeAudit({ userId: user.id, employeeId: id, action: "BADGE_RENEW", message: t(`أصدر رمز بطاقة جديداً للموظف ${employee!.fullName}`, `Issued a new ID card code for ${employee!.fullName}`) });
+  refreshAll();
+  go(`/employees/${id}#badge`, { message: t("صدر رمز جديد. اطبع البطاقة من جديد؛ البطاقة القديمة لم تعد صالحة.", "New code issued. Print the card again; the old card no longer works.") });
+}
+
 /** Paid salaries are financial records, so an employee who has any is ended (status) instead of deleted. */
 export async function deleteEmployee(formData: FormData) {
   const user = await requirePermission("employees.delete", "/employees");
@@ -272,7 +295,7 @@ export async function deleteEmployee(formData: FormData) {
     prisma.employee.delete({ where: { id } }),
   ]);
   for (const document of employee!.documents) await removeUpload(document.fileUrl);
-  for (const url of [employee!.idFileUrl, employee!.passportFileUrl, employee!.residenceFileUrl]) await removeUpload(url);
+  for (const url of [employee!.idFileUrl, employee!.passportFileUrl, employee!.residenceFileUrl, employee!.photoUrl]) await removeUpload(url);
   await writeAudit({
     userId: user.id,
     action: "EMPLOYEE_DELETE",

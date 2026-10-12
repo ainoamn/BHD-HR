@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Paperclip } from "lucide-react";
+import { EmployeeAvatar } from "@/components/employee-avatar";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { Card, InfoItem, SectionTitle, ToneBadge, linkAction } from "@/components/ui";
@@ -81,13 +82,16 @@ export default async function TeamMemberPage({ params, searchParams }: { params:
 
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="break-words text-xl font-bold text-slate-900">{name}</h2>
-            <p className="mt-0.5 text-sm text-slate-500">
-              <span className="tabular">{employee.employeeNumber}</span>
-              {job ? ` · ${job}` : ""}
-              {department ? ` · ${department}` : ""}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <EmployeeAvatar name={name} photo={employee.photoUrl} eager className="size-14 rounded-2xl bg-teal-700 text-2xl text-white" />
+            <div className="min-w-0">
+              <h2 className="break-words text-xl font-bold text-slate-900">{name}</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                <span className="tabular">{employee.employeeNumber}</span>
+                {job ? ` · ${job}` : ""}
+                {department ? ` · ${department}` : ""}
+              </p>
+            </div>
           </div>
           {employee.status !== "ACTIVE" ? <ToneBadge tone="amber">{employee.status === "ON_LEAVE" ? t("في إجازة", "On leave") : employee.status}</ToneBadge> : null}
         </div>

@@ -1,19 +1,30 @@
 import Link from "next/link";
 import { Network, Users } from "lucide-react";
+import { EmployeeAvatar } from "@/components/employee-avatar";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { termText } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 
-type Person = { id: string; fullName: string; nameEn: string | null; jobTitle: string | null; jobTitleEn: string | null; department: string | null; departmentEn: string | null; managerId: string | null };
+type Person = {
+  id: string;
+  fullName: string;
+  nameEn: string | null;
+  photoUrl: string | null;
+  jobTitle: string | null;
+  jobTitleEn: string | null;
+  department: string | null;
+  departmentEn: string | null;
+  managerId: string | null;
+};
 
 export default async function OrgChartPage() {
   const user = await requirePermission("employees.view");
   const { lang, t } = await getI18n();
   const people: Person[] = await prisma.employee.findMany({
     where: { companyId: user.companyId, status: { not: "TERMINATED" } },
-    select: { id: true, fullName: true, nameEn: true, jobTitle: true, jobTitleEn: true, department: true, departmentEn: true, managerId: true },
+    select: { id: true, fullName: true, nameEn: true, photoUrl: true, jobTitle: true, jobTitleEn: true, department: true, departmentEn: true, managerId: true },
     orderBy: { fullName: "asc" },
   });
   const ids = new Set(people.map((person) => person.id));
@@ -37,9 +48,7 @@ export default async function OrgChartPage() {
           href={`/employees/${person.id}`}
           className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-3 py-2.5 shadow-card transition duration-150 hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-raised"
         >
-          <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${depth === 0 ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-800"}`}>
-            {name(person).trim().slice(0, 1)}
-          </span>
+          <EmployeeAvatar name={name(person)} photo={person.photoUrl} className={`size-9 rounded-xl text-sm ${depth === 0 ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-800"}`} />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-slate-900">{name(person)}</span>
             <span className="block truncate text-xs text-slate-500">{[job, department].filter(Boolean).join(" · ") || "—"}</span>

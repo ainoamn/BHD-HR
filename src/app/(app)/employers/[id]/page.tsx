@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Banknote, FileText, Mail, MapPin, PencilLine, Phone, Printer, ReceiptText, Trash2, UserPlus, Users, Wallet } from "lucide-react";
 import { AccountCard } from "@/components/account-card";
+import { EmployeeAvatar } from "@/components/employee-avatar";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
@@ -169,9 +170,7 @@ export default async function EmployerPage({
                   <tr key={employee.id}>
                     <td className="cell-title px-4 py-3">
                       <Link href={`/employees/${employee.id}`} className="flex items-center gap-2.5 font-semibold text-slate-900 hover:text-teal-700">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-sm font-bold text-teal-700">
-                          {employeeName(employee).trim().slice(0, 1)}
-                        </span>
+                        <EmployeeAvatar name={employeeName(employee)} photo={employee.photoUrl} className="size-8 rounded-lg bg-teal-50 text-sm text-teal-700" />
                         <span className="min-w-0 break-words">{employeeName(employee)}</span>
                       </Link>
                     </td>

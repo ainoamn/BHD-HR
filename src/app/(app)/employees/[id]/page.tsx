@@ -4,8 +4,25 @@ import { AccountCard } from "@/components/account-card";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarCheck2, FileBadge, Mail, Pencil, Phone, ReceiptText, ScrollText, Wallet } from "lucide-react";
+import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BriefcaseBusiness,
+  CalendarCheck2,
+  ExternalLink,
+  FileBadge,
+  Mail,
+  Pencil,
+  Phone,
+  Printer,
+  ReceiptText,
+  RefreshCw,
+  ScrollText,
+  Wallet,
+} from "lucide-react";
+import { EmployeeAvatar } from "@/components/employee-avatar";
+import { badgeUrl, ensureBadgeToken, qrSvg } from "@/lib/badge";
 import { AttendanceEditForm, DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { can, requirePermission } from "@/lib/auth";
 import { allowanceAmount, describeAllowance } from "@/lib/allowances";
@@ -37,7 +54,7 @@ import { DocumentScan } from "@/components/document-scan";
 import { bankName } from "@/lib/banks";
 import { HR_DOC_LABEL, HR_DOC_NEEDS_SALARY, HR_DOC_TYPES } from "@/lib/hr-docs";
 import { gratuity } from "@/lib/oman";
-import { deleteEmployee } from "@/server/employee-actions";
+import { deleteEmployee, renewBadgeToken } from "@/server/employee-actions";
 import { addLeaveCredit } from "@/server/leave-actions";
 import { savePayItem } from "@/server/pay-item-actions";
 import { createSalary } from "@/server/salary-actions";
@@ -198,7 +215,10 @@ export default async function EmployeePage({
   const jobTitle = termText(employee.jobTitle, employee.jobTitleEn, lang);
   const department = termText(employee.department, employee.departmentEn, lang);
   const base = `/employees/${employee.id}`;
-  const portalLink = employee.portalToken ? portalUrl(await requestOrigin(), employee.portalToken) : null;
+  const origin = await requestOrigin();
+  const portalLink = employee.portalToken ? portalUrl(origin, employee.portalToken) : null;
+  const badgeLink = badgeUrl(origin, await ensureBadgeToken(employee));
+  const badgeSvg = await qrSvg(badgeLink);
   const personName = (person: { fullName: string; nameEn: string | null }) => (lang === "en" && person.nameEn ? person.nameEn : person.fullName);
   const companyName = lang === "en" && user.company.nameEn ? user.company.nameEn : user.company.name;
 
@@ -257,9 +277,12 @@ export default async function EmployeePage({
         </div>
         <div className="flex flex-col gap-4 px-4 pb-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
           <div className="flex min-w-0 items-end gap-4">
-            <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-surface sm:-mt-12 sm:size-24">
-              {displayName.trim().slice(0, 1)}
-            </div>
+            <EmployeeAvatar
+              name={displayName}
+              photo={employee.photoUrl}
+              eager
+              className="relative -mt-10 size-20 rounded-2xl bg-teal-700 text-3xl text-white shadow-raised ring-4 ring-surface sm:-mt-12 sm:size-24"
+            />
             <div className="min-w-0 pb-0.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{displayName}</h1>
@@ -1024,6 +1047,46 @@ export default async function EmployeePage({
               )}
             </Card>
           ) : null}
+          <Card id="badge" className="scroll-mt-24">
+            <SectionTitle>{t("بطاقة الموظف", "Employee ID card")}</SectionTitle>
+            <p className="mb-3 text-xs leading-5 text-slate-600">
+              {t(
+                "رمز QR خاص بالموظف. مسحه بكاميرا أي هاتف يفتح صفحة تحقق تُظهر صورته واسمه ومسماه الوظيفي وجهة عمله فقط، دون أي بيانات شخصية أخرى.",
+                "The employee's own QR code. Scanning it with any phone camera opens a check page showing only the photo, name, job title and workplace, with no other personal data.",
+              )}
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="size-32 shrink-0 rounded-2xl bg-white p-1.5 ring-1 ring-slate-200 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: badgeSvg }} />
+              <div className="flex min-w-0 flex-col items-start gap-2">
+                <Link href={`${base}/badge`} className={secondaryBtn}>
+                  <Printer size={16} />
+                  {t("طباعة البطاقة", "Print card")}
+                </Link>
+                <a href={badgeLink} target="_blank" rel="noreferrer" className={linkAction}>
+                  <ExternalLink size={15} />
+                  {t("فتح صفحة التحقق", "Open check page")}
+                </a>
+              </div>
+            </div>
+            {allow.edit && !employee.photoUrl ? (
+              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-inset ring-amber-100">
+                {t("لا توجد صورة للموظف بعد. أضفها من «تعديل البيانات» لتظهر في البطاقة وصفحة التحقق.", "No photo yet. Add one from “Edit” so it shows on the card and the check page.")}
+              </p>
+            ) : null}
+            {allow.edit ? (
+              <form action={renewBadgeToken} className="mt-3 border-t border-slate-100 pt-3">
+                <input type="hidden" name="id" value={employee.id} />
+                <SubmitButton
+                  variant="link"
+                  className="inline-flex items-center gap-1.5"
+                  confirm={t("سيتوقف رمز البطاقة الحالية عن العمل ويلزم طباعة بطاقة جديدة. متابعة؟", "The current card's code will stop working and a new card must be printed. Continue?")}
+                >
+                  <RefreshCw size={15} />
+                  {t("رمز جديد (إلغاء بطاقة مفقودة)", "New code (cancel a lost card)")}
+                </SubmitButton>
+              </form>
+            ) : null}
+          </Card>
           <Card>
             <SectionTitle>{t("مستندات الموارد البشرية", "HR documents")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2">

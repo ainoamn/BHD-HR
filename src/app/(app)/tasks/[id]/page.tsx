@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Flag, ListChecks, MessageSquare, Pencil, Sparkles, X } from "lucide-react";
+import { EmployeeAvatar } from "@/components/employee-avatar";
 import { Flash } from "@/components/flash";
 import { Modal } from "@/components/modal";
 import { DeleteButton } from "@/components/row-forms";
@@ -34,7 +35,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const task = await prisma.task.findFirst({
     where: { id, companyId: user.companyId },
     include: {
-      assignees: { include: { employee: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true, jobTitle: true, jobTitleEn: true } } } },
+      assignees: { include: { employee: { select: { id: true, fullName: true, nameEn: true, photoUrl: true, employeeNumber: true, jobTitle: true, jobTitleEn: true } } } },
       items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
       comments: { orderBy: { createdAt: "asc" } },
     },
@@ -258,7 +259,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
               {task.assignees.map(({ employee }) => (
                 <li key={employee.id}>
                   <Link href={`/employees/${employee.id}?tab=tasks`} className="flex items-center gap-2.5 rounded-xl p-1.5 transition hover:bg-slate-50">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">{nameOf(employee).trim().slice(0, 1)}</span>
+                    <EmployeeAvatar name={nameOf(employee)} photo={employee.photoUrl} className="size-8 rounded-full bg-teal-700 text-sm text-white" />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-slate-900">{nameOf(employee)}</span>
                       <span className="block truncate text-xs text-slate-500">

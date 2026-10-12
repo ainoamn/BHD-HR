@@ -14,6 +14,7 @@ import { BilingualFields } from "./bilingual-fields";
 import { DocumentScan } from "./document-scan";
 import { EmployerPicker } from "./employer-picker";
 import { PhoneField } from "./phone-input";
+import { PhotoField } from "./photo-field";
 import { SalaryFields } from "./salary-fields";
 import { SearchSelect } from "./search-select";
 import { SubmitButton } from "./submit-button";
@@ -136,6 +137,7 @@ export async function EmployeeForm({
             )}
           </>,
         )}
+        <PhotoField current={employee?.photoUrl} name={employee?.fullName} />
         <div className="grid gap-4 md:grid-cols-2">
           <BilingualFields
             arName="fullName"

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarCheck2, CalendarX2, Check, ChevronLeft, ChevronRight, FileWarning, Inbox, Receipt, Users, X } from "lucide-react";
+import { EmployeeAvatar } from "@/components/employee-avatar";
 import { ExpenseClaimCard } from "@/components/expense-claim";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
@@ -41,6 +42,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         id: true,
         fullName: true,
         nameEn: true,
+        photoUrl: true,
         employeeNumber: true,
         jobTitle: true,
         jobTitleEn: true,
@@ -223,7 +225,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                   href={`/team/${employee.id}`}
                   className="group flex h-full items-start justify-between gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-teal-200 hover:bg-teal-50/40"
                 >
-                  <div className="min-w-0">
+                  <EmployeeAvatar name={nameOf(employee)} photo={employee.photoUrl} className="size-11 rounded-xl bg-teal-50 text-base text-teal-800 ring-1 ring-inset ring-teal-100" />
+                  <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-slate-900">{nameOf(employee)}</p>
                     <p className="truncate text-sm text-slate-500">
                       <span className="tabular">{employee.employeeNumber}</span>
