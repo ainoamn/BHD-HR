@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CalendarCheck2, Clock3, FileUp, Files, ReceiptText, ScrollText, ShieldOff } from "lucide-react";
+import { CalendarCheck2, Clock3, FileUp, Files, ReceiptText, ScrollText, ShieldOff, Target, Wallet } from "lucide-react";
 import { ClockButton } from "@/components/clock-button";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
@@ -9,16 +9,18 @@ import { SubmitButton } from "@/components/submit-button";
 import { Card, ToneBadge, fieldClass } from "@/components/ui";
 import { muscatDay, muscatTime, workedLabel } from "@/lib/clock";
 import { DOC_LABEL, EXTRA_DOC_TYPES, monthName, termText } from "@/lib/constants";
+import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, EXPENSE_PAY_LABEL, EXPENSE_STATUS_LABEL, EXPENSE_STATUS_TONE } from "@/lib/expenses";
 import { describeExpiry } from "@/lib/expiry";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { inlineLogo } from "@/lib/inline-logo";
 import { getI18n } from "@/lib/lang";
 import { attendanceLabel, computeLeaveBalances, leaveName } from "@/lib/leave";
+import { SCORE_LABEL, criterionName, overallBand, overallTone, parseCriteria, parseScores } from "@/lib/performance";
 import { LEAVE_REQUEST_LABEL, LEAVE_REQUEST_TONE, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { daysLabel, formatDate, money, todayInputValue } from "@/lib/utils";
-import { cancelLeaveRequest, requestLeave, submitPortalDocument } from "@/server/portal-actions";
+import { cancelExpense, cancelLeaveRequest, requestLeave, submitExpense, submitPortalDocument } from "@/server/portal-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +50,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const company = employee.company;
   const base = `/portal/${token}`;
   const today = muscatDay();
-  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent] = await Promise.all([
+  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims] = await Promise.all([
     getLeaveTypes(company.id),
     prisma.attendance.findMany({ where: { employeeId: employee.id }, select: { type: true, balanceKey: true } }),
     prisma.leaveCredit.findMany({ where: { employeeId: employee.id }, select: { balanceKey: true, days: true } }),
@@ -68,6 +70,13 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     }),
     company.clockEnabled ? prisma.clockEntry.findUnique({ where: { employeeId_day: { employeeId: employee.id, day: today } } }) : null,
     company.clockEnabled ? prisma.clockEntry.findMany({ where: { employeeId: employee.id }, orderBy: { day: "desc" }, take: 7 }) : [],
+    prisma.performanceReview.findMany({
+      where: { employeeId: employee.id, status: "DONE", sharedAt: { not: null } },
+      select: { id: true, scores: true, overall: true, strengths: true, improvements: true, goals: true, completedAt: true, cycle: { select: { name: true, periodStart: true, periodEnd: true, criteria: true } } },
+      orderBy: { completedAt: "desc" },
+      take: 6,
+    }),
+    prisma.expenseClaim.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" }, take: 15 }),
   ]);
   const balances = computeLeaveBalances(employee, attendance, credits, leaveTypes).filter((item) => item.applies || item.remaining !== 0);
   const choices = portalLeaveChoices(leaveTypes, employee.jobTitleId, lang);
@@ -89,7 +98,9 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     { id: "leave", label: t("الإجازات", "Leave") },
     { id: "payslips", label: t("الرواتب", "Payslips") },
     { id: "documents", label: t("المستندات", "Documents") },
+    { id: "expenses", label: t("المصروفات", "Expenses") },
     letters.length ? { id: "letters", label: t("الخطابات", "Letters") } : null,
+    reviews.length ? { id: "reviews", label: t("التقييم", "Reviews") } : null,
   ].filter((item): item is { id: string; label: string } => Boolean(item));
   const sectionTitle = (Icon: typeof Clock3, title: string, hint?: string) => (
     <div className="mb-4 flex items-start gap-3">
@@ -347,6 +358,88 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           </details>
         </Card>
 
+        <Card id="expenses" className="scroll-mt-16">
+          {sectionTitle(Wallet, t("تعويض المصروفات", "Expense claims"), t("صرفت من مالك لأجل العمل؟ أرسل الإيصال، وبعد الموافقة يُصرف لك مع الراتب أو مباشرة.", "Spent your own money on work? Send the receipt; once approved it is paid with your salary or directly."))}
+          <details className="group rounded-2xl border border-slate-200 p-3 sm:p-4" open={claims.length === 0}>
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-teal-800">
+              <FileUp size={16} />
+              {t("طلب تعويض جديد", "New claim")}
+            </summary>
+            <form action={submitExpense} className="mt-3 grid gap-3 sm:grid-cols-2">
+              <input type="hidden" name="token" value={token} />
+              <label className="block space-y-1.5 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-700">{t("الوصف", "Description")}</span>
+                <input className={`${fieldClass} w-full`} name="title" required maxLength={120} placeholder={t("مثال: وقود رحلة عمل إلى صحار", "e.g. Fuel for a work trip to Sohar")} />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">{t("النوع", "Category")}</span>
+                <select className={`${fieldClass} w-full`} name="category" defaultValue="TRAVEL">
+                  {EXPENSE_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {pick(EXPENSE_CATEGORY_LABEL[category], lang, category)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  {t("المبلغ", "Amount")} ({company.currency})
+                </span>
+                <input className={`${fieldClass} w-full`} name="amount" type="number" inputMode="decimal" step="0.001" min="0.001" required dir="ltr" />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">{t("تاريخ المصروف", "Date spent")}</span>
+                <input className={`${fieldClass} w-full`} type="date" name="spentAt" required defaultValue={todayInputValue()} />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">{t("الإيصال (صورة أو PDF)", "Receipt (image or PDF)")}</span>
+                <input className={`${fieldClass} w-full`} type="file" name="receipt" required accept="application/pdf,image/png,image/jpeg,image/webp" />
+              </label>
+              <label className="block space-y-1.5 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-700">{t("ملاحظة", "Note")}</span>
+                <input className={`${fieldClass} w-full`} name="notes" maxLength={500} />
+              </label>
+              <div className="sm:col-span-2">
+                <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
+                  {t("إرسال الطلب", "Send claim")}
+                </SubmitButton>
+              </div>
+            </form>
+          </details>
+          {claims.length ? (
+            <ul className="mt-4 space-y-2">
+              {claims.map((claim) => (
+                <li key={claim.id} className="rounded-xl border border-slate-100 p-3 text-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-slate-900">{claim.title}</p>
+                      <p className="mt-0.5 text-slate-600">
+                        <span className="tabular font-semibold">{money(claim.amount, company.currency)}</span> · {formatDate(claim.spentAt)}
+                      </p>
+                    </div>
+                    <ToneBadge tone={EXPENSE_STATUS_TONE[claim.status] || "slate"}>{pick(EXPENSE_STATUS_LABEL[claim.status], lang, claim.status)}</ToneBadge>
+                  </div>
+                  {claim.status === "PAID" && claim.payMethod ? (
+                    <p className="mt-1.5 text-xs text-emerald-700">
+                      {pick(EXPENSE_PAY_LABEL[claim.payMethod], lang, claim.payMethod)} · {formatDate(claim.paidAt)}
+                    </p>
+                  ) : null}
+                  {claim.decisionNote ? <p className="mt-1.5 break-words text-xs text-slate-600">{t("ملاحظة الإدارة:", "Note from HR:")} {claim.decisionNote}</p> : null}
+                  {claim.status === "PENDING" ? (
+                    <form action={cancelExpense} className="mt-2">
+                      <input type="hidden" name="token" value={token} />
+                      <input type="hidden" name="id" value={claim.id} />
+                      <SubmitButton variant="link" confirm={t("إلغاء هذا الطلب؟", "Cancel this claim?")}>
+                        {t("إلغاء الطلب", "Cancel claim")}
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Card>
+
         {letters.length ? (
           <Card id="letters" className="scroll-mt-16">
             {sectionTitle(ScrollText, t("الخطابات", "Letters"))}
@@ -365,6 +458,56 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                 </li>
               ))}
             </ul>
+          </Card>
+        ) : null}
+
+        {reviews.length ? (
+          <Card id="reviews" className="scroll-mt-16">
+            {sectionTitle(Target, t("تقييم الأداء", "Performance reviews"), t("الدرجات من 1 إلى 5، مع ملاحظات مديرك وأهدافك للفترة القادمة.", "Scores from 1 to 5, with your manager's notes and your goals for the next period."))}
+            <div className="space-y-3">
+              {reviews.map((review, index) => {
+                const scores = parseScores(review.scores);
+                const band = overallBand(review.overall);
+                return (
+                  <details key={review.id} open={index === 0} className="group rounded-2xl border border-slate-200 p-3 sm:p-4">
+                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+                      <span className="min-w-0">
+                        <span className="block font-bold text-slate-900">{review.cycle.name}</span>
+                        <span className="text-xs text-slate-500">
+                          {formatDate(review.cycle.periodStart)} – {formatDate(review.cycle.periodEnd)}
+                        </span>
+                      </span>
+                      {review.overall !== null ? (
+                        <ToneBadge tone={overallTone(review.overall)}>
+                          <span className="tabular">{review.overall} / 5</span>
+                          {band ? ` · ${pick(SCORE_LABEL[band], lang)}` : ""}
+                        </ToneBadge>
+                      ) : null}
+                    </summary>
+                    <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                      {parseCriteria(review.cycle.criteria).map((item) => (
+                        <li key={item.key} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                          <span className="min-w-0 text-slate-700">{criterionName(item, lang)}</span>
+                          <span className="tabular shrink-0 font-bold text-slate-900">{scores[item.key] ?? "—"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {[
+                      { label: t("نقاط القوة", "Strengths"), value: review.strengths },
+                      { label: t("مجالات التحسين", "Areas to improve"), value: review.improvements },
+                      { label: t("أهدافك للفترة القادمة", "Your goals for the next period"), value: review.goals },
+                    ]
+                      .filter((block) => block.value)
+                      .map((block) => (
+                        <div key={block.label} className="mt-3">
+                          <p className="text-xs font-bold text-slate-500">{block.label}</p>
+                          <p className="mt-0.5 whitespace-pre-line break-words text-sm leading-7 text-slate-800">{block.value}</p>
+                        </div>
+                      ))}
+                  </details>
+                );
+              })}
+            </div>
           </Card>
         ) : null}
 

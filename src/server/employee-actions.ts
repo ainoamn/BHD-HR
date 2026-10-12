@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, NEW_EMPLOYER } from "@/lib/constants";
 import { readAllowanceRows, readEmployeeInput, readLeaveDays } from "@/lib/employee-input";
+import { nextEmployeeNumber } from "@/lib/employee-number";
 import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -68,15 +69,6 @@ async function saveAllowances(tx: Prisma.TransactionClient, employeeId: string, 
     if (id && keep.has(id)) await tx.employeeAllowance.update({ where: { id }, data });
     else await tx.employeeAllowance.create({ data: { ...data, employeeId, companyId } });
   }
-}
-
-async function nextEmployeeNumber(companyId: string) {
-  const rows = await prisma.employee.findMany({ where: { companyId }, select: { employeeNumber: true } });
-  const max = rows.reduce((highest, row) => {
-    const value = Number(row.employeeNumber.replace(/\D/g, "")) || 0;
-    return Math.max(highest, value);
-  }, 0);
-  return `EMP-${String(max + 1).padStart(4, "0")}`;
 }
 
 async function resolveEmployer(formData: FormData, user: { companyId: string; permissions: readonly string[] }, errorPath: string) {
@@ -144,6 +136,7 @@ export async function createEmployee(formData: FormData) {
         leaveDays: readLeaveDays(formData, catalog.leaveTypes),
         employerId,
         managerId,
+        terminatedAt: input.status === "TERMINATED" ? new Date() : null,
         employeeNumber,
         companyId: user.companyId,
       },
@@ -188,7 +181,15 @@ export async function updateEmployee(formData: FormData) {
     async (tx) => {
       await tx.employee.update({
         where: { id },
-        data: { ...input, ...jobFields(formData, catalog), ...files.data, leaveDays: readLeaveDays(formData, catalog.leaveTypes), employerId, managerId },
+        data: {
+          ...input,
+          ...jobFields(formData, catalog),
+          ...files.data,
+          leaveDays: readLeaveDays(formData, catalog.leaveTypes),
+          employerId,
+          managerId,
+          terminatedAt: input.status === "TERMINATED" ? (existing!.terminatedAt ?? new Date()) : null,
+        },
       });
       if (allowances) await saveAllowances(tx, id, user.companyId, allowances);
       if (allowances || input.nationality !== existing!.nationality) await syncEmployeeSalaries(tx, id, user.company.salaryDays);

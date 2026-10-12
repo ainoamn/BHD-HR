@@ -50,6 +50,12 @@ src/
     (app)/approvals/     طلبات الموظفين: الموافقة على الإجازات ومراجعة المستندات المرسلة من البوابة
     (app)/org/           الهيكل التنظيمي حسب «المدير المباشر»
     (app)/assistant/     المساعد الذكي (محادثة)
+    (app)/recruitment/   التوظيف: الشواغر، [id] الشاغر ومرشحوه، candidates/[id] المرشح
+    apply/[token]/       صفحة التقديم العامة على شاغر (بلا دخول)
+    (app)/performance/   جولات تقييم الأداء، [id] الجولة، reviews/[id] تقييم موظف
+    (app)/assets/        العُهد والأصول، و[id] العهدة وسجلها
+    (app)/expenses/      طلبات تعويض المصروفات والموافقة والصرف
+    (app)/analytics/     لوحة المالك (تحليلات 12 شهراً + قراءة بالذكاء الاصطناعي)
     login/               غلاف الدخول + دخول الطوارئ المحلي
   components/
     bhd/                 BhdAppSwitcher و BhdAppIcon (منسوخان من ONE-BHD) و site-footer
@@ -62,6 +68,10 @@ src/
     employee-workspace.tsx     تبويبات الملاحظات والمهام والخطابات في ملف الموظف
     letter-form.tsx letter-sheet.tsx share-letter.tsx  نموذج الخطاب، ورقته الرسمية، أزرار المشاركة
     assistant-chat.tsx   واجهة المساعد: الرسائل، الروابط، بطاقات الاقتراح مع «تأكيد وحفظ»
+    job-form.tsx         نموذج الشاغر (إضافة وتعديل)
+    expense-claim.tsx    بطاقة طلب المصروف بخطوتها التالية (موافقة / رفض، ثم الصرف) — في المصروفات والطلبات وملف الموظف
+    employee-hr-tab.tsx  تبويب «الأداء والعهد والمصروفات» في ملف الموظف (يحمّل بياناته بنفسه)
+    owner-insights.tsx   زر «حلّل الأرقام بالذكاء الاصطناعي» في لوحة المالك
     ui.tsx               عناصر الواجهة المشتركة (انظر «نظام الواجهة» أدناه)
     ...                  النماذج والمطبوعات
   lib/
@@ -90,6 +100,11 @@ src/
     portal.ts            رمز البوابة ورابطها، قراءة الموظف من الرمز، خيارات الإجازة في البوابة، حالات الطلب
     clock.ts             يوم مسقط ووقته، التأخير، المسافة (haversine)، التحقق من الإحداثيات
     assistant.ts         المساعد الذكي: التعليمات، أدوات القراءة حسب الصلاحية، أدوات الاقتراح، runAssistant
+    recruitment.ts       حالات الشاغر ومراحل المرشح وأنواع التوظيف ورمز رابط التقديم
+    performance.ts       معايير التقييم الافتراضية، الدرجات 1–5، المتوسط، وحقائق الفترة من ملف الموظف (reviewFacts)
+    assets.ts expenses.ts  أنواع العهد وحالاتها وسجلها؛ أنواع المصروفات وحالاتها وطرق صرفها (آمنة للمتصفح)
+    analytics.ts         بيانات لوحة المالك (loadAnalytics) ونصها للذكاء الاصطناعي (analyticsFacts)
+    employee-number.ts   الرقم الوظيفي التالي (خارج ملفات "use server" حتى لا يصبح نقطة استدعاء)
     inline-logo.ts       تضمين الشعار data: للصفحات العامة (الخطاب والبوابة)
     search.ts            توحيد النص العربي للبحث (أ/إ/آ، ة/ه، ى/ي، التشكيل)
     leave.ts             أرصدة الإجازات حسب أنواع المنشأة وتنبيهاتها وخيارات الحضور
@@ -186,6 +201,19 @@ src/
 - **الكتابة بالتأكيد فقط:** المساعد لا يكتب في القاعدة. `propose_task` و`propose_note` (`tasks.create`) و`propose_reminder` (`calendar.create`) تتحقق من المدخلات وتحل الموظف بالاسم أو الرقم (وتسأل عند التشابه)، ثم تضيف «اقتراحاً» يظهر بطاقة بزر «تأكيد وحفظ». إذا حاول النموذج الاقتراح ولم يُجهَّز شيء يُضاف تنبيه للمستخدم. `confirmAssistantProposal` يعيد التحقق من الصلاحية والموظفين والقيم كاملة ثم ينشئ `Task` أو `EmployeeNote` أو `Reminder`، ويكتب في السجل «… عبر المساعد الذكي»، ويستدعي `refreshAll()`.
 - **الأعطال:** حد الطلبات يعيد «المساعد مشغول الآن. حاول بعد دقيقة.»، وأي خطأ آخر «المساعد غير متاح الآن…» مع تسجيله في سجلات الخادم.
 
+### التوظيف وتقييم الأداء والعهد والمصروفات ولوحة المالك
+
+- **الشواغر** (`server/recruitment-actions.ts`، `recruitment.*`): `saveJob` (المسمى والقسم من الكتالوج، العدد، الراتب المتوقع، آخر موعد، الحالة `OPEN`/`ON_HOLD`/`CLOSED`)، `setApplyLink` (`renew` يولّد `applyToken` جديداً 18 بايت فيتوقف القديم، `off` يفرّغه)، `deleteJob`. مراحل المرشح: `NEW` → `SCREENING` → `INTERVIEW` → `OFFER` → `HIRED` / `REJECTED`.
+- **التقديم العام `/apply/<token>`** (`server/apply-actions.ts`، `submitApplication`): بلا دخول (`noindex`). يرفض الشاغر غير المفتوح أو بعد `closesAt`، ويشترط اسماً (3 أحرف) وبريداً أو هاتفاً وسيرة (صورة أو PDF، 4 ميغابايت). حقل فخ `website` للروبوتات، وحد 300 طلب لكل رابط، والتكرار بنفس البريد أو الهاتف يُقبل بصمت دون إنشاء مرشح ثانٍ.
+- **تقييم السيرة بالذكاء الاصطناعي** (`aiScreenCandidate` في `lib/ai.ts`، `screenCandidate` / `screenJobCandidates` بدفعات 5): يقرأ نموذج الرؤية ملف السيرة من `StoredFile` ويقارنه بوصف الشاغر، فيعيد درجة 0–100 وملخصاً ونقاط قوة وفجوات، ويعبئ البريد والهاتف والخبرة إن كانت فارغة. التعليمات تمنع استخدام العمر والجنس والجنسية والديانة والحالة الاجتماعية. استبدال السيرة يمسح التقييم السابق.
+- **المقابلة:** `interviewAt` من حقل `datetime-local` يُقرأ بتوقيت مسقط (`+04:00`) ويُعرض بـ `muscatDateTime`؛ تظهر في التقويم (النوع `interview`، `recruitment.view`) وفي التنبيهات إن كانت خلال 48 ساعة (`interview-<id>`).
+- **التعيين** `hireCandidate` (يتطلب `employees.create`؛ الراتب يُحفظ فقط مع `salaries.edit`): ينشئ `Employee` بالرقم التالي والاسم والتواصل والمسمى والقسم وتاريخ المباشرة، ويضيف السيرة مستنداً (`CERTIFICATE`) في ملفه، ويضع المرشح `HIRED` مع `employeeId`، ويغلق الشاغر تلقائياً عند اكتمال العدد، ثم يفتح تعديل الموظف لإكمال بياناته. حذف المرشح لا يحذف السيرة إن كانت مستنداً لموظف.
+- **تقييم الأداء** (`server/performance-actions.ts`، `performance.*`): `createCycle` بالاسم والفترة والموعد والمعايير (7 جاهزة + حتى 5 إضافية بمفاتيح `custom1..5`) ونطاق القسم، وينشئ `PerformanceReview` لكل موظف نشط أو في إجازة؛ `addMissingEmployees` للمنضمين لاحقاً؛ `setCycleStatus` يغلق الجولة (لا تعديل بعدها) أو يعيد فتحها. `saveReview` يقرأ `score_<key>` (1–5) والنصوص؛ `decision=finish` يشترط كل الدرجات ويضع `DONE` و`overall` (المتوسط لأقرب 0.1)، و`draft` يعيده مسودة ويخفيه من البوابة. `draftReview` (`aiDraftReview`) يكتب نقاط القوة والتحسين والأهداف من `reviewFacts` (الغياب والإجازات، التأخير في تسجيل الحضور، المهام المنجزة والمتأخرة، الملاحظات حسب النوع، الخطابات والإنذارات، التقييم السابق) في الحقول الفارغة فقط. `shareReview` يضبط `sharedAt` فيظهر في البوابة (الدرجات والنصوص دون التعليق الداخلي). التنبيه `cycle-<id>` عند اقتراب `dueDate` وبقاء تقييمات غير معتمدة.
+- **العهد** (`server/asset-actions.ts`، `assets.*`): `saveAsset` (مع تسليم فوري اختياري)، `assignAsset` (للمتاحة أو في الصيانة، لا لموظف منتهي الخدمة)، `returnAsset` (الحالة عند الاستلام، ثم متاحة أو صيانة)، `setAssetStatus` (متاحة / صيانة / مستبعدة، فقط إن لم تكن مع موظف)، `deleteAsset` (لا تُحذف وهي مع موظف). كل حركة تُضاف إلى `AssetEvent`. التنبيه `asset-<id>` (خطر) لكل عهدة مع موظف منتهي الخدمة. `/approvals` تُفتح أيضاً بـ `expenses.view`.
+- **المصروفات** (`server/expense-actions.ts`، `expenses.*`): من البوابة `submitExpense` (الإيصال إلزامي، حد 10 طلبات معلّقة لكل موظف) و`cancelExpense` للمعلّق، أو من الإدارة `addExpense` (الإيصال اختياري، ويمكن اعتماده مباشرة). `decideExpense` (`expenses.edit`) يوافق أو يرفض (السبب إلزامي عند الرفض). `payExpense` (`expenses.pay`): `SALARY` (يتطلب أيضاً `salaries.create`) ينشئ `PayItem` من نوع `ENTITLEMENT` لشهر واحد بعنوان «تعويض مصروف: …» في أول شهر غير مصروف (الشهر الحالي بتوقيت مسقط، أو التالي إن صُرف راتبه) ثم `syncEmployeeSalaries`، فلا يدخل في الحماية الاجتماعية؛ أو `CASH` / `BANK_TRANSFER` / `CHEQUE` فيُسجَّل مصروفاً فوراً. `deleteExpense` يرفض المصروف الذي دخل راتباً مصروفاً، وإلا يحذف بنده ويعيد احتساب الرواتب. الإيصالات في `/files` تتطلب `expenses.view`. التنبيهات `expenses-pending` و`expenses-approved`.
+- **لوحة المالك `/analytics`** (`reports.view`؛ كل المبالغ تتطلب `salaries.view`): `loadAnalytics` يحسب لآخر 12 شهراً بتوقيت مسقط: عدد الموظفين في نهاية كل شهر (من `joiningDate` أو تاريخ الإنشاء، و`terminatedAt`)، التعيين والخروج، معدل الدوران = الخارجون ÷ متوسط العدد، الغياب (نصف يوم = 0.5) والمرضية والإجازات شهرياً، تكلفة الرواتب الشهرية = الصافي + حصتي الحماية الاجتماعية، الأقسام (العدد، العمانيون، إجمالي الرواتب)، التعمين، مكافأة نهاية الخدمة المستحقة اليوم لغير العمانيين، العقود المنتهية أو التي تنتهي خلال 90 يوماً، مسار التوظيف، المصروفات حسب النوع، العهد، ومتوسط تقييم الأداء. الرسوم CSS بلا مكتبة. زر «حلّل الأرقام» يستدعي `ownerInsights()` (يعيد `{text|error}`) الذي يرسل `analyticsFacts` فقط (بلا أسماء ولا بيانات شخصية) إلى `aiOwnerInsights`.
+- **`Employee.terminatedAt`:** يُضبط عند تحويل الحالة إلى «منتهي الخدمة» (ويُحفظ إن كان موجوداً) ويُفرَّغ عند إعادته؛ تعتمد عليه لوحة المالك في الخروج والدوران.
+
 ---
 
 ## 3. نموذج البيانات
@@ -200,7 +228,7 @@ src/
 | `User` | الحسابات | `email` (فريد)، `password` (scrypt أو فارغ لحسابات BHD)، `bhdSub` (فريد)، `picture`، `lastLoginAt`. لا دور ولا منشأة على الحساب نفسه |
 | `Membership` | من يصل إلى أي منشأة وبأي صلاحية | `companyId`، `userId` (فارغ للدعوة حتى أول دخول)، `email`، `role` (`ADMIN` / `MANAGER` / `VIEWER` / `CUSTOM`)، `permissions` (JSON للدور `CUSTOM` فقط)، `inviteToken` (فريد)، `invitedById`، `invitedAt`، `acceptedAt`؛ فريد على (`companyId`، `email`) |
 | `Employer` | الكفلاء وأصحاب العمل | `kind` (COMPANY / PERSON)، الاسم، الهاتف، البريد، الشعار |
-| `Employee` | الموظفون | البيانات الشخصية، `nationality` (رمز ISO مثل `OM`؛ القيم النصية القديمة تُقرأ أيضاً)، الوثائق وتواريخ انتهائها و`idFileUrl`/`passportFileUrl`/`residenceFileUrl`، `jobTitleId`+`jobTitle`/`jobTitleEn` و`departmentId`+`department`/`departmentEn` (نص مكرر للعرض والبحث)، الحالة، `leaveDays` (JSON: أيام مخصصة لكل `key` تختلف عن الافتراضي؛ أعمدة `annualLeaveDays` وأخواتها قديمة لا تُقرأ)، مكوّنات الراتب، `bankBic` و`bankAccount`، `employerId`، `managerId` (المدير المباشر)، `portalToken` (فريد، رابط البوابة). `employeeNumber` فريد داخل المنشأة (كل منشأة تبدأ من EMP-0001) |
+| `Employee` | الموظفون | البيانات الشخصية، `nationality` (رمز ISO مثل `OM`؛ القيم النصية القديمة تُقرأ أيضاً)، الوثائق وتواريخ انتهائها و`idFileUrl`/`passportFileUrl`/`residenceFileUrl`، `jobTitleId`+`jobTitle`/`jobTitleEn` و`departmentId`+`department`/`departmentEn` (نص مكرر للعرض والبحث)، الحالة، `leaveDays` (JSON: أيام مخصصة لكل `key` تختلف عن الافتراضي؛ أعمدة `annualLeaveDays` وأخواتها قديمة لا تُقرأ)، مكوّنات الراتب، `bankBic` و`bankAccount`، `employerId`، `managerId` (المدير المباشر)، `portalToken` (فريد، رابط البوابة)، `terminatedAt` (تاريخ انتهاء الخدمة). `employeeNumber` فريد داخل المنشأة (كل منشأة تبدأ من EMP-0001) |
 | `EmployeeDocument` | المستندات الإضافية | النوع، الرقم، الانتهاء، `fileUrl`، `submittedAt` (أرسله الموظف من البوابة)، `reviewedAt` |
 | `LeaveRequest` | طلب إجازة من البوابة | `employeeId`، `choice` (`leave:<key>` أو `UNPAID_LEAVE`)، `fromDate`/`toDate`، `days`، `reason`، `status` (`PENDING`/`APPROVED`/`REJECTED`/`CANCELLED`)، `decidedById`/`decidedByName`/`decidedAt`/`decisionNote`، `attendanceGroupId` (صفوف الحضور المنشأة عند الموافقة) |
 | `ClockEntry` | تسجيل حضور يومي من البوابة | `day` (`YYYY-MM-DD` مسقط، فريد مع الموظف)، `inAt`/`outAt`، الإحداثيات والمسافة لكل منهما، `lateMinutes` |
@@ -219,6 +247,12 @@ src/
 | `Letter` | خطاب أو إنذار للموظف | `kind` (`NOTICE` / `WARNING_1` / `WARNING_2` / `FINAL_WARNING` / `APPRECIATION` / `GENERAL`)، `refNo` (`HR-YYYY-0001`، فريد داخل المنشأة)، `issuedAt`، `subject`/`body` و`subjectEn`/`bodyEn`، الموقّع، `token` (فريد، 24 بايت base64url — مفتاح نسخة الموظف)، `viewedAt`، `acknowledgedAt`، `cancelledAt` |
 | `LetterDelivery` | نسخة مرسلة عبر قناة | `channel` (`EMAIL` / `WHATSAPP`)، `target`، `status` (`PENDING` / `SENT` / `FAILED`)، `error`، `sentAt` |
 | `DailyBrief` | ملخص اليوم المكتوب بالذكاء الاصطناعي (ذاكرة مؤقتة) | `companyId`، `day` (`YYYY-MM-DD` بتوقيت مسقط)، `lang`، `scope` (بصمة الصلاحيات)، `text`؛ فريد على الأربعة |
+| `JobOpening` | شاغر وظيفي | `title`/`titleEn`، `jobTitleId`، `departmentId`+`department`/`departmentEn`، `description`، `location`، `employmentType` (`FULL_TIME`/`PART_TIME`/`CONTRACT`/`INTERNSHIP`)، `openings`، `salaryMin`/`salaryMax`، `status` (`OPEN`/`ON_HOLD`/`CLOSED`)، `applyToken` (فريد، رابط التقديم)، `closesAt` |
+| `Candidate` | مرشح لشاغر | `jobId` (حذف متسلسل)، الاسم والتواصل والجنسية والمسمى الحالي والخبرة والراتب المتوقع، `source` (`HR`/`APPLY_LINK`)، `cvUrl`، `coverNote`، `stage`، `rating` (1–5)، `aiScore`/`aiSummary`/`aiStrengths[]`/`aiGaps[]`/`aiAt`، `interviewAt`، `notes`، `rejectReason`، `employeeId` (بعد التعيين) |
+| `ReviewCycle` | جولة تقييم أداء | `name`، `periodStart`/`periodEnd`، `dueDate`، `status` (`OPEN`/`CLOSED`)، `criteria` (JSON: `[{key, ar, en}]`) |
+| `PerformanceReview` | تقييم موظف في جولة | `cycleId` (حذف متسلسل)، `employeeId`، `status` (`DRAFT`/`DONE`)، `scores` (JSON: مفتاح المعيار ← 1–5)، `overall`، `strengths`، `improvements`، `goals`، `comment` (داخلي)، `reviewerName`، `completedAt`، `sharedAt` (ظاهر في البوابة)؛ فريد على (`cycleId`، `employeeId`) |
+| `Asset` / `AssetEvent` | عهدة وسجل حركتها | `name`، `category` (`LAPTOP`/`PHONE`/`VEHICLE`/`ACCESS_CARD`/`TOOL`/`UNIFORM`/`FURNITURE`/`OTHER`)، `tag`، `serialNo`، `value`، `purchaseDate`، `status` (`AVAILABLE`/`ASSIGNED`/`MAINTENANCE`/`RETIRED`)، `employeeId`، `assignedAt`. الحدث: `kind` (`CREATE`/`ASSIGN`/`RETURN`/`MAINTENANCE`/`AVAILABLE`/`RETIRE`)، الموظف واسمه، الملاحظة، المنفّذ |
+| `ExpenseClaim` | طلب تعويض مصروف | `employeeId`، `category`، `title`، `amount`، `spentAt`، `receiptUrl`، `source` (`HR`/`PORTAL`)، `status` (`PENDING`/`APPROVED`/`PAID`/`REJECTED`/`CANCELLED`)، القرار (`decidedByName`، `decidedAt`، `decisionNote`)، الصرف (`payMethod`: `SALARY`/`CASH`/`BANK_TRANSFER`/`CHEQUE`، `payItemId`، `paidAt`، `paidByName`) |
 
 **التواريخ** تُخزّن عند الظهر بتوقيت UTC وتُقرأ بدوال `getUTC*` حتى لا ينزاح اليوم بسبب فرق التوقيت.
 
@@ -338,6 +372,10 @@ sequenceDiagram
 | `calendar` التقويم والتذكيرات | `view` `create` `edit` `delete` |
 | `tasks` المهام والملاحظات | `view` `create` `edit` `delete` — تشمل ملاحظات ملف الموظف. حذف تعليق الغير يتطلب `delete`؛ صاحب التعليق يحذفه دائماً |
 | `letters` الإنذارات والخطابات | `view` `create` `edit` (إلغاء / استعادة، طلب نسخة) `delete` |
+| `recruitment` التوظيف | `view` `create` `edit` (المرشحون والمراحل وتقييم السيرة ورابط التقديم) `delete`. التعيين يتطلب أيضاً `employees.create` |
+| `performance` تقييم الأداء | `view` `create` (جولة، إضافة الموظفين الجدد) `edit` (التقييم، الصياغة، المشاركة، إغلاق الجولة) `delete` |
+| `assets` العُهد والأصول | `view` `create` `edit` (تسليم، استلام، حالة) `delete` |
+| `expenses` المصروفات | `view` `create` `edit` (موافقة / رفض) `delete` `pay` (الصرف؛ مع الراتب يتطلب أيضاً `salaries.create`) |
 | `reports` التقارير | `view` `export` (Excel) |
 | `activity` سجل العمليات | `view` |
 
@@ -352,7 +390,8 @@ sequenceDiagram
 - `getSessionUser` يعيد `role` و`permissions` للمنشأة النشطة. `can(user, perm)` للإخفاء في الواجهة، و`requirePermission(perm, back)` في **كل** Server Action وكل صفحة؛ عند الرفض يحوّل إلى `back?error=ليست لديك صلاحية…`. الإخفاء في الواجهة لا يكفي وحده: طلب POST مزوّر يُرفض في الخادم.
 - الشريط الجانبي يعرض الوحدات التي يملك المستخدم `view` لها فقط. التنبيهات وأحداث التقويم تُصفّى حسب الوحدة (عقود وأعياد ميلاد ← الموظفون، مستندات ← المستندات، إجازات وغياب ← الحضور، تذكيرات ← التقويم، مهام ← المهام، الباقي ← الرواتب).
 - بلا `salaries.view` تُخفى المبالغ في قوائم الموظفين والكفلاء ولوحة المعلومات. بلا `salaries.edit` لا تظهر حقول الراتب في نموذج الموظف ولا تُغيَّر من الخادم.
-- `/files/<name>` يتطلب `documents.view` لملفات المستندات؛ الشعارات متاحة لكل أعضاء المنشأة.
+- `/files/<name>` يتطلب `documents.view` لملفات المستندات، و`recruitment.view` للسير الذاتية، و`expenses.view` للإيصالات؛ الشعارات متاحة لكل أعضاء المنشأة.
+- التنبيهات الجديدة: المقابلات ← التوظيف، طلبات المصروفات ← المصروفات، عهدة مع موظف منتهي الخدمة ← العهد، موعد جولة التقييم ← تقييم الأداء.
 - كل مستخدم يعدّل بياناته الشخصية (`updateProfile`) أياً كان دوره. لا يغيّر المسؤول صلاحيته ولا يزيل نفسه، فتبقى لكل منشأة مسؤول واحد على الأقل.
 
 ### الدعوات
@@ -466,6 +505,7 @@ npm run build
 
 | التاريخ | التغيير |
 |---|---|
+| 2026-10-12 | المرحلة الرابعة: التوظيف (`/recruitment`: شواغر، رابط تقديم عام `/apply/<token>`، مسار المرشحين، تقييم السيرة بالذكاء الاصطناعي، المقابلات في التقويم والتنبيهات، التعيين إلى ملف موظف)؛ تقييم الأداء (`/performance`: جولات ومعايير 1–5، حقائق الفترة من ملف الموظف، صياغة بالذكاء الاصطناعي، المشاركة في البوابة)؛ العُهد (`/assets`: تسليم واستلام وصيانة وسجل، تنبيه العهد لدى المغادرين)؛ المصروفات (`/expenses` وفي البوابة والطلبات: إيصال، موافقة، صرف مع الراتب كاستحقاق أو مباشرة)؛ لوحة المالك (`/analytics`: 12 شهراً من العدد والتكلفة والدوران والغياب والتعمين والالتزامات، مع قراءة بالذكاء الاصطناعي)؛ تبويب «الأداء والعهد والمصروفات» في ملف الموظف؛ أربع وحدات صلاحيات جديدة. سبعة جداول جديدة وعمود `Employee.terminatedAt` (`db push` إضافي، وقيد فريد على `applyToken` الجديد) |
 | 2026-10-12 | المرحلة الثالثة (ج): المساعد الذكي `/assistant` — محادثة تقرأ بيانات المنشأة بأدوات مقيدة بصلاحيات المستخدم (الملخص، التنبيهات، الموظفون وملفاتهم، الحضور، طلبات الإجازة، الرواتب)، ويقترح مهمة أو ملاحظة أو تذكيراً لا يُحفظ إلا بعد «تأكيد وحفظ» مع التسجيل في السجل؛ نماذج احتياطية عبر AI Gateway. بلا تغيير في القاعدة |
 | 2026-10-12 | المرحلة الثالثة (أ، ب): بوابة الموظف برابط شخصي (`/portal/<token>`: الأرصدة، طلب إجازة وإلغاؤه، القسائم، المستندات وإرسال المحدّث، الخطابات، تسجيل الحضور)؛ صفحة «طلبات الموظفين» (`/approvals`) للموافقة على الإجازات وتسجيلها في الحضور ومراجعة المستندات؛ المدير المباشر والهيكل التنظيمي (`/org`)؛ تسجيل الحضور والانصراف بالموقع ونطاق العمل والتأخير، وسجل الدوام في الحضور وملف الموظف. جدولان جديدان وأعمدة جديدة (`db push` إضافي، وقيد فريد على `portalToken` الجديد) |
 | 2026-10-12 | المرحلة الثانية: الامتثال العماني — اشتراكات الحماية الاجتماعية (إعدادات، سطر خصم في الراتب، حصة صاحب العمل، كشف Excel)، ملف تحويل الرواتب WPS، بنك وحساب للمنشأة والموظف، مكافأة نهاية الخدمة، نسبة التعمين في لوحة المعلومات والتقارير؛ مستندات الموارد البشرية (شهادة راتب وخبرة، رسالة تحويل راتب، تسوية نهاية الخدمة)؛ فحص الرواتب قبل الصرف. أعمدة جديدة فقط (`db push` إضافي) |

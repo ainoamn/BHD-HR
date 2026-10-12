@@ -62,6 +62,12 @@ model Company {
   employeeNotes        EmployeeNote[]
   letters              Letter[]
   briefs               DailyBrief[]
+  jobOpenings          JobOpening[]
+  candidates           Candidate[]
+  reviewCycles         ReviewCycle[]
+  reviews              PerformanceReview[]
+  assets               Asset[]
+  expenseClaims        ExpenseClaim[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 }
@@ -178,6 +184,8 @@ model Employee {
   joiningDate        DateTime?
   contractEnd        DateTime?
   status             String              @default("ACTIVE")
+  /// Set when the status becomes TERMINATED (turnover figures); empty for employees ended before it was tracked.
+  terminatedAt       DateTime?
   annualLeaveDays    Float               @default(30)
   sickLeaveDays      Float               @default(0)
   otherLeaveDays     Float               @default(0)
@@ -205,6 +213,10 @@ model Employee {
   letters            Letter[]
   leaveRequests      LeaveRequest[]
   clockEntries       ClockEntry[]
+  hiredFrom          Candidate[]
+  reviews            PerformanceReview[]
+  assets             Asset[]
+  expenseClaims      ExpenseClaim[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -642,6 +654,198 @@ model LetterDelivery {
 
   @@index([letterId])
   @@index([status])
+}
+
+/// A vacancy (src/lib/recruitment.ts). `applyToken` opens the public form /apply/<token>; null = not open to the public.
+model JobOpening {
+  id             String      @id @default(cuid())
+  companyId      String
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title          String
+  titleEn        String?
+  jobTitleId     String?
+  departmentId   String?
+  department     String?
+  departmentEn   String?
+  /// Duties and requirements; also what AI screening compares CVs against.
+  description    String?
+  location       String?
+  /// FULL_TIME, PART_TIME, CONTRACT or INTERNSHIP.
+  employmentType String      @default("FULL_TIME")
+  openings       Int         @default(1)
+  salaryMin      Float?
+  salaryMax      Float?
+  /// OPEN, ON_HOLD or CLOSED.
+  status         String      @default("OPEN")
+  applyToken     String?     @unique
+  closesAt       DateTime?
+  createdByName  String?
+  candidates     Candidate[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([companyId, status])
+}
+
+model Candidate {
+  id              String     @id @default(cuid())
+  companyId       String
+  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobId           String
+  job             JobOpening @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fullName        String
+  email           String?
+  phone           String?
+  nationality     String?
+  currentTitle    String?
+  experienceYears Float?
+  expectedSalary  Float?
+  /// HR (added by a user) or APPLY_LINK (public form).
+  source          String     @default("HR")
+  cvUrl           String?
+  coverNote       String?
+  /// NEW, SCREENING, INTERVIEW, OFFER, HIRED or REJECTED.
+  stage           String     @default("NEW")
+  /// HR's own 1–5 rating.
+  rating          Int?
+  /// AI screening against the job description: 0–100 match, summary, strengths and gaps.
+  aiScore         Int?
+  aiSummary       String?
+  aiStrengths     String[]   @default([])
+  aiGaps          String[]   @default([])
+  aiAt            DateTime?
+  interviewAt     DateTime?
+  notes           String?
+  rejectReason    String?
+  /// The employee record created on hiring.
+  employeeId      String?
+  employee        Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([companyId, stage])
+  @@index([jobId])
+}
+
+/// A performance review round (src/lib/performance.ts). `criteria` = [{key, ar, en}], each scored 1–5.
+model ReviewCycle {
+  id            String              @id @default(cuid())
+  companyId     String
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name          String
+  periodStart   DateTime
+  periodEnd     DateTime
+  dueDate       DateTime?
+  /// OPEN or CLOSED.
+  status        String              @default("OPEN")
+  criteria      Json
+  createdByName String?
+  reviews       PerformanceReview[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([companyId])
+}
+
+model PerformanceReview {
+  id           String      @id @default(cuid())
+  companyId    String
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cycleId      String
+  cycle        ReviewCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// DRAFT or DONE.
+  status       String      @default("DRAFT")
+  /// {criterionKey: 1–5}
+  scores       Json?
+  overall      Float?
+  strengths    String?
+  improvements String?
+  goals        String?
+  comment      String?
+  reviewerName String?
+  completedAt  DateTime?
+  /// Shown in the employee portal from this time.
+  sharedAt     DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([cycleId, employeeId])
+  @@index([employeeId])
+}
+
+/// Company property that can be handed to an employee (custody / عهدة).
+model Asset {
+  id           String       @id @default(cuid())
+  companyId    String
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name         String
+  /// LAPTOP, PHONE, VEHICLE, ACCESS_CARD, TOOL, UNIFORM, FURNITURE or OTHER.
+  category     String       @default("OTHER")
+  tag          String?
+  serialNo     String?
+  value        Float?
+  purchaseDate DateTime?
+  /// AVAILABLE, ASSIGNED, MAINTENANCE or RETIRED.
+  status       String       @default("AVAILABLE")
+  employeeId   String?
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  assignedAt   DateTime?
+  notes        String?
+  events       AssetEvent[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId])
+}
+
+/// History of an asset: CREATE, ASSIGN, RETURN, MAINTENANCE, AVAILABLE or RETIRE.
+model AssetEvent {
+  id           String   @id @default(cuid())
+  assetId      String
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kind         String
+  employeeId   String?
+  employeeName String?
+  note         String?
+  byName       String?
+  createdAt    DateTime @default(now())
+
+  @@index([assetId])
+}
+
+/// Money an employee spent for work and claims back (src/lib/expenses.ts).
+model ExpenseClaim {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  category      String    @default("OTHER")
+  title         String
+  amount        Float
+  spentAt       DateTime
+  receiptUrl    String?
+  notes         String?
+  /// HR or PORTAL.
+  source        String    @default("HR")
+  /// PENDING, APPROVED (to be paid), PAID, REJECTED or CANCELLED (by the employee).
+  status        String    @default("PENDING")
+  decidedByName String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  /// SALARY (added to a salary through payItemId) or CASH / BANK_TRANSFER / CHEQUE.
+  payMethod     String?
+  payItemId     String?
+  paidAt        DateTime?
+  paidByName    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId])
 }
 
 model AuditLog {

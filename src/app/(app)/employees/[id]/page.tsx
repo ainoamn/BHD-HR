@@ -42,6 +42,7 @@ import { savePayItem } from "@/server/pay-item-actions";
 import { createSalary } from "@/server/salary-actions";
 import { PayItemForm } from "@/components/pay-item-form";
 import { PayItemsList } from "@/components/pay-items-list";
+import { EmployeeHrTab } from "@/components/employee-hr-tab";
 import { EmployeeLettersTab, EmployeeNotesTab, EmployeeTasksTab, PinnedNotes } from "@/components/employee-workspace";
 import { WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
 import { employeeOptions, loadBoardTasks } from "@/lib/task-data";
@@ -97,6 +98,9 @@ export default async function EmployeePage({
     taskDelete: can(user, "tasks.delete"),
     letters: can(user, "letters.view"),
     letterAdd: can(user, "letters.create"),
+    reviews: can(user, "performance.view"),
+    assets: can(user, "assets.view"),
+    expenses: can(user, "expenses.view"),
   };
   const warningSince = new Date(Date.now() - WARNING_LOOKBACK_DAYS * 86400000);
   const [notes, employeeTasks, taskEmployees, letters] = await Promise.all([
@@ -136,6 +140,7 @@ export default async function EmployeePage({
     attendance: allow.attendance,
     salaries: allow.salaries,
     pay: allow.salaries,
+    hr: allow.reviews || allow.assets || allow.expenses,
   };
   const now = currentPeriod();
   const nowKey = monthKey(now.year, now.month);
@@ -182,6 +187,7 @@ export default async function EmployeePage({
     { id: "attendance", label: t("الحضور والإجازات", "Attendance & leave"), count: periods.length },
     { id: "salaries", label: t("الرواتب", "Salaries"), count: employee.salaries.length },
     { id: "pay", label: t("السلف والمكافآت", "Advances & bonuses"), count: openPayItems },
+    { id: "hr", label: t("الأداء والعهد والمصروفات", "Performance, assets & expenses"), count: null },
   ].filter((item) => tabAllowed[item.id]);
   const employer = employee.employer;
   const employerName = employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : null;
@@ -437,6 +443,18 @@ export default async function EmployeePage({
               lang={lang}
               returnTo={`${base}?tab=tasks`}
               canCreate={allow.taskAdd}
+            />
+          ) : null}
+
+          {tab === "hr" ? (
+            <EmployeeHrTab
+              employeeId={employee.id}
+              companyId={user.companyId}
+              lang={lang}
+              currency={user.company.currency}
+              returnTo={`${base}?tab=hr`}
+              show={{ reviews: allow.reviews, assets: allow.assets, expenses: allow.expenses }}
+              claimAllow={{ decide: can(user, "expenses.edit"), pay: can(user, "expenses.pay"), salaryPay: allow.salaries && can(user, "salaries.create"), remove: can(user, "expenses.delete") }}
             />
           ) : null}
 

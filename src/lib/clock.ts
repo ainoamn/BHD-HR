@@ -12,6 +12,19 @@ export function muscatTime(date: Date | string | null | undefined) {
   return new Date(new Date(date).getTime() + MUSCAT_OFFSET_MS).toISOString().slice(11, 16);
 }
 
+/** DD/MM/YYYY HH:MM in Muscat time, for appointments such as interviews. */
+export function muscatDateTime(date: Date | string | null | undefined) {
+  if (!date) return "—";
+  const iso = new Date(new Date(date).getTime() + MUSCAT_OFFSET_MS).toISOString();
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)} ${iso.slice(11, 16)}`;
+}
+
+/** Value for <input type="datetime-local"> in Muscat time. */
+export function muscatInputValue(date: Date | string | null | undefined) {
+  if (!date) return "";
+  return new Date(new Date(date).getTime() + MUSCAT_OFFSET_MS).toISOString().slice(0, 16);
+}
+
 export function parseWorkStart(value: string | null | undefined) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value?.trim() || "");
   if (!match) return null;

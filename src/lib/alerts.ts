@@ -3,6 +3,7 @@ import type { Company } from "@prisma/client";
 import { can, getSessionUser } from "./auth";
 import type { Permission } from "./permissions";
 import { reminderDayIn, payDayFor } from "./calendar";
+import { muscatDateTime } from "./clock";
 import { DOC_LABEL, monthName } from "./constants";
 import { daysUntil, describeExpiry } from "./expiry";
 import { getLeaveTypes } from "./hr-catalog";
@@ -51,7 +52,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
   const thisMonth = now.getMonth() + 1;
   const { start, end } = monthRange(thisYear, thisMonth);
   const taskHorizon = new Date(Date.UTC(thisYear, now.getMonth(), now.getDate() + TASK_ALERT_DAYS + 1));
-  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs] = await Promise.all([
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
@@ -96,6 +97,30 @@ export async function computeAlerts(company: Company, permissions: readonly stri
         })
       : [],
     can(user, "documents.view") ? prisma.employeeDocument.count({ where: { employee: { companyId: company.id }, submittedAt: { not: null }, reviewedAt: null } }) : 0,
+    can(user, "recruitment.view")
+      ? prisma.candidate.findMany({
+          where: { companyId: company.id, stage: "INTERVIEW", interviewAt: { gte: new Date(now.getTime() - 2 * 3600_000), lt: new Date(now.getTime() + 48 * 3600_000) } },
+          select: { id: true, fullName: true, interviewAt: true, job: { select: { title: true } } },
+          orderBy: { interviewAt: "asc" },
+          take: 10,
+        })
+      : [],
+    can(user, "expenses.view")
+      ? prisma.expenseClaim.groupBy({ by: ["status"], where: { companyId: company.id, status: { in: ["PENDING", "APPROVED"] } }, _count: true, _sum: { amount: true } })
+      : [],
+    can(user, "assets.view")
+      ? prisma.asset.findMany({
+          where: { companyId: company.id, status: "ASSIGNED", employee: { status: "TERMINATED" } },
+          select: { id: true, name: true, employee: { select: { id: true, fullName: true, nameEn: true } } },
+          take: 20,
+        })
+      : [],
+    can(user, "performance.view")
+      ? prisma.reviewCycle.findMany({
+          where: { companyId: company.id, status: "OPEN", dueDate: { not: null, lt: new Date(now.getTime() + (limits.urgent + 1) * 86_400_000) } },
+          select: { id: true, name: true, dueDate: true, _count: { select: { reviews: { where: { status: { not: "DONE" } } } } } },
+        })
+      : [],
   ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const alerts: AlertItem[] = [];
@@ -245,6 +270,56 @@ export async function computeAlerts(company: Company, permissions: readonly stri
     });
   }
 
+  for (const candidate of interviews) {
+    alerts.push({
+      id: `interview-${candidate.id}`,
+      severity: "warning",
+      title: t("مقابلة قريبة", "Upcoming interview"),
+      message: `${candidate.fullName} — ${candidate.job.title} — ${muscatDateTime(candidate.interviewAt)}`,
+      href: `/recruitment/candidates/${candidate.id}`,
+      days: -30,
+    });
+  }
+
+  for (const group of claimGroups) {
+    const pending = group.status === "PENDING";
+    alerts.push({
+      id: `expenses-${group.status.toLowerCase()}`,
+      severity: "warning",
+      title: pending ? t("مصروفات بانتظار الموافقة", "Expense claims awaiting approval") : t("مصروفات معتمدة بانتظار الصرف", "Approved expenses to be paid"),
+      message: t(`${group._count} طلب — ${money(group._sum.amount || 0, company.currency)}`, `${group._count} claim(s) — ${money(group._sum.amount || 0, company.currency)}`),
+      href: pending ? "/approvals#expenses" : "/expenses?view=APPROVED",
+      days: pending ? -35 : 100,
+    });
+  }
+
+  for (const asset of strandedAssets) {
+    alerts.push({
+      id: `asset-${asset.id}`,
+      severity: "danger",
+      title: t("عهدة لدى موظف منتهية خدمته", "Asset held by a former employee"),
+      message: `${asset.name} — ${asset.employee ? nameOf(asset.employee) : ""}`,
+      href: `/assets/${asset.id}`,
+      days: -20,
+    });
+  }
+
+  for (const cycle of dueCycles) {
+    if (!cycle._count.reviews || !cycle.dueDate) continue;
+    const days = daysUntil(cycle.dueDate);
+    alerts.push({
+      id: `cycle-${cycle.id}`,
+      severity: days <= 0 ? "danger" : "warning",
+      title: t(`موعد تقييم الأداء: ${cycle.name}`, `Review due: ${cycle.name}`),
+      message: t(
+        `${cycle._count.reviews} تقييم لم يُعتمد — ${days < 0 ? `متأخر ${daysPhrase(days, "ar")}` : days === 0 ? "اليوم" : `بعد ${daysPhrase(days, "ar")}`}`,
+        `${cycle._count.reviews} review(s) not completed — ${days < 0 ? `${daysPhrase(days, "en")} overdue` : days === 0 ? "today" : `in ${daysPhrase(days, "en")}`}`,
+      ),
+      href: `/performance/${cycle.id}?show=DRAFT`,
+      days,
+    });
+  }
+
   for (const period of groupAttendance(absences).slice(0, 8)) {
     const kind = attendanceLabel(period.row, leaveTypes, lang);
     const when =
@@ -308,5 +383,9 @@ function alertPermission(id: string): Permission {
   if (id === "review-documents") return "documents.view";
   if (id.startsWith("reminder-")) return "calendar.view";
   if (id.startsWith("task-")) return "tasks.view";
+  if (id.startsWith("interview-")) return "recruitment.view";
+  if (id.startsWith("expenses-")) return "expenses.view";
+  if (id.startsWith("asset-")) return "assets.view";
+  if (id.startsWith("cycle-")) return "performance.view";
   return "salaries.view";
 }

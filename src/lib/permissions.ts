@@ -1,6 +1,21 @@
 import type { Bi } from "./i18n";
 
-export const MODULES = ["employees", "employers", "attendance", "salaries", "documents", "calendar", "tasks", "letters", "reports", "activity"] as const;
+export const MODULES = [
+  "employees",
+  "employers",
+  "attendance",
+  "salaries",
+  "documents",
+  "calendar",
+  "tasks",
+  "letters",
+  "recruitment",
+  "performance",
+  "assets",
+  "expenses",
+  "reports",
+  "activity",
+] as const;
 export type Module = (typeof MODULES)[number];
 
 export const ACTION_LABEL: Record<string, Bi> = {
@@ -23,6 +38,10 @@ export const MODULE_ACTIONS: Record<Module, readonly string[]> = {
   calendar: ["view", "create", "edit", "delete"],
   tasks: ["view", "create", "edit", "delete"],
   letters: ["view", "create", "edit", "delete"],
+  recruitment: ["view", "create", "edit", "delete"],
+  performance: ["view", "create", "edit", "delete"],
+  assets: ["view", "create", "edit", "delete"],
+  expenses: ["view", "create", "edit", "delete", "pay"],
   reports: ["view", "export"],
   activity: ["view"],
 };
@@ -36,6 +55,10 @@ export const MODULE_LABEL: Record<Module, Bi> = {
   calendar: { ar: "التقويم والتذكيرات", en: "Calendar & reminders" },
   tasks: { ar: "المهام والملاحظات", en: "Tasks & notes" },
   letters: { ar: "الإنذارات والخطابات", en: "Warnings & letters" },
+  recruitment: { ar: "التوظيف", en: "Recruitment" },
+  performance: { ar: "تقييم الأداء", en: "Performance reviews" },
+  assets: { ar: "العُهد والأصول", en: "Assets & custody" },
+  expenses: { ar: "المصروفات", en: "Expenses" },
   reports: { ar: "التقارير", en: "Reports" },
   activity: { ar: "سجل العمليات", en: "Activity log" },
 };
@@ -77,6 +100,10 @@ export const MODULE_HREF: Record<Module, string> = {
   calendar: "/calendar",
   tasks: "/tasks",
   letters: "/letters",
+  recruitment: "/recruitment",
+  performance: "/performance",
+  assets: "/assets",
+  expenses: "/expenses",
   reports: "/reports",
   activity: "/activity",
 };

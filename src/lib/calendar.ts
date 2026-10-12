@@ -1,3 +1,4 @@
+import { muscatTime } from "./clock";
 import { DOC_LABEL, monthName } from "./constants";
 import { daysUntil } from "./expiry";
 import { getLeaveTypes } from "./hr-catalog";
@@ -12,7 +13,7 @@ export const REMINDER_REPEAT: Record<string, Bi> = {
   YEARLY: { ar: "كل سنة", en: "Every year" },
 };
 
-export type EventKind = "salary" | "document" | "birthday" | "leave" | "reminder" | "task";
+export type EventKind = "salary" | "document" | "birthday" | "leave" | "reminder" | "task" | "interview";
 
 export const EVENT_KINDS: { id: EventKind; label: Bi; dot: string; chip: string }[] = [
   { id: "salary", label: { ar: "الرواتب", en: "Payroll" }, dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
@@ -21,6 +22,7 @@ export const EVENT_KINDS: { id: EventKind; label: Bi; dot: string; chip: string 
   { id: "leave", label: { ar: "الإجازات", en: "Leave" }, dot: "bg-sky-500", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
   { id: "reminder", label: { ar: "التذكيرات", en: "Reminders" }, dot: "bg-amber-500", chip: "bg-amber-50 text-amber-900 ring-amber-200" },
   { id: "task", label: { ar: "المهام", en: "Tasks" }, dot: "bg-teal-600", chip: "bg-teal-50 text-teal-800 ring-teal-200" },
+  { id: "interview", label: { ar: "المقابلات", en: "Interviews" }, dot: "bg-navy-500", chip: "bg-navy-50 text-navy-500 ring-navy-100" },
 ];
 
 export type CalendarEvent = {
@@ -45,6 +47,8 @@ export function payDayFor(year: number, month: number, payDay: number) {
   return payDay <= 0 ? last : Math.min(payDay, last);
 }
 
+const MUSCAT_OFFSET_MS = 4 * 3600000;
+
 function noonUtc(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
@@ -60,7 +64,7 @@ export function reminderDayIn(reminder: { date: Date; repeat: string }, year: nu
   return key === startKey ? date.getUTCDate() : null;
 }
 
-const KIND_ORDER: EventKind[] = ["salary", "reminder", "task", "document", "leave", "birthday"];
+const KIND_ORDER: EventKind[] = ["salary", "reminder", "task", "interview", "document", "leave", "birthday"];
 
 export async function getCalendarEvents(companyId: string, year: number, month: number, lang: Lang) {
   const t = makeT(lang);
@@ -72,7 +76,7 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const events: CalendarEvent[] = [];
 
-  const [salaries, activeCount, employees, monthRows, reminders, tasks] = await Promise.all([
+  const [salaries, activeCount, employees, monthRows, reminders, tasks, interviews] = await Promise.all([
     prisma.salary.findMany({ where: { year, month, employee: { companyId } }, select: { paid: true } }),
     prisma.employee.count({ where: { companyId, status: { in: ["ACTIVE", "VACATION"] } } }),
     prisma.employee.findMany({
@@ -91,6 +95,11 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
       where: { companyId, dueDate: { gte: start, lt: end } },
       select: { id: true, title: true, status: true, dueDate: true, assignees: { select: { employee: { select: { fullName: true, nameEn: true } } } } },
       take: 300,
+    }),
+    prisma.candidate.findMany({
+      where: { companyId, interviewAt: { gte: new Date(start.getTime() - MUSCAT_OFFSET_MS), lt: new Date(end.getTime() - MUSCAT_OFFSET_MS) } },
+      select: { id: true, fullName: true, stage: true, interviewAt: true, job: { select: { title: true, titleEn: true } } },
+      take: 200,
     }),
   ]);
 
@@ -248,6 +257,22 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
       detail: names.length ? (names.length > 2 ? `${names.slice(0, 2).join("، ")} +${names.length - 2}` : names.join(lang === "en" ? ", " : "، ")) : undefined,
       href: `/tasks/${task.id}`,
       urgent: !done && daysUntil(task.dueDate!) <= 0,
+      done,
+    });
+  }
+
+  for (const candidate of interviews) {
+    const local = new Date(candidate.interviewAt!.getTime() + MUSCAT_OFFSET_MS);
+    const job = lang === "en" && candidate.job.titleEn ? candidate.job.titleEn : candidate.job.title;
+    const done = candidate.stage === "HIRED" || candidate.stage === "REJECTED";
+    events.push({
+      id: `interview-${candidate.id}`,
+      day: local.getUTCDate(),
+      kind: "interview",
+      title: t(`مقابلة: ${candidate.fullName}`, `Interview: ${candidate.fullName}`),
+      detail: `${muscatTime(candidate.interviewAt)} — ${job}`,
+      href: `/recruitment/candidates/${candidate.id}`,
+      urgent: !done && daysUntil(candidate.interviewAt!) === 0,
       done,
     });
   }

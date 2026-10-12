@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarCheck2, Check, FileCheck2, Inbox, X } from "lucide-react";
+import { CalendarCheck2, Check, FileCheck2, Inbox, Receipt, X } from "lucide-react";
+import { ExpenseClaimCard } from "@/components/expense-claim";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, EmptyState, PageHeader, SectionTitle, ToneBadge, fieldClass } from "@/components/ui";
+import { Card, EmptyState, PageHeader, SectionTitle, ToneBadge, fieldClass, linkAction } from "@/components/ui";
 import { can, requireUser } from "@/lib/auth";
 import { DOC_LABEL } from "@/lib/constants";
 import { getLeaveTypes } from "@/lib/hr-catalog";
@@ -24,9 +25,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     decide: can(user, "attendance.create"),
     docs: can(user, "documents.view"),
     review: can(user, "documents.edit"),
+    expenses: can(user, "expenses.view"),
   };
-  if (!allow.leave && !allow.docs) redirect(`/?error=${encodeURIComponent(t("ليست لديك صلاحية لهذه الصفحة", "You cannot open this page"))}`);
-  const [pending, decided, documents, leaveTypes] = await Promise.all([
+  if (!allow.leave && !allow.docs && !allow.expenses) redirect(`/?error=${encodeURIComponent(t("ليست لديك صلاحية لهذه الصفحة", "You cannot open this page"))}`);
+  const claimAllow = { decide: can(user, "expenses.edit"), pay: false, salaryPay: false, remove: false };
+  const [pending, decided, documents, leaveTypes, claims] = await Promise.all([
     allow.leave
       ? prisma.leaveRequest.findMany({
           where: { companyId: user.companyId, status: "PENDING" },
@@ -50,6 +53,14 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         })
       : [],
     getLeaveTypes(user.companyId),
+    allow.expenses
+      ? prisma.expenseClaim.findMany({
+          where: { companyId: user.companyId, status: "PENDING" },
+          include: { employee: { select: { id: true, fullName: true, nameEn: true } } },
+          orderBy: { createdAt: "asc" },
+          take: 50,
+        })
+      : [],
   ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const labelOf = (choice: string) =>
@@ -61,8 +72,8 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         icon={Inbox}
         title={t("طلبات الموظفين", "Employee requests")}
         description={t(
-          "طلبات الإجازة والمستندات التي أرسلها الموظفون من بوابتهم. الموافقة على الإجازة تسجّلها في الحضور وتخصمها من الرصيد.",
-          "Leave requests and documents employees sent from their portal. Approving leave records it in attendance and uses the balance.",
+          "طلبات الإجازة والمستندات وتعويض المصروفات التي أرسلها الموظفون من بوابتهم. الموافقة على الإجازة تسجّلها في الحضور وتخصمها من الرصيد.",
+          "Leave requests, documents and expense claims employees sent from their portal. Approving leave records it in attendance and uses the balance.",
         )}
       />
       <Flash error={sp.error} message={sp.message} />
@@ -183,6 +194,27 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                   </form>
                 ) : null}
               </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {allow.expenses ? (
+        <Card id="expenses" className="mt-5">
+          <SectionTitle
+            hint={t(`${claims.length} بانتظار الموافقة`, `${claims.length} awaiting approval`)}
+            action={
+              <Link href="/expenses?view=APPROVED" className={linkAction}>
+                {t("المعتمدة بانتظار الصرف", "Approved, to be paid")}
+              </Link>
+            }
+          >
+            {t("طلبات تعويض المصروفات", "Expense claims")}
+          </SectionTitle>
+          {claims.length === 0 ? <EmptyState icon={Receipt} title={t("لا طلبات معلّقة", "No pending claims")} text={t("طلبات التعويض التي يرسلها الموظفون مع الإيصالات تظهر هنا.", "Claims employees send with receipts appear here.")} /> : null}
+          <ul className="space-y-3">
+            {claims.map((claim) => (
+              <ExpenseClaimCard key={claim.id} claim={claim} lang={lang} currency={user.company.currency} allow={claimAllow} returnTo="/approvals#expenses" />
             ))}
           </ul>
         </Card>

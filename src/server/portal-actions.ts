@@ -3,6 +3,7 @@
 import { writeAudit } from "@/lib/audit";
 import { distanceMeters, lateMinutes, muscatDay, muscatTime, validCoords } from "@/lib/clock";
 import { EXTRA_DOC_TYPES } from "@/lib/constants";
+import { EXPENSE_CATEGORIES, MAX_EXPENSE_AMOUNT, MAX_PENDING_PORTAL_CLAIMS } from "@/lib/expenses";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -10,7 +11,7 @@ import { attendanceLabel, eachUtcDate } from "@/lib/leave";
 import { MAX_PENDING_UPLOADS, MAX_REQUEST_DAYS, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { removeUpload, saveUpload } from "@/lib/uploads";
-import { clip, daysLabel, formatDate, parseDateInput, req, str } from "@/lib/utils";
+import { clip, daysLabel, formatDate, num, parseDateInput, req, round3, str } from "@/lib/utils";
 
 /** Every portal action starts here: the link is the only credential. */
 async function employeeFor(formData: FormData) {
@@ -106,6 +107,68 @@ export async function submitPortalDocument(formData: FormData) {
   });
   refreshAll();
   go(back, { message: t("أُرسل المستند للمراجعة", "Document sent for review") });
+}
+
+export async function submitExpense(formData: FormData) {
+  const { employee, base } = await employeeFor(formData);
+  const { lang, t } = await getI18n();
+  const back = `${base}#expenses`;
+  const title = clip(str(formData, "title"), 120) || "";
+  if (title.length < 2) go(back, { error: t("اكتب وصف المصروف", "Describe the expense") });
+  const amount = round3(num(formData, "amount"));
+  if (amount <= 0 || amount > MAX_EXPENSE_AMOUNT) go(back, { error: t("أدخل مبلغاً أكبر من صفر", "Enter an amount above zero") });
+  const spentAt = parseDateInput(req(formData, "spentAt"));
+  if (!spentAt) go(back, { error: t("حدد تاريخ المصروف", "Choose the expense date") });
+  const category = req(formData, "category");
+  const file = formData.get("receipt");
+  if (!(file instanceof File) || file.size === 0) go(back, { error: t("أرفق صورة الإيصال أو الفاتورة", "Attach a photo of the receipt or invoice") });
+  const pending = await prisma.expenseClaim.count({ where: { employeeId: employee.id, status: "PENDING" } });
+  if (pending >= MAX_PENDING_PORTAL_CLAIMS) go(back, { error: t("لديك طلبات كثيرة بانتظار الموافقة. انتظر البت فيها أولاً.", "Too many claims are awaiting approval. Wait for a decision first.") });
+  let receiptUrl: string | null = null;
+  try {
+    receiptUrl = await saveUpload(file as File, employee.companyId, lang);
+  } catch (error) {
+    go(back, { error: error instanceof Error ? error.message : t("تعذر رفع الإيصال", "Could not upload the receipt") });
+  }
+  try {
+    await prisma.expenseClaim.create({
+      data: {
+        companyId: employee.companyId,
+        employeeId: employee.id,
+        category: (EXPENSE_CATEGORIES as readonly string[]).includes(category) ? category : "OTHER",
+        title,
+        amount,
+        spentAt: spentAt!,
+        receiptUrl,
+        notes: clip(str(formData, "notes"), 500),
+        source: "PORTAL",
+      },
+    });
+  } catch (error) {
+    await removeUpload(receiptUrl);
+    console.error(error);
+    go(back, { error: t("تعذر حفظ الطلب", "Could not save the claim") });
+  }
+  await writeAudit({
+    companyId: employee.companyId,
+    employeeId: employee.id,
+    action: "EXPENSE_REQUEST",
+    message: `طلب ${employee.fullName} من البوابة تعويض مصروف «${title}» بمبلغ ${amount}`,
+  });
+  refreshAll();
+  go(back, { message: t("أُرسل الطلب، وستظهر هنا الموافقة والصرف", "Claim sent. The decision and payment will appear here") });
+}
+
+export async function cancelExpense(formData: FormData) {
+  const { employee, base } = await employeeFor(formData);
+  const { t } = await getI18n();
+  const updated = await prisma.expenseClaim.updateMany({
+    where: { id: req(formData, "id"), employeeId: employee.id, status: "PENDING" },
+    data: { status: "CANCELLED" },
+  });
+  if (!updated.count) go(`${base}#expenses`, { error: t("لا يمكن إلغاء هذا الطلب", "This claim cannot be cancelled") });
+  refreshAll();
+  go(`${base}#expenses`, { message: t("أُلغي الطلب", "Claim cancelled") });
 }
 
 export type ClockResult = { error?: string; message?: string };
