@@ -172,7 +172,7 @@ export function PayItemForm({
               ).map(([value, label]) => (
                 <label
                   key={value}
-                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-900"
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-surface px-3 py-1.5 text-xs font-medium text-slate-700 transition has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-900"
                 >
                   <input type="radio" name="repeat" value={value} checked={repeat === value} onChange={() => setRepeat(value)} className="accent-teal-700" />
                   {label}

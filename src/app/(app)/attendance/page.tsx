@@ -77,7 +77,7 @@ export default async function AttendancePage({
   const returnTo = `/attendance?year=${year}&month=${month}`;
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader
         icon={CalendarDays}
         title={t("الحضور والغياب", "Attendance & leave")}
@@ -136,8 +136,8 @@ export default async function AttendancePage({
               <form method="get" className="flex items-center gap-2">
                 <input type="hidden" name="year" value={year} />
                 <input type="hidden" name="month" value={month} />
-                <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm" aria-label={t("اليوم", "Day")} />
-                <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-sm" aria-label={t("اليوم", "Day")} />
+                <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   {t("عرض", "Show")}
                 </button>
               </form>

@@ -8,7 +8,7 @@ import { SubmitButton } from "./submit-button";
 function BriefFrame({ lang, children, footer }: { lang: Lang; children: React.ReactNode; footer?: React.ReactNode }) {
   const t = (ar: string, en: string) => (lang === "en" ? en : ar);
   return (
-    <section id="brief" className="scroll-mt-24 rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50/80 via-white to-white p-5 shadow-card sm:p-6">
+    <section id="brief" className="scroll-mt-24 rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50/80 via-surface to-surface p-5 shadow-card sm:p-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
           <span className="flex size-8 items-center justify-center rounded-xl bg-teal-700 text-white">

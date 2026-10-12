@@ -111,7 +111,7 @@ export function DocumentScan({ mode }: { mode: "employee" | "document" }) {
 
   return (
     <div ref={root} className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-teal-300 bg-teal-50/40 p-3">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-teal-700 ring-1 ring-inset ring-teal-100">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface text-teal-700 ring-1 ring-inset ring-teal-100">
         {busy ? <Loader2 size={18} className="animate-spin motion-reduce:animate-none" /> : <ScanText size={18} />}
       </span>
       <div className="min-w-0 flex-1">
@@ -137,7 +137,7 @@ export function DocumentScan({ mode }: { mode: "employee" | "document" }) {
         type="button"
         disabled={busy}
         onClick={() => picker.current?.click()}
-        className="inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-teal-800 ring-1 ring-inset ring-teal-200 transition duration-150 hover:bg-teal-50 disabled:opacity-60 motion-reduce:transition-none"
+        className="inline-flex min-h-10 items-center justify-center rounded-xl bg-surface px-4 text-sm font-semibold text-teal-800 ring-1 ring-inset ring-teal-200 transition duration-150 hover:bg-teal-50 disabled:opacity-60 motion-reduce:transition-none"
       >
         {t("اختر صورة أو PDF", "Choose image or PDF")}
       </button>

@@ -34,7 +34,7 @@ export default async function NewLetterPage({ searchParams }: { searchParams: Pr
   const back = sp.employeeId ? `/employees/${sp.employeeId}?tab=letters` : "/letters";
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="page-wide">
       <Link href={back} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {sp.employeeId ? t("ملف الموظف", "Employee file") : t("كل الخطابات", "All letters")}

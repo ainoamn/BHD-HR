@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import { LangProvider } from "@/components/lang-provider";
 import { getI18n } from "@/lib/lang";
+import { THEME_COOKIE, normalizeTheme } from "@/lib/utils";
 import "./globals.css";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
@@ -12,6 +14,9 @@ const plexArabic = IBM_Plex_Sans_Arabic({
 });
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+
+/** Runs before paint so the night theme never flashes light; with no saved choice it follows the device. */
+const THEME_SCRIPT = `(function(){var d=document.documentElement,q=matchMedia("(prefers-color-scheme: dark)");function saved(){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);return m&&m[1]}function apply(){d.dataset.theme=saved()||(q.matches?"dark":"light")}apply();q.addEventListener("change",function(){if(!saved())apply()})})()`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -30,8 +35,18 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { lang } = await getI18n();
+  const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang={lang} dir={lang === "en" ? "ltr" : "rtl"} className={`${inter.variable} ${plexArabic.variable}`}>
+    <html
+      lang={lang}
+      dir={lang === "en" ? "ltr" : "rtl"}
+      data-theme={theme === "system" ? undefined : theme}
+      className={`${inter.variable} ${plexArabic.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-dvh antialiased">
         <LangProvider lang={lang}>{children}</LangProvider>
       </body>

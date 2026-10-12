@@ -30,8 +30,8 @@ function Bars({ bars, empty, caption }: { bars: Bar[]; empty: string; caption: s
                   {bar.segments.map((segment, index) => (segment.value ? <span key={index} className={cn("block w-full", segment.className)} style={{ height: `${(segment.value / total) * 100}%` }} /> : null))}
                 </div>
               </div>
-              <span className="tabular text-center text-[0.65rem] leading-4 text-slate-500">{bar.label}</span>
-              {bar.note ? <span className="tabular text-center text-[0.6rem] leading-3 text-slate-400">{bar.note}</span> : null}
+              <span className="tabular text-center text-xs leading-4 text-slate-500">{bar.label}</span>
+              {bar.note ? <span className="tabular text-center text-[0.68rem] leading-4 text-slate-500">{bar.note}</span> : null}
             </div>
           );
         })}
@@ -81,7 +81,7 @@ export default async function AnalyticsPage() {
   const lastCostLabel = data.lastCost ? t(`راتب ${period(data.lastCost)}`, `${period(data.lastCost)} payroll`) : t("لا رواتب مسجلة بعد", "No payroll recorded yet");
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="page-wide space-y-5">
       <PageHeader
         icon={ChartNoAxesCombined}
         title={t("لوحة المالك", "Owner dashboard")}

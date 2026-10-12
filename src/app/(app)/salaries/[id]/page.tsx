@@ -37,7 +37,7 @@ export default async function SalaryDetailPage({
   const deductionLines = salary.lines.filter((line) => line.deduct);
   const lineLabel = (line: (typeof salary.lines)[number]) => (
     <>
-      <span className="me-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[0.7rem] font-medium text-slate-500">{pick(PAY_KIND_LABEL[line.kind], lang, line.kind)}</span>
+      <span className="me-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">{pick(PAY_KIND_LABEL[line.kind], lang, line.kind)}</span>
       {line.payItemId ? (
         <Link href={`/employees/${salary.employeeId}?tab=pay#item-${line.payItemId}`} className="text-teal-700 hover:underline">
           {line.title}
@@ -64,7 +64,7 @@ export default async function SalaryDetailPage({
   const row = "flex items-center justify-between gap-4 py-2.5";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link
         href={`/salaries?year=${salary.year}&month=${salary.month}`}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700"
@@ -85,7 +85,7 @@ export default async function SalaryDetailPage({
       <Flash error={sp.error} message={sp.message} />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-card">
+        <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-200/90 bg-surface shadow-card">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
             <h2 className="font-bold text-slate-900">{t("تفاصيل الراتب", "Salary breakdown")}</h2>
             <span className="tabular text-xs text-slate-500">
@@ -132,7 +132,7 @@ export default async function SalaryDetailPage({
               ))}
             </div>
           </div>
-          <div className="mx-3 mb-3 flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-l from-slate-900 to-teal-900 px-5 py-4 text-white shadow-raised sm:mx-4 sm:mb-4">
+          <div className="mx-3 mb-3 flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-l from-ink-900 to-teal-900 px-5 py-4 text-white shadow-raised sm:mx-4 sm:mb-4">
             <span className="text-sm font-medium text-white/75">{t("صافي الراتب", "Net salary")}</span>
             <span className="tabular text-2xl font-bold tracking-tight">{money(salary.netSalary, currency)}</span>
           </div>
@@ -286,7 +286,7 @@ export default async function SalaryDetailPage({
               ) : null}
 
               {allow.addItem ? (
-                <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+                <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
                   <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
                     <span className="flex items-center gap-3 text-sm font-bold text-slate-900">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gold-50 text-gold-600 ring-1 ring-inset ring-gold-100">

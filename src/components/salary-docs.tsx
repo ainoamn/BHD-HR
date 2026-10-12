@@ -187,7 +187,7 @@ export function SalaryDocsList({
 }
 
 export const sheetClass =
-  "sheet mx-auto w-full max-w-[190mm] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none";
+  "sheet mx-auto w-full max-w-[190mm] rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm sm:p-8 print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none";
 
 export function Payslip({ header, salary, currency }: { header: DocHeader; salary: DocSalary; currency: string }) {
   const gross = totalEarnings(salary);

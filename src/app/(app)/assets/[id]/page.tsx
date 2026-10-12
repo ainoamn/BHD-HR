@@ -38,7 +38,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
   ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/assets" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("كل العهد", "All assets")}
@@ -136,7 +136,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
             <ol className="relative space-y-3 border-s border-slate-200 ps-4">
               {asset.events.map((event) => (
                 <li key={event.id} className="relative text-sm">
-                  <span className="absolute -start-[1.3rem] top-1.5 size-2.5 rounded-full bg-teal-600 ring-4 ring-white" aria-hidden="true" />
+                  <span className="absolute -start-[1.3rem] top-1.5 size-2.5 rounded-full bg-teal-600 ring-4 ring-surface" aria-hidden="true" />
                   <p className="text-slate-900">
                     <span className="font-semibold">{pick(ASSET_EVENT_LABEL[event.kind], lang, event.kind)}</span>
                     {event.employeeName ? ` ${event.employeeName}` : ""}

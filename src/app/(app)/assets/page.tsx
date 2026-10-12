@@ -50,7 +50,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="page-wide">
       <PageHeader
         icon={LaptopMinimal}
         title={t("العُهد والأصول", "Assets & custody")}
@@ -69,7 +69,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
       </div>
 
       {can(user, "assets.create") ? (
-        <details className="group mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+        <details className="group mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
             <span className="flex items-center gap-3 font-bold text-slate-900">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">

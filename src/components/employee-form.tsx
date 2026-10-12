@@ -332,7 +332,7 @@ export async function EmployeeForm({
         <textarea className={`${fieldClass} min-h-28 w-full`} name="notes" defaultValue={employee?.notes || ""} aria-label={t("ملاحظات", "Notes")} />
       </Card>
 
-      <div className="sticky bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+0.75rem)] z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-raised backdrop-blur-md lg:bottom-4">
+      <div className="sticky bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+0.75rem)] z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-surface/90 p-3 shadow-raised backdrop-blur-md lg:bottom-4">
         <p className="hidden min-w-0 truncate text-sm text-slate-500 sm:block">
           {employee ? t("راجع التعديلات ثم احفظ.", "Review your changes, then save.") : t("سيُنشأ الرقم الوظيفي عند الحفظ.", "The employee number is generated on save.")}
         </p>

@@ -6,11 +6,12 @@ import { BhdAppSwitcher } from "@/components/bhd/BhdAppSwitcher";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { SiteFooter } from "@/components/bhd/site-footer";
 import { LangToggle } from "@/components/lang-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getAlerts } from "@/lib/alerts";
 import { can, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { MODULES, MODULE_HREF } from "@/lib/permissions";
-import { SIDEBAR_COOKIE, formatLongDate } from "@/lib/utils";
+import { SIDEBAR_COOKIE, THEME_COOKIE, formatLongDate, normalizeTheme } from "@/lib/utils";
 import { logout, switchCompany } from "@/server/auth-actions";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const { lang, t } = await getI18n();
   const alerts = await getAlerts();
-  const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === "collapsed";
+  const jar = await cookies();
+  const sidebarCollapsed = jar.get(SIDEBAR_COOKIE)?.value === "collapsed";
+  const theme = normalizeTheme(jar.get(THEME_COOKIE)?.value);
   const urgent = alerts.filter((item) => item.severity !== "info").length;
   const roleName =
     user.role === "ADMIN"
@@ -71,6 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               />
             </div>
           ) : null}
+          <ThemeToggle initial={theme} />
           <LangToggle />
           <BhdAppSwitcher user={{ name: user.name, email: user.email, picture: user.picture }} onSignOut={logout} locale={lang} />
         </>

@@ -16,7 +16,7 @@ const td = "px-4 py-3 whitespace-nowrap tabular";
 
 function ReportSection({ icon: Icon, title, aside, children }: { icon: LucideIcon; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card print:shadow-none">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card print:shadow-none">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-slate-100 px-4 py-3.5 sm:px-5">
         <h2 className="flex items-center gap-2.5 font-bold text-slate-900">
           <span className="flex size-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
@@ -51,7 +51,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const statusTones = ["text-teal-700", "text-gold-600", "text-navy-500", "text-slate-500"];
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader
         icon={PieChart}
         title={t("التقارير", "Reports")}
@@ -77,7 +77,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {report.statusCounts.map((item, index) => (
-            <div key={item.status} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card sm:p-5">
+            <div key={item.status} className="min-w-0 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card sm:p-5">
               <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">{item.label}</p>
               <p className={`tabular mt-1.5 text-2xl font-bold sm:text-[1.65rem] ${statusTones[index % statusTones.length]}`}>{item.count}</p>
             </div>
@@ -136,7 +136,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   [t("مصروف / غير مصروف", "Paid / unpaid"), `${report.totals.paid} / ${report.totals.unpaid}`, "text-slate-900"],
                 ] as const
               ).map(([label, value, tone]) => (
-                <div key={label} className="min-w-0 bg-white px-4 py-3 sm:px-5">
+                <div key={label} className="min-w-0 bg-surface px-4 py-3 sm:px-5">
                   <dt className="text-xs text-slate-500">{label}</dt>
                   <dd className={`tabular mt-0.5 truncate font-bold ${tone}`}>{value}</dd>
                 </div>

@@ -4,16 +4,16 @@ import { Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const fieldClass =
-  "min-h-11 min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-slate-900 shadow-[inset_0_1px_1px_rgb(9_45_36/0.03)] outline-none transition duration-150 placeholder:text-slate-400 hover:border-slate-300 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 sm:min-h-10 sm:text-sm";
+  "min-h-11 min-w-0 max-w-full rounded-xl border border-slate-200 bg-surface px-3.5 py-2.5 text-base text-slate-900 shadow-[inset_0_1px_1px_rgb(9_45_36/0.03)] outline-none transition duration-150 placeholder:text-slate-400 hover:border-slate-300 focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 sm:min-h-10 sm:text-sm";
 
 const btnBase =
   "inline-flex min-h-11 select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-150 ease-out active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60 sm:min-h-10";
 
 export const primaryBtn = `${btnBase} bg-teal-700 text-white shadow-[0_1px_2px_rgb(9_45_36/0.2),inset_0_1px_0_rgb(255_255_255/0.08)] hover:bg-teal-800`;
 
-export const secondaryBtn = `${btnBase} border border-slate-200 bg-white text-slate-700 shadow-card hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900`;
+export const secondaryBtn = `${btnBase} border border-slate-200 bg-surface text-slate-700 shadow-card hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900`;
 
-export const dangerBtn = `${btnBase} border border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50`;
+export const dangerBtn = `${btnBase} border border-red-200 bg-surface text-red-700 hover:border-red-300 hover:bg-red-50`;
 
 export const ghostBtn = `${btnBase} text-slate-600 hover:bg-slate-100 hover:text-slate-900`;
 
@@ -48,7 +48,7 @@ export function ToneBadge({ tone, children, className }: { tone: string; childre
 
 export function Card({ className, children, id }: { className?: string; children: React.ReactNode; id?: string }) {
   return (
-    <section id={id} className={cn("min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card sm:p-6", className)}>
+    <section id={id} className={cn("min-w-0 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card sm:p-6", className)}>
       {children}
     </section>
   );
@@ -69,7 +69,7 @@ export function PageHeader({
     <div className="mb-6 flex animate-fade-up flex-col gap-4 sm:mb-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex min-w-0 items-start gap-3.5">
         {Icon ? (
-          <span className="mt-0.5 hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-white text-teal-700 shadow-card ring-1 ring-slate-200 sm:flex">
+          <span className="mt-0.5 hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-teal-700 shadow-card ring-1 ring-slate-200 sm:flex">
             <Icon size={22} strokeWidth={1.8} />
           </span>
         ) : null}
@@ -137,7 +137,7 @@ export function Stat({
   const inner = (
     <div
       className={cn(
-        "group relative h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition duration-200 ease-out sm:p-5",
+        "group relative h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition duration-200 ease-out sm:p-5",
         href && "hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-raised",
       )}
     >
@@ -171,7 +171,7 @@ export function Stat({
 
 export function EmptyState({ title, text, icon: Icon = Inbox, children }: { title: string; text: string; icon?: LucideIcon; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white/70 px-6 py-14 text-center">
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-surface/70 px-6 py-14 text-center">
       <span className="flex size-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">
         <Icon size={26} strokeWidth={1.7} />
       </span>
@@ -184,7 +184,7 @@ export function EmptyState({ title, text, icon: Icon = Inbox, children }: { titl
 
 /** Filter / search bar above lists. */
 export function Toolbar({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("mb-4 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-card sm:p-3.5", className)}>{children}</div>;
+  return <div className={cn("mb-4 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-3.5", className)}>{children}</div>;
 }
 
 /** Label / value pair in detail grids. */

@@ -21,6 +21,9 @@ export function ReportToolbar({ targetId, excelHref, fileName, canExport }: { ta
         backgroundColor: "#ffffff",
         useCORS: true,
         ignoreElements: (node) => node instanceof HTMLElement && node.dataset.pdfIgnore === "true",
+        onclone: (doc) => {
+          doc.documentElement.dataset.theme = "light";
+        },
         windowWidth: Math.max(element.scrollWidth, 1024),
       });
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });

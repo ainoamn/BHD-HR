@@ -54,7 +54,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     .sort((a, b) => a.status.days - b.status.days);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader
         icon={Files}
         title={t("المستندات", "Documents")}
@@ -73,7 +73,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         </Link>
       ) : null}
       {allow.create && employees.length ? (
-        <details className="group mb-5 rounded-2xl border border-slate-200/90 bg-white shadow-card">
+        <details className="group mb-5 rounded-2xl border border-slate-200/90 bg-surface shadow-card">
           <summary className="flex list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
             <span className="flex items-center gap-2.5 font-bold text-slate-900">
               <span className="flex size-8 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">

@@ -43,8 +43,8 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
         <LangToggle />
       </div>
       <div className="flex flex-1 items-center justify-center px-4 py-10">
-      <div className="w-full max-w-lg animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-raised">
-        <div className="relative flex items-center gap-3.5 overflow-hidden bg-gradient-to-l from-slate-900 to-teal-900 px-6 py-6 text-white sm:px-8">
+      <div className="w-full max-w-lg animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-surface shadow-raised">
+        <div className="relative flex items-center gap-3.5 overflow-hidden bg-gradient-to-l from-ink-900 to-teal-900 px-6 py-6 text-white sm:px-8">
           <span className="higher-horizon pointer-events-none absolute -bottom-6 end-0 h-28 w-48 bg-[length:100%] opacity-[0.08]" aria-hidden="true" />
           <span className="relative flex size-11 items-center justify-center rounded-xl bg-white/10 text-gold-300 ring-1 ring-inset ring-white/15">
             <MailOpen size={20} />

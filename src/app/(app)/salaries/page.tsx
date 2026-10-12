@@ -105,14 +105,14 @@ export default async function SalariesPage({
         <Icon size={19} />
       </span>
       <div className="min-w-0">
-        <p className="text-[0.7rem] font-semibold text-slate-400">{t(`الخطوة ${number}`, `Step ${number}`)}</p>
+        <p className="text-xs font-semibold text-slate-500">{t(`الخطوة ${number}`, `Step ${number}`)}</p>
         <h2 className="font-bold leading-tight text-slate-900">{title}</h2>
       </div>
     </div>
   );
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader
         icon={Banknote}
         title={t("الرواتب", "Payroll")}

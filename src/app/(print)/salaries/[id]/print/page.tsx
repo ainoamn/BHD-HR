@@ -49,7 +49,7 @@ export default async function SalaryPrintPage({
                 href={`/salaries/${salary.id}/print?doc=${tab.key}`}
                 className={cn(
                   "rounded-lg border px-3 py-2 text-sm font-semibold",
-                  doc === tab.key ? "border-teal-800 bg-teal-800 text-white" : "border-slate-300 bg-white text-slate-700",
+                  doc === tab.key ? "border-teal-800 bg-teal-800 text-white" : "border-slate-300 bg-surface text-slate-700",
                 )}
               >
                 {tab.label}

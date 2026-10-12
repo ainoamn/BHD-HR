@@ -88,7 +88,7 @@ export function PhoneInput({ id, name, defaultValue, ariaLabel }: { id?: string;
         aria-label={t(`رمز الدولة +${dialCode(country)}`, `Country code +${dialCode(country)}`)}
         className={cn(fieldClass, "flex w-[6.5rem] shrink-0 cursor-pointer items-center gap-1.5")}
       >
-        <span className="text-[0.7rem] font-semibold text-slate-400">{country}</span>
+        <span className="text-xs font-semibold text-slate-500">{country}</span>
         <span className="tabular flex-1 text-start font-semibold">+{dialCode(country)}</span>
         <ChevronDown size={14} className={cn("shrink-0 text-slate-400 transition", open && "rotate-180")} />
       </button>
@@ -115,7 +115,7 @@ export function PhoneInput({ id, name, defaultValue, ariaLabel }: { id?: string;
       />
       {open ? (
         <div
-          className="absolute start-0 top-full z-40 mt-1 w-72 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-float"
+          className="absolute start-0 top-full z-40 mt-1 w-72 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-xl border border-slate-200 bg-surface shadow-float"
           onMouseDown={(event) => {
             if (event.target !== event.currentTarget.querySelector("input")) event.preventDefault();
           }}

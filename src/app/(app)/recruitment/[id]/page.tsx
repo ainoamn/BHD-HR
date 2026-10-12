@@ -46,7 +46,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/recruitment" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("كل الشواغر", "All vacancies")}
@@ -65,7 +65,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
           {allow.create ? (
-            <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card" open={job.candidates.length === 0}>
+            <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card" open={job.candidates.length === 0}>
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
                 <span className="flex items-center gap-3 font-bold text-slate-900">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
@@ -139,7 +139,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
                   <Link key={item.id} href={`${base}?stage=${item.id}`} aria-current={item.id === stage ? "page" : undefined}>
                     {item.label}
                     {item.count ? (
-                      <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === stage ? "bg-teal-50 text-teal-800" : "bg-white/70 text-slate-500")}>{item.count}</span>
+                      <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === stage ? "bg-teal-50 text-teal-800" : "bg-surface/70 text-slate-500")}>{item.count}</span>
                     ) : null}
                   </Link>
                 ))}
@@ -281,7 +281,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           </Card>
 
           {catalog ? (
-            <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+            <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold text-slate-900 transition hover:bg-slate-50/70">
                 <span className="flex items-center gap-2">
                   <Pencil size={16} className="text-teal-700" />

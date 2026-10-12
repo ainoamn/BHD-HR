@@ -60,7 +60,7 @@ export function AccessEditor({ defaultRole = "VIEWER", defaultPermissions = [] }
             type="button"
             onClick={() => choosePreset(preset.id)}
             aria-pressed={role === preset.id}
-            className={`rounded-xl border px-3 py-2.5 text-start transition duration-150 ${role === preset.id ? "border-teal-600 bg-teal-50 ring-4 ring-teal-600/10" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+            className={`rounded-xl border px-3 py-2.5 text-start transition duration-150 ${role === preset.id ? "border-teal-600 bg-teal-50 ring-4 ring-teal-600/10" : "border-slate-200 bg-surface hover:border-slate-300 hover:bg-slate-50"}`}
           >
             <span className="block text-sm font-bold text-slate-900">{preset.title}</span>
             <span className="block text-xs leading-5 text-slate-500">{preset.text}</span>

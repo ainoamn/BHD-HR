@@ -51,13 +51,13 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const employees = allow.edit ? await employeeOptions(user.companyId, lang) : [];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/tasks" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("كل المهام", "All tasks")}
       </Link>
 
-      <section className="animate-fade-up rounded-3xl border border-slate-200/90 bg-white p-4 shadow-card sm:p-6">
+      <section className="animate-fade-up rounded-3xl border border-slate-200/90 bg-surface p-4 shadow-card sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -122,10 +122,10 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
                   aria-pressed={option === status}
                   className={cn(
                     "flex min-h-10 w-full items-center justify-center gap-2 rounded-xl px-3.5 text-sm font-semibold ring-1 ring-inset transition",
-                    option === status ? "bg-teal-700 text-white ring-teal-700" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50",
+                    option === status ? "bg-teal-700 text-white ring-teal-700" : "bg-surface text-slate-700 ring-slate-200 hover:bg-slate-50",
                   )}
                 >
-                  <span className={cn("size-2 rounded-full", option === status ? "bg-white" : TASK_STATUS[option].dot)} />
+                  <span className={cn("size-2 rounded-full", option === status ? "bg-surface" : TASK_STATUS[option].dot)} />
                   {pick(TASK_STATUS[option].label, lang)}
                 </button>
               </form>
@@ -180,7 +180,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
                         aria-label={item.done ? t("إلغاء الإنجاز", "Mark not done") : t("تم", "Mark done")}
                         className={cn(
                           "mt-0.5 flex size-5 items-center justify-center rounded-md ring-1 ring-inset transition",
-                          item.done ? "bg-teal-700 text-white ring-teal-700" : "bg-white ring-slate-300 hover:ring-teal-600",
+                          item.done ? "bg-teal-700 text-white ring-teal-700" : "bg-surface ring-slate-300 hover:ring-teal-600",
                         )}
                       >
                         {item.done ? <Check size={13} strokeWidth={3} /> : null}

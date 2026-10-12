@@ -48,7 +48,7 @@ export default async function LettersPage({ searchParams }: { searchParams: Prom
   const filtered = Boolean(kind || sp.employeeId || q || state);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader
         icon={ScrollText}
         title={t("الإنذارات والخطابات", "Warnings & letters")}

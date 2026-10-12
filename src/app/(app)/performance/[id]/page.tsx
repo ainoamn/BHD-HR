@@ -38,7 +38,7 @@ export default async function CyclePage({ params, searchParams }: { params: Prom
   const name = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/performance" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("كل الجولات", "All rounds")}

@@ -22,7 +22,7 @@
   --color-slate-100: #eef2f0;
   --color-slate-200: #d7e2dc;
   --color-slate-300: #c3d0c9;
-  --color-slate-400: #8fa09a;
+  --color-slate-400: #77897f;
   --color-slate-500: #66756f;
   --color-slate-600: #4e5e57;
   --color-slate-700: #364841;
@@ -54,6 +54,15 @@
   --color-navy-500: #174b70;
   --color-navy-700: #10364f;
 
+  /* Cards, inputs and menus: white by day, deep green by night. `text-white` stays white in both. */
+  --color-surface: #ffffff;
+
+  /* Always-dark brand surfaces (sidebar, hero cards, overlays); not inverted at night. */
+  --color-ink-700: #364841;
+  --color-ink-800: #1c3129;
+  --color-ink-900: #092d24;
+  --color-ink-950: #061f19;
+
   --shadow-card: 0 1px 2px rgb(9 45 36 / 0.04), 0 1px 1px rgb(9 45 36 / 0.02);
   --shadow-raised: 0 12px 32px -14px rgb(9 45 36 / 0.22), 0 2px 6px -2px rgb(9 45 36 / 0.06);
   --shadow-float: 0 24px 60px -20px rgb(9 45 36 / 0.35);
@@ -79,6 +88,13 @@
   --font-sans: var(--font-inter), var(--font-plex-arabic), "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
+/* Page container: the full content width, capped only on very wide monitors. */
+@utility page-wide {
+  width: 100%;
+  max-width: 120rem;
+  margin-inline: auto;
+}
+
 :root {
   --ink: #092d24;
   --emerald: #075c45;
@@ -91,6 +107,108 @@
 
 .app-shell[data-sidebar="collapsed"] {
   --sidebar-width: 5rem;
+}
+
+/*
+ * Night theme: <html data-theme="dark"> (set before paint from the hr_theme cookie or the device setting).
+ * Neutrals invert; colour tints (50–200) turn into deep tints; coloured text is lifted below so it reads on
+ * dark cards, while solid fills (buttons, dots, bars) keep their colour under white text. Print stays light.
+ */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #e8efec;
+    --sand: #0b1512;
+    --sand-deep: #101c18;
+    --line: #263a32;
+
+    --color-surface: #12201b;
+    --color-sand-50: #0b1512;
+    --color-sand-100: #111d19;
+    --color-sand-200: #1a2924;
+
+    --color-slate-50: #16251f;
+    --color-slate-100: #1c2d27;
+    --color-slate-200: #263a32;
+    --color-slate-300: #354b42;
+    --color-slate-400: #74887f;
+    --color-slate-500: #9cada6;
+    --color-slate-600: #b4c2bc;
+    --color-slate-700: #c9d4cf;
+    --color-slate-800: #dbe4e0;
+    --color-slate-900: #ecf2ef;
+    --color-slate-950: #f5f9f7;
+
+    --color-teal-50: #0f2a22;
+    --color-teal-100: #143a2f;
+    --color-teal-200: #1c4e40;
+    --color-teal-300: #2b6c58;
+    --color-teal-600: #138a6b;
+    --color-teal-700: #0d7a5c;
+    --color-teal-800: #0b664d;
+
+    --color-red-50: #2b1515;
+    --color-red-100: #3b1b1b;
+    --color-red-200: #5c2828;
+    --color-orange-50: #2b1a0f;
+    --color-orange-100: #3d2412;
+    --color-orange-200: #5c3618;
+    --color-amber-50: #2a2010;
+    --color-amber-100: #3a2c13;
+    --color-amber-200: #5a441a;
+    --color-emerald-50: #0f2a1f;
+    --color-emerald-100: #13382a;
+    --color-emerald-200: #1d5240;
+    --color-sky-50: #0f2333;
+    --color-sky-200: #1f4566;
+    --color-fuchsia-50: #2c1430;
+    --color-fuchsia-200: #4f2557;
+    --color-navy-50: #122233;
+    --color-navy-100: #1a3047;
+    --color-gold-50: #2a2216;
+    --color-gold-100: #3a2f1d;
+    --color-gold-200: #5a4a2e;
+    --color-aqua-50: #0d2a29;
+    --color-aqua-100: #123a39;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-raised: 0 12px 32px -14px rgb(0 0 0 / 0.6), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+    --shadow-float: 0 24px 60px -20px rgb(0 0 0 / 0.75);
+  }
+
+  :root[data-theme="dark"] :is(.text-teal-500, .text-teal-600, .text-teal-700, .group:hover .group-hover\:text-teal-700) {
+    color: #6fd0ab;
+  }
+  :root[data-theme="dark"] :is(.text-teal-800, .text-teal-900, .text-teal-950, .hover\:text-teal-700:hover, .hover\:text-teal-800:hover, .hover\:text-teal-900:hover) {
+    color: #9de0c5;
+  }
+  :root[data-theme="dark"] :is(.text-teal-50, .text-teal-100) {
+    color: #d8ece3;
+  }
+  :root[data-theme="dark"] :is(.text-red-500, .text-red-600, .text-red-700, .text-red-800, .hover\:text-red-600:hover, .hover\:text-red-700:hover, .hover\:text-red-800:hover) {
+    color: #f4a0a0;
+  }
+  :root[data-theme="dark"] :is(.text-orange-500, .text-orange-600, .text-orange-700, .text-orange-800) {
+    color: #f5b27a;
+  }
+  :root[data-theme="dark"] :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) {
+    color: #f1cb7c;
+  }
+  :root[data-theme="dark"] :is(.text-emerald-600, .text-emerald-700, .text-emerald-800) {
+    color: #7dd8ad;
+  }
+  :root[data-theme="dark"] .text-fuchsia-800 {
+    color: #ecaaf2;
+  }
+  :root[data-theme="dark"] :is(.text-sky-800, .text-navy-500) {
+    color: #9cc3ea;
+  }
+  :root[data-theme="dark"] :is(.text-gold-500, .text-gold-600, .text-gold-700) {
+    color: #ddb984;
+  }
+  :root[data-theme="dark"] :is(.text-aqua-600, .text-aqua-700) {
+    color: #6fd3cf;
+  }
 }
 
 html {
@@ -175,7 +293,7 @@ textarea:focus-visible {
     overflow-x: auto;
     border: 1px solid var(--color-slate-200);
     border-radius: 1rem;
-    background: #fff;
+    background: var(--color-surface);
     box-shadow: var(--shadow-card);
     scrollbar-width: thin;
   }
@@ -209,7 +327,7 @@ textarea:focus-visible {
   }
 
   .table-shell tbody tr:hover {
-    background: #f9fbfa;
+    background: color-mix(in srgb, var(--color-slate-50) 70%, transparent);
   }
 
   .table-shell tfoot td,
@@ -255,7 +373,7 @@ textarea:focus-visible {
   .segmented > [aria-current="page"],
   .segmented > [aria-current="true"],
   .segmented > [data-active="true"] {
-    background: #fff;
+    background: var(--color-surface);
     color: var(--ink);
     box-shadow: 0 1px 2px rgb(9 45 36 / 0.08), 0 0 0 1px rgb(9 45 36 / 0.04);
   }
@@ -369,6 +487,11 @@ textarea:focus-visible {
 }
 
 .official-logo-ink { background: #0a493b; }
+:root[data-theme="dark"] .official-logo-ink { background: #e8efec; }
+
+@media print {
+  :root[data-theme="dark"] .official-logo-ink { background: #0a493b; }
+}
 .official-logo-light { background: #fffdf8; }
 
 /* BHD app icons + switcher (docs/BHD-APP-SWITCHER.md). */
@@ -407,7 +530,7 @@ textarea:focus-visible {
   border: 0;
   background: transparent;
   cursor: pointer;
-  color: #092d24;
+  color: var(--ink);
 }
 
 .bhd-switcher-grid span {
@@ -453,11 +576,11 @@ textarea:focus-visible {
   max-height: min(360px, calc(100svh - 96px));
   overflow: auto;
   padding: 14px;
-  border: 1px solid #d7e2dc;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: 0 18px 40px rgba(9, 45, 36, 0.12);
-  color: #092d24;
+  color: var(--ink);
 }
 
 .bhd-switcher-card-head p {
@@ -498,7 +621,7 @@ textarea:focus-visible {
 
 .bhd-switcher-app:hover,
 .bhd-switcher-app:focus-visible {
-  background: #f5f7f6;
+  background: var(--color-slate-50);
 }
 
 .bhd-switcher-app.is-disabled {
@@ -517,7 +640,7 @@ textarea:focus-visible {
 }
 
 .bhd-switcher-mark.is-current {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px currentColor;
 }
 
 .bhd-switcher-account-row {
@@ -539,7 +662,7 @@ textarea:focus-visible {
 }
 
 .bhd-switcher-account-row small {
-  color: #5d7169;
+  color: var(--color-slate-500);
   font-size: 12px;
 }
 
@@ -551,7 +674,7 @@ textarea:focus-visible {
   padding: 10px 12px;
   border: 0;
   border-radius: 12px;
-  background: #f4f7f5;
+  background: var(--color-slate-100);
   color: var(--ink);
   font: inherit;
   font-size: 13px;
@@ -563,7 +686,7 @@ textarea:focus-visible {
 
 .bhd-switcher-signout {
   margin-top: 8px;
-  background: var(--ink);
+  background: var(--color-ink-900);
   color: #fff;
 }
 

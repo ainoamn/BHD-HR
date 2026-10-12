@@ -108,7 +108,7 @@ export function LetterForm({
                 onClick={() => chooseKind(option)}
                 className={cn(
                   "flex min-h-12 items-center gap-2 rounded-xl px-3 py-2 text-start text-sm font-semibold ring-1 ring-inset transition",
-                  kind === option ? "bg-teal-700 text-white ring-teal-700" : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50",
+                  kind === option ? "bg-teal-700 text-white ring-teal-700" : "bg-surface text-slate-700 ring-slate-200 hover:bg-slate-50",
                 )}
               >
                 {meta.warning || option === "NOTICE" ? <TriangleAlert size={16} className={kind === option ? "text-white" : "text-orange-500"} /> : <FileText size={16} className={kind === option ? "text-white" : "text-teal-700"} />}
@@ -199,7 +199,7 @@ export function LetterForm({
               ["WHATSAPP", MessageCircle, t("إرسال نسخة عبر واتساب", "Send a copy on WhatsApp"), channelHint(channels.WHATSAPP, withPhone, "هاتف")],
             ] as const
           ).map(([channel, Icon, label, hint]) => (
-            <label key={channel} className="flex cursor-pointer items-start gap-3 rounded-xl bg-white p-3 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 has-[:checked]:bg-teal-50/60 has-[:checked]:ring-teal-300">
+            <label key={channel} className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface p-3 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 has-[:checked]:bg-teal-50/60 has-[:checked]:ring-teal-300">
               <input type="checkbox" name={`send${channel}`} value="1" defaultChecked className="mt-1 accent-teal-700" />
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">

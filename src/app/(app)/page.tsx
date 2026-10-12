@@ -66,8 +66,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ].filter((item): item is { href: string; label: string; icon: typeof UserPlus } => Boolean(item));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <section className="relative animate-fade-up overflow-hidden rounded-3xl bg-slate-900 px-5 py-6 text-white shadow-raised sm:px-8 sm:py-8">
+    <div className="page-wide space-y-6">
+      <section className="relative animate-fade-up overflow-hidden rounded-3xl bg-ink-900 px-5 py-6 text-white shadow-raised sm:px-8 sm:py-8">
         <div className="higher-horizon pointer-events-none absolute -bottom-6 end-0 h-48 w-80 bg-[length:100%] opacity-[0.07]" aria-hidden="true" />
         <div className="pointer-events-none absolute -top-24 start-1/3 size-72 rounded-full bg-teal-500/20 blur-3xl" aria-hidden="true" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -113,7 +113,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   href={item.href}
                   className={cn(
                     "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition duration-150 active:scale-[0.98]",
-                    index === 0 ? "bg-white text-slate-900 hover:bg-sand-100" : "bg-white/[0.08] text-white ring-1 ring-inset ring-white/15 hover:bg-white/[0.14]",
+                    index === 0 ? "bg-white text-ink-900 hover:bg-white/90" : "bg-white/[0.08] text-white ring-1 ring-inset ring-white/15 hover:bg-white/[0.14]",
                   )}
                 >
                   <Icon size={17} className="shrink-0" />

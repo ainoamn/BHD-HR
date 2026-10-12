@@ -187,7 +187,7 @@ export default async function HrDocumentPage({
           </Link>
           <PrintButton label={t("طباعة / حفظ PDF", "Print / Save PDF")} />
         </div>
-        <GetForm className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_1fr_auto]">
+        <GetForm className="grid gap-2 rounded-2xl border border-slate-200 bg-surface p-3 sm:grid-cols-[1fr_1fr_auto]">
           <select name="type" defaultValue={type} className={`${fieldClass} w-full`} aria-label={t("نوع المستند", "Document type")}>
             {available.map((item) => (
               <option key={item} value={item}>

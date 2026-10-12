@@ -93,7 +93,7 @@ export default async function ContactsPrintPage({
           </Link>
           <PrintButton label={t("طباعة / حفظ PDF", "Print / Save PDF")} />
         </div>
-        <form method="get" className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-white p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto_auto] lg:items-center">
+        <form method="get" className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-surface p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto_auto] lg:items-center">
           {q ? <input type="hidden" name="q" value={q} /> : null}
           <select className={`${fieldClass} w-full`} name="employerId" defaultValue={employerId} aria-label={t("الكفيل", "Sponsor")}>
             <option value="">{t("كل الكفلاء", "All sponsors")}</option>

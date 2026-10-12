@@ -37,7 +37,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
   const defaultEnd = `${year}-${half === 1 ? "06-30" : "12-31"}`;
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="page-wide">
       <PageHeader
         icon={Target}
         title={t("تقييم الأداء", "Performance reviews")}
@@ -57,7 +57,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
       </div>
 
       {catalog ? (
-        <details open={cycles.length === 0} className="group mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+        <details open={cycles.length === 0} className="group mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
             <span className="flex items-center gap-3 font-bold text-slate-900">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
@@ -94,7 +94,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
               <legend className="mb-2 text-sm font-medium text-slate-700">{t("المعايير (كل معيار من 1 إلى 5)", "Criteria (each scored 1–5)")}</legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 {DEFAULT_CRITERIA.map((item) => (
-                  <label key={item.key} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm ring-1 ring-inset ring-slate-200">
+                  <label key={item.key} className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-sm ring-1 ring-inset ring-slate-200">
                     <input type="checkbox" name="criteria" value={item.key} defaultChecked className="size-4 accent-teal-700" />
                     {lang === "en" ? item.en : item.ar}
                   </label>
@@ -125,7 +125,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
             const mean = avg.length ? Math.round((avg.reduce((sum, review) => sum + review.overall!, 0) / avg.length) * 10) / 10 : null;
             return (
               <li key={cycle.id}>
-                <Link href={`/performance/${cycle.id}`} className="block rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-raised sm:p-5">
+                <Link href={`/performance/${cycle.id}`} className="block rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-raised sm:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="break-words font-bold text-slate-900">{cycle.name}</p>

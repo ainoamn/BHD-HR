@@ -30,7 +30,7 @@ export function Modal({
           ref.current = node;
           if (node && defaultOpen && !node.open) node.showModal();
         }}
-        className="m-auto w-[min(56rem,calc(100vw-1.5rem))] rounded-3xl border border-slate-200 bg-white p-0 text-slate-900 shadow-float backdrop:bg-slate-950/45 backdrop:backdrop-blur-[2px] open:animate-fade-up"
+        className="m-auto w-[min(56rem,calc(100vw-1.5rem))] rounded-3xl border border-slate-200 bg-surface p-0 text-slate-900 shadow-float backdrop:bg-ink-950/45 backdrop:backdrop-blur-[2px] open:animate-fade-up"
         onClick={(event) => {
           if (event.target === ref.current) ref.current?.close();
         }}

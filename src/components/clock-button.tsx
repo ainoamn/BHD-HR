@@ -58,7 +58,7 @@ export function ClockButton({ token, next, needsLocation }: { token: string; nex
         disabled={busy}
         className={cn(
           "flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-5 text-base font-bold text-white shadow-raised transition duration-200 disabled:opacity-70",
-          next === "in" ? "bg-teal-700 hover:bg-teal-800" : "bg-slate-800 hover:bg-slate-900",
+          next === "in" ? "bg-teal-700 hover:bg-teal-800" : "bg-ink-800 hover:bg-ink-900",
         )}
       >
         {locating ? <MapPin size={20} className="animate-pulse motion-reduce:animate-none" /> : <Icon size={20} />}

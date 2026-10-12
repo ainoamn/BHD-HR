@@ -22,7 +22,7 @@ function NoteKindPicker({ name, defaultValue, lang }: { name: string; defaultVal
       {Object.entries(NOTE_KINDS).map(([value, meta]) => (
         <label
           key={value}
-          className="cursor-pointer rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition duration-150 hover:border-slate-300 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-800 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-teal-600/30"
+          className="cursor-pointer rounded-full border border-slate-200 bg-surface px-3 py-1.5 text-xs font-semibold text-slate-600 transition duration-150 hover:border-slate-300 has-[:checked]:border-teal-600 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-800 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-teal-600/30"
         >
           <input type="radio" name={name} value={value} defaultChecked={value === defaultValue} className="sr-only" />
           {pick(meta.label, lang)}
@@ -88,8 +88,8 @@ export function EmployeeNotesTab({
               const meta = NOTE_KINDS[note.kind] || NOTE_KINDS.GENERAL;
               return (
                 <li key={note.id} className="relative ps-7">
-                  <span className={cn("absolute start-0 top-4 size-[15px] rounded-full border-[3px] border-white ring-1", note.pinned ? "bg-amber-400 ring-amber-300" : "bg-teal-600 ring-teal-200")} aria-hidden="true" />
-                  <article className={cn("rounded-2xl border p-3.5 sm:p-4", note.pinned ? "border-amber-200 bg-amber-50/50" : "border-slate-100 bg-white")}>
+                  <span className={cn("absolute start-0 top-4 size-[15px] rounded-full border-[3px] border-surface ring-1", note.pinned ? "bg-amber-400 ring-amber-300" : "bg-teal-600 ring-teal-200")} aria-hidden="true" />
+                  <article className={cn("rounded-2xl border p-3.5 sm:p-4", note.pinned ? "border-amber-200 bg-amber-50/50" : "border-slate-100 bg-surface")}>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       <ToneBadge tone={meta.tone}>{pick(meta.label, lang)}</ToneBadge>
                       {note.pinned ? (
@@ -216,7 +216,7 @@ export function EmployeeLettersTab({
   const next = nextWarningKind(activeWarnings);
   return (
     <>
-      <div className={cn("flex flex-col gap-3 rounded-2xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between", activeWarnings ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-white shadow-card")}>
+      <div className={cn("flex flex-col gap-3 rounded-2xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between", activeWarnings ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-surface shadow-card")}>
         <div className="flex items-start gap-3">
           <TriangleAlert size={20} className={cn("mt-0.5 shrink-0", activeWarnings ? "text-orange-600" : "text-slate-400")} />
           <div>

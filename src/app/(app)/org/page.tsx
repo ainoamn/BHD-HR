@@ -35,7 +35,7 @@ export default async function OrgChartPage() {
       <li key={person.id} className="relative">
         <Link
           href={`/employees/${person.id}`}
-          className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-card transition duration-150 hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-raised"
+          className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-surface px-3 py-2.5 shadow-card transition duration-150 hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-raised"
         >
           <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${depth === 0 ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-800"}`}>
             {name(person).trim().slice(0, 1)}
@@ -63,7 +63,7 @@ export default async function OrgChartPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="page-wide">
       <PageHeader
         icon={Network}
         title={t("الهيكل التنظيمي", "Org chart")}

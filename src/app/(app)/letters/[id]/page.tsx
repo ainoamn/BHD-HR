@@ -47,7 +47,7 @@ export default async function LetterPage({ params, searchParams }: { params: Pro
   const channelLabel = (channel: string) => (channel === "EMAIL" ? t("البريد الإلكتروني", "Email") : t("واتساب", "WhatsApp"));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/letters" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("كل الخطابات", "All letters")}

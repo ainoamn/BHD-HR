@@ -32,7 +32,7 @@ export default async function CandidatePage({ params, searchParams }: { params: 
   const whatsapp = candidate.phone ? `https://wa.me/${candidate.phone.replace(/\D/g, "")}` : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href={`/recruitment/${job.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {jobTitle}
@@ -76,7 +76,7 @@ export default async function CandidatePage({ params, searchParams }: { params: 
                     }`}
                   >
                     <span className="tabular text-2xl font-bold">{candidate.aiScore}%</span>
-                    <span className="text-[0.68rem] font-semibold">{t("تطابق", "match")}</span>
+                    <span className="text-xs font-semibold">{t("تطابق", "match")}</span>
                   </div>
                   <p className="min-w-0 text-sm leading-7 text-slate-700">{candidate.aiSummary}</p>
                 </div>
@@ -171,7 +171,7 @@ export default async function CandidatePage({ params, searchParams }: { params: 
           </Card>
 
           {allow.edit ? (
-            <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+            <details className="group overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold text-slate-900 transition hover:bg-slate-50/70 sm:px-5">
                 <span className="flex items-center gap-2">
                   <Pencil size={16} className="text-teal-700" />

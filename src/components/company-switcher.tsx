@@ -19,7 +19,7 @@ export function CompanySwitcher({
         aria-label={label}
         title={label}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        className="h-10 w-full truncate rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-card transition hover:border-slate-300 md:w-auto md:max-w-[15rem]"
+        className="h-10 w-full truncate rounded-xl border border-slate-200 bg-surface px-3 text-sm font-medium text-slate-700 shadow-card transition hover:border-slate-300 md:w-auto md:max-w-[15rem]"
       >
         {companies.map((company) => (
           <option key={company.id} value={company.id}>

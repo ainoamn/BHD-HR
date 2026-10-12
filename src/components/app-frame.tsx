@@ -201,7 +201,7 @@ export function AppFrame({
 
       <div
         className={cn(
-          "fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden",
+          "fixed inset-0 z-50 bg-ink-950/50 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => setOpen(false)}
@@ -254,7 +254,7 @@ export function AppFrame({
                 prefetch
                 aria-label={t(`التنبيهات (${alertCount})`, `Alerts (${alertCount})`)}
                 className={cn(
-                  "relative flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-card transition hover:border-slate-300 hover:text-slate-900",
+                  "relative flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-surface text-slate-600 shadow-card transition hover:border-slate-300 hover:text-slate-900",
                   pathname === "/notifications" && "border-teal-200 text-teal-700",
                 )}
               >
@@ -275,7 +275,7 @@ export function AppFrame({
       </div>
 
       <nav
-        className="app-bottom-nav no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+        className="app-bottom-nav no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
         aria-label={t("التنقل السريع", "Quick navigation")}
       >
         <div className="mx-auto grid h-[var(--bottom-nav-height)] max-w-xl" style={{ gridTemplateColumns: `repeat(${bottom.length + 1}, minmax(0, 1fr))` }}>
@@ -290,7 +290,7 @@ export function AppFrame({
                 prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[0.7rem] font-semibold transition",
+                  "relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs font-semibold transition",
                   active ? "text-teal-700" : "text-slate-500 hover:text-slate-800",
                 )}
               >
@@ -303,7 +303,7 @@ export function AppFrame({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[0.7rem] font-semibold text-slate-500 transition hover:text-slate-800"
+            className="relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs font-semibold text-slate-500 transition hover:text-slate-800"
           >
             <MoreHorizontal size={21} strokeWidth={1.8} />
             <span>{t("المزيد", "More")}</span>
@@ -337,7 +337,7 @@ function SidebarContent({
   const toggleLabel = collapsed ? t("توسيع القائمة", "Expand menu") : t("طيّ القائمة", "Collapse menu");
   const ToggleIcon = collapsed ? ChevronsRight : ChevronsLeft;
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-slate-900 text-white">
+    <div className="relative flex h-full flex-col overflow-hidden bg-ink-900 text-white">
       {collapsed ? null : (
         <div className="higher-horizon pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-[length:22rem] bg-[position:bottom_-2rem_center] opacity-[0.05]" aria-hidden="true" />
       )}
@@ -348,7 +348,7 @@ function SidebarContent({
           {collapsed ? null : (
             <span className="min-w-0 border-s border-white/15 ps-3">
               <span className="block truncate text-[0.95rem] font-bold leading-tight">{t("الموظفون والرواتب", "HR & Payroll")}</span>
-              <span className="block text-[0.7rem] leading-5 text-white/50">{t("من منتجات BHD", "A BHD product")}</span>
+              <span className="block text-xs leading-5 text-white/60">{t("من منتجات BHD", "A BHD product")}</span>
             </span>
           )}
         </Link>
@@ -373,9 +373,9 @@ function SidebarContent({
         </div>
       ) : (
         <div className="relative mx-4 mb-3 rounded-2xl bg-white/[0.06] px-3.5 py-3 ring-1 ring-inset ring-white/10">
-          <p className="text-[0.68rem] font-medium text-white/45">{t("المنشأة", "Company")}</p>
+          <p className="text-xs font-medium text-white/55">{t("المنشأة", "Company")}</p>
           <p className="truncate text-sm font-semibold leading-6">{companyName}</p>
-          {roleName ? <p className="truncate text-[0.7rem] text-gold-300">{roleName}</p> : null}
+          {roleName ? <p className="truncate text-xs text-gold-300">{roleName}</p> : null}
         </div>
       )}
 
@@ -388,7 +388,7 @@ function SidebarContent({
                 {index > 0 ? <div className="mx-auto mb-3 h-px w-8 bg-white/10" aria-hidden="true" /> : null}
               </>
             ) : (
-              <p className="mb-1.5 px-3 text-[0.68rem] font-semibold tracking-wide text-white/40 ltr:uppercase">{t(group.ar, group.en)}</p>
+              <p className="mb-1.5 px-3 text-xs font-semibold tracking-wide text-white/50 ltr:uppercase">{t(group.ar, group.en)}</p>
             )}
             <ul className={collapsed ? "space-y-1" : "space-y-0.5"}>
               {group.items.map((item) => {
@@ -414,7 +414,7 @@ function SidebarContent({
                       <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate"}>{label}</span>
                       {count ? (
                         collapsed ? (
-                          <span className="tabular absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-bold text-white ring-2 ring-slate-900">
+                          <span className="tabular absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-bold text-white ring-2 ring-ink-900">
                             {count > 99 ? "99+" : count}
                           </span>
                         ) : (
@@ -432,7 +432,7 @@ function SidebarContent({
 
       <div className={cn("relative flex items-center gap-2 border-t border-white/10 py-3", collapsed ? "justify-center px-2" : "ps-5 pe-3")}>
         {collapsed ? null : (
-          <div className="min-w-0 flex-1 text-[0.7rem] leading-5 text-white/40">
+          <div className="min-w-0 flex-1 text-xs leading-5 text-white/50">
             <p className="truncate font-semibold text-white/60">BHD · Build Higher Dreams</p>
             <p className="truncate">{t("ابنِ أحلامًا أكبر.", "Build higher dreams.")}</p>
           </div>

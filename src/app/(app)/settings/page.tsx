@@ -84,7 +84,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const Chevron = lang === "en" ? ChevronRight : ChevronLeft;
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="page-wide">
       <PageHeader
         icon={Settings}
         title={t("الإعدادات", "Settings")}
@@ -104,7 +104,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <li key={section.id} className="shrink-0">
                   <a
                     href={`#${section.id}`}
-                    className="flex items-center gap-2.5 whitespace-nowrap rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-card transition hover:text-teal-700 lg:border-transparent lg:bg-transparent lg:shadow-none lg:hover:bg-white lg:hover:shadow-card"
+                    className="flex items-center gap-2.5 whitespace-nowrap rounded-xl border border-slate-200/90 bg-surface px-3 py-2 text-sm font-semibold text-slate-600 shadow-card transition hover:text-teal-700 lg:border-transparent lg:bg-transparent lg:shadow-none lg:hover:bg-surface lg:hover:shadow-card"
                   >
                     <Icon size={16} className="text-slate-400" />
                     {section.label}
@@ -119,7 +119,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {isAdmin ? (
             <Link
               href="/settings/hr"
-              className="group relative flex items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-l from-slate-900 to-teal-900 p-5 text-white shadow-raised transition hover:-translate-y-0.5"
+              className="group relative flex items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-l from-ink-900 to-teal-900 p-5 text-white shadow-raised transition hover:-translate-y-0.5"
             >
               <span className="higher-horizon pointer-events-none absolute -bottom-6 end-10 h-32 w-56 bg-[length:100%] opacity-[0.08]" aria-hidden="true" />
               <span className="relative flex min-w-0 items-start gap-3.5">
@@ -417,7 +417,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     {row.ready ? null : (
                       <p className="mt-3 text-xs leading-5 text-slate-500">
                         {t("للتفعيل أضف في إعدادات الخادم:", "To activate, set on the server:")}{" "}
-                        <span className="break-all font-mono text-[11px] text-slate-700" dir="ltr">
+                        <span className="break-all font-mono text-xs text-slate-700" dir="ltr">
                           {row.env}
                         </span>
                       </p>

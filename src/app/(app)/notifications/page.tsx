@@ -35,7 +35,7 @@ export default async function NotificationsPage() {
     },
   ];
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="page-wide">
       <PageHeader
         icon={Bell}
         title={t("التنبيهات", "Alerts")}
@@ -59,9 +59,9 @@ export default async function NotificationsPage() {
             <section key={group.key}>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="font-bold text-slate-900">{group.title}</h2>
-                <span className="tabular rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{items.length}</span>
+                <span className="tabular rounded-full bg-surface px-2.5 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{items.length}</span>
               </div>
-              <ul className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+              <ul className="overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
                 {items.map((item) => (
                   <li key={item.id} className="border-t border-slate-100 first:border-t-0">
                     <Link href={item.href} className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-slate-50 sm:gap-4">

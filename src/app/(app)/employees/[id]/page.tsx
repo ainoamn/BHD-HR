@@ -244,19 +244,19 @@ export default async function EmployeePage({
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/employees" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("كل الموظفين", "All employees")}
       </Link>
 
-      <section className="animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-card">
-        <div className="relative h-24 overflow-hidden bg-gradient-to-l from-slate-900 to-teal-800 sm:h-28" aria-hidden="true">
+      <section className="animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-surface shadow-card">
+        <div className="relative h-24 overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 sm:h-28" aria-hidden="true">
           <div className="higher-horizon absolute -bottom-10 end-4 h-44 w-72 bg-[length:100%] opacity-[0.1]" />
         </div>
         <div className="flex flex-col gap-4 px-4 pb-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
           <div className="flex min-w-0 items-end gap-4">
-            <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-white sm:-mt-12 sm:size-24">
+            <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-surface sm:-mt-12 sm:size-24">
               {displayName.trim().slice(0, 1)}
             </div>
             <div className="min-w-0 pb-0.5">
@@ -305,14 +305,14 @@ export default async function EmployeePage({
           </div>
         </div>
         <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs sm:px-6">
-          <span className="tabular inline-flex items-center rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">{employee.employeeNumber}</span>
+          <span className="tabular inline-flex items-center rounded-full bg-surface px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">{employee.employeeNumber}</span>
           {jobTitle ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200">
               <BriefcaseBusiness size={13} className="text-slate-400" />
               {jobTitle}
             </span>
           ) : null}
-          {department ? <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200">{department}</span> : null}
+          {department ? <span className="inline-flex items-center rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200">{department}</span> : null}
           {employerName ? (
             <Link href={`/employers/${employer!.id}`} className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-800 ring-1 ring-teal-100 hover:bg-teal-100">
               {t("الكفيل:", "Sponsor:")} {employerName}
@@ -321,13 +321,13 @@ export default async function EmployeePage({
             <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-amber-800 ring-1 ring-amber-100">{t("بدون كفيل", "No sponsor")}</span>
           )}
           {employee.phone ? (
-            <a href={phoneHref(employee.phone)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
+            <a href={phoneHref(employee.phone)} className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
               <Phone size={13} className="text-slate-400" />
               {formatPhone(employee.phone)}
             </a>
           ) : null}
           {employee.email ? (
-            <a href={`mailto:${employee.email}`} className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
+            <a href={`mailto:${employee.email}`} className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
               <Mail size={13} className="shrink-0 text-slate-400" />
               <span className="truncate">{employee.email}</span>
             </a>
@@ -358,7 +358,7 @@ export default async function EmployeePage({
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {allow.salaries ? (
-          <div className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card">
+          <div className="min-w-0 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card">
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-xs font-medium text-slate-500">{t("إجمالي الراتب", "Gross salary")}</p>
               <Wallet size={17} className="shrink-0 text-gold-500" />
@@ -367,7 +367,7 @@ export default async function EmployeePage({
           </div>
         ) : null}
         {allow.attendance && annual ? (
-          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-card", warnedKeys.has(annual.key) ? "border-red-200 bg-red-50" : "border-slate-200/90 bg-white")}>
+          <div className={cn("min-w-0 rounded-2xl border p-4 shadow-card", warnedKeys.has(annual.key) ? "border-red-200 bg-red-50" : "border-slate-200/90 bg-surface")}>
             <div className="flex items-center justify-between gap-2">
               <p className={cn("truncate text-xs font-medium", warnedKeys.has(annual.key) ? "text-red-700" : "text-slate-500")}>
                 {t("رصيد", "Left:")} {leaveName(annual, lang)}
@@ -380,7 +380,7 @@ export default async function EmployeePage({
           </div>
         ) : null}
         {allow.docs ? (
-          <Link href={`${base}?tab=docs`} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-raised">
+          <Link href={`${base}?tab=docs`} className="min-w-0 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-raised">
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-xs font-medium text-slate-500">{t("أقرب انتهاء وثيقة", "Nearest document expiry")}</p>
               <FileBadge size={17} className="shrink-0 text-navy-500" />
@@ -391,7 +391,7 @@ export default async function EmployeePage({
           </Link>
         ) : null}
         {allow.salaries ? (
-        <Link href={`${base}?tab=salaries`} className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-raised">
+        <Link href={`${base}?tab=salaries`} className="min-w-0 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-raised">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-xs font-medium text-slate-500">{t("آخر راتب", "Last salary")}</p>
             <ReceiptText size={17} className="shrink-0 text-aqua-600" />
@@ -416,7 +416,7 @@ export default async function EmployeePage({
             <Link key={item.id} href={`${base}?tab=${item.id}`} aria-current={item.id === tab ? "page" : undefined}>
               {item.label}
               {item.count ? (
-                <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === tab ? "bg-teal-50 text-teal-800" : "bg-white/70 text-slate-500")}>{item.count}</span>
+                <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === tab ? "bg-teal-50 text-teal-800" : "bg-surface/70 text-slate-500")}>{item.count}</span>
               ) : null}
             </Link>
           ))}

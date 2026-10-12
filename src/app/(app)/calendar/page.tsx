@@ -19,7 +19,7 @@ const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_EN_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_PREVIEW = 3;
 const monthBtn =
-  "flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-card transition duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.96] sm:size-10";
+  "flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-surface text-slate-700 shadow-card transition duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.96] sm:size-10";
 
 export default async function CalendarPage({
   searchParams,
@@ -95,11 +95,11 @@ export default async function CalendarPage({
   const employeeName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="page-wide grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="screen-fit flex min-w-0 flex-col gap-3">
         <div className="flex animate-fade-up items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="hidden size-11 shrink-0 items-center justify-center rounded-2xl bg-white text-teal-700 shadow-card ring-1 ring-slate-200 sm:flex">
+            <span className="hidden size-11 shrink-0 items-center justify-center rounded-2xl bg-surface text-teal-700 shadow-card ring-1 ring-slate-200 sm:flex">
               <CalendarClock size={21} strokeWidth={1.8} />
             </span>
             <div className="min-w-0">
@@ -159,7 +159,7 @@ export default async function CalendarPage({
                   href={toggleKind(kind.id)}
                   className={cn(
                     "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition sm:px-3",
-                    active ? kind.chip : "bg-white text-slate-400 ring-slate-200 line-through",
+                    active ? kind.chip : "bg-surface text-slate-400 ring-slate-200 line-through",
                   )}
                 >
                   <span className={cn("h-2 w-2 rounded-full", active ? kind.dot : "bg-slate-300")} />
@@ -170,7 +170,7 @@ export default async function CalendarPage({
             })}
           </div>
 
-          <div className="grid shrink-0 grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500 sm:gap-1.5 sm:text-xs">
+          <div className="grid shrink-0 grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-500 sm:gap-1.5">
             {weekdays.map((name, index) => (
               <div key={name} className={cn("truncate py-0.5", index >= 5 && "text-slate-400")}>
                 <span className="sm:hidden">{weekdaysShort[index]}</span>
@@ -191,7 +191,7 @@ export default async function CalendarPage({
                   title={list.length ? list.map((event) => event.title).join("\n") : undefined}
                   className={cn(
                     "group flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border p-1 text-start transition duration-150 hover:border-teal-300 hover:shadow-card sm:p-1.5",
-                    weekend ? "bg-sand-50" : "bg-white",
+                    weekend ? "bg-sand-50" : "bg-surface",
                     day === todayDay ? "border-teal-600 ring-2 ring-teal-100" : hasUrgent ? "border-red-200" : "border-slate-200/70",
                   )}
                 >
@@ -213,7 +213,7 @@ export default async function CalendarPage({
                       <span
                         key={event.id}
                         className={cn(
-                          "block truncate rounded px-1 py-0.5 text-[10px] font-medium ring-1 lg:text-[11px]",
+                          "block truncate rounded px-1 py-0.5 text-[11px] font-medium ring-1 lg:text-xs",
                           event.urgent && !event.done ? "bg-red-50 text-red-700 ring-red-200" : kindMeta(event.kind).chip,
                           event.done && "line-through opacity-60",
                         )}
@@ -222,7 +222,7 @@ export default async function CalendarPage({
                       </span>
                     ))}
                     {list.length > DAY_PREVIEW ? (
-                      <span className="block px-1 text-[10px] font-semibold text-slate-500">
+                      <span className="block px-1 text-[11px] font-semibold text-slate-500">
                         {t(`+${list.length - DAY_PREVIEW} أخرى`, `+${list.length - DAY_PREVIEW} more`)}
                       </span>
                     ) : null}
@@ -237,7 +237,7 @@ export default async function CalendarPage({
       <div className="min-w-0 xl:relative">
         <div className="thin-scroll space-y-4 xl:absolute xl:inset-0 xl:overflow-y-auto xl:overscroll-contain xl:pb-1">
           {allow.create ? (
-            <details id="reminder" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+            <details id="reminder" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70">
                 <span className="flex items-center gap-3 font-bold text-slate-900">
                   <span className="flex size-9 items-center justify-center rounded-xl bg-gold-50 text-gold-600 ring-1 ring-inset ring-gold-100">
@@ -317,7 +317,7 @@ export default async function CalendarPage({
                         key={event.id}
                         className={cn(
                           "flex items-start gap-2.5 rounded-xl border px-3 py-2.5",
-                          event.urgent && !event.done ? "border-red-200 bg-red-50" : "border-slate-200/70 bg-white",
+                          event.urgent && !event.done ? "border-red-200 bg-red-50" : "border-slate-200/70 bg-surface",
                         )}
                       >
                         <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", kindMeta(event.kind).dot)} />

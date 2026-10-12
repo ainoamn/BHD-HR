@@ -20,7 +20,7 @@ export type BoardTask = {
   comments: number;
 };
 
-const AVATAR_TONES = ["bg-teal-700", "bg-navy-500", "bg-gold-600", "bg-aqua-700", "bg-slate-700", "bg-emerald-600"];
+const AVATAR_TONES = ["bg-teal-700", "bg-navy-500", "bg-gold-600", "bg-aqua-700", "bg-ink-700", "bg-emerald-600"];
 
 export function Avatars({ people, max = 3 }: { people: { id: string; name: string }[]; max?: number }) {
   if (!people.length) return null;
@@ -31,13 +31,13 @@ export function Avatars({ people, max = 3 }: { people: { id: string; name: strin
         <span
           key={person.id}
           title={person.name}
-          className={cn("flex size-6 items-center justify-center rounded-full text-[0.68rem] font-bold text-white ring-2 ring-white", tone(person.id))}
+          className={cn("flex size-6 items-center justify-center rounded-full text-[0.68rem] font-bold text-white ring-2 ring-surface", tone(person.id))}
         >
           {person.name.trim().slice(0, 1)}
         </span>
       ))}
       {people.length > max ? (
-        <span className="flex size-6 items-center justify-center rounded-full bg-slate-200 text-[0.65rem] font-bold text-slate-700 ring-2 ring-white">+{people.length - max}</span>
+        <span className="flex size-6 items-center justify-center rounded-full bg-slate-200 text-[0.65rem] font-bold text-slate-700 ring-2 ring-surface">+{people.length - max}</span>
       ) : null}
     </span>
   );
@@ -136,7 +136,7 @@ export function TaskBoard({ tasks, canEdit }: { tasks: BoardTask[]; canEdit: boo
                   <span className={cn("size-2.5 rounded-full", meta.dot)} />
                   {pick(meta.label, lang)}
                 </h2>
-                <span className="tabular rounded-full bg-white/80 px-2 text-xs font-semibold leading-5 text-slate-600 ring-1 ring-slate-200">{items.length}</span>
+                <span className="tabular rounded-full bg-surface/80 px-2 text-xs font-semibold leading-5 text-slate-600 ring-1 ring-slate-200">{items.length}</span>
               </header>
               <div ref={(node) => void (columns.current[status] = node)} className="flex min-h-24 flex-1 flex-col gap-2">
                 {items.map((task, index) => (
@@ -155,7 +155,7 @@ export function TaskBoard({ tasks, canEdit }: { tasks: BoardTask[]; canEdit: boo
                         setOver(null);
                       }}
                       className={cn(
-                        "group rounded-xl border border-slate-200/90 bg-white p-3 shadow-card transition hover:border-slate-300 hover:shadow-raised",
+                        "group rounded-xl border border-slate-200/90 bg-surface p-3 shadow-card transition hover:border-slate-300 hover:shadow-raised",
                         canEdit && "cursor-grab active:cursor-grabbing",
                         dragging === task.id && "opacity-40",
                       )}

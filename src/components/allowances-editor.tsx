@@ -183,7 +183,7 @@ export function AllowancesEditor({
                 {t("إزالة", "Remove")}
               </button>
             </div>
-            <p className="rounded-lg bg-white px-3 py-2 text-xs text-teal-900 ring-1 ring-inset ring-slate-100 sm:col-span-6">
+            <p className="rounded-lg bg-surface px-3 py-2 text-xs text-teal-900 ring-1 ring-inset ring-slate-100 sm:col-span-6">
               {t("المبلغ:", "Amount:")} <strong>{money(amount, currency)}</strong>{" "}
               {months.length
                 ? t(`يُصرف في: ${months.map((month) => monthName(month, "ar")).join("، ")}`, `paid in: ${months.map((month) => monthName(month, "en")).join(", ")}`)

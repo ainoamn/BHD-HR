@@ -49,14 +49,14 @@ export default async function EmployerPage({
   const employeeName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href="/employers" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("دفتر العناوين", "Address book")}
       </Link>
 
-      <section className="animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-card">
-        <div className="relative h-24 overflow-hidden bg-gradient-to-l from-slate-900 to-navy-700 sm:h-28" aria-hidden="true">
+      <section className="animate-fade-up overflow-hidden rounded-3xl border border-slate-200/90 bg-surface shadow-card">
+        <div className="relative h-24 overflow-hidden bg-gradient-to-l from-ink-900 to-navy-700 sm:h-28" aria-hidden="true">
           <div className="higher-horizon absolute -bottom-10 end-4 h-44 w-72 bg-[length:100%] opacity-[0.1]" />
         </div>
         <div className="flex flex-col gap-4 px-4 pb-5 sm:px-6 md:flex-row md:items-end md:justify-between">
@@ -65,10 +65,10 @@ export default async function EmployerPage({
               <img
                 src={employer.logoUrl}
                 alt=""
-                className="relative -mt-10 size-20 shrink-0 rounded-2xl bg-white object-contain p-1.5 shadow-raised ring-4 ring-white sm:-mt-12 sm:size-24"
+                className="relative -mt-10 size-20 shrink-0 rounded-2xl bg-surface object-contain p-1.5 shadow-raised ring-4 ring-surface sm:-mt-12 sm:size-24"
               />
             ) : (
-              <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-white sm:-mt-12 sm:size-24">
+              <div className="relative -mt-10 flex size-20 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-3xl font-bold text-white shadow-raised ring-4 ring-surface sm:-mt-12 sm:size-24">
                 {title.trim().slice(0, 1)}
               </div>
             )}
@@ -113,7 +113,7 @@ export default async function EmployerPage({
           <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs sm:px-6">
             {contacts.map((item) => {
               const Icon = item.icon;
-              const chip = "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200";
+              const chip = "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200";
               return item.href ? (
                 <a key={item.value} href={item.href} className={`${chip} hover:text-teal-700`} dir="ltr">
                   <Icon size={13} className="shrink-0 text-slate-400" />

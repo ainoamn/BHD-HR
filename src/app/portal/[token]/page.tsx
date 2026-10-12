@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { CalendarCheck2, Clock3, FileUp, Files, ReceiptText, ScrollText, ShieldOff, Target, Wallet } from "lucide-react";
 import { ClockButton } from "@/components/clock-button";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { headerFor } from "@/components/salary-docs";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, ToneBadge, fieldClass } from "@/components/ui";
@@ -19,7 +21,7 @@ import { attendanceLabel, computeLeaveBalances, leaveName } from "@/lib/leave";
 import { SCORE_LABEL, criterionName, overallBand, overallTone, parseCriteria, parseScores } from "@/lib/performance";
 import { LEAVE_REQUEST_LABEL, LEAVE_REQUEST_TONE, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
-import { daysLabel, formatDate, money, todayInputValue } from "@/lib/utils";
+import { THEME_COOKIE, daysLabel, formatDate, money, normalizeTheme, todayInputValue } from "@/lib/utils";
 import { cancelExpense, cancelLeaveRequest, requestLeave, submitExpense, submitPortalDocument } from "@/server/portal-actions";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +33,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const { token } = await params;
   const sp = await searchParams;
   const { lang, t } = await getI18n();
+  const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const employee = await portalEmployee(token);
   if (!employee) {
     return (
@@ -116,7 +119,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
 
   return (
     <div className="min-h-dvh bg-slate-50">
-      <header className="relative overflow-hidden bg-gradient-to-l from-slate-900 to-teal-800 text-white">
+      <header className="relative overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 text-white">
         <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
         <div className="relative mx-auto flex max-w-3xl items-start justify-between gap-3 px-4 pb-6 pt-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -130,11 +133,14 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
               </p>
             </div>
           </div>
-          <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
+            <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
+          </div>
         </div>
       </header>
 
-      <nav className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur-md" aria-label={t("أقسام البوابة", "Portal sections")}>
+      <nav className="sticky top-0 z-10 border-b border-slate-200 bg-surface/90 backdrop-blur-md" aria-label={t("أقسام البوابة", "Portal sections")}>
         <div className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-3 py-2">
           {sections.map((section) => (
             <a key={section.id} href={`#${section.id}`} className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-teal-50 hover:text-teal-800">

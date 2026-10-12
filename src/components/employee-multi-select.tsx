@@ -58,7 +58,7 @@ export function EmployeeMultiSelect({
         <input key={value} type="hidden" name={name} value={value} />
       ))}
       <div
-        className="flex min-h-11 w-full cursor-text flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-1.5 transition hover:border-slate-300 focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-600/10 sm:min-h-10"
+        className="flex min-h-11 w-full cursor-text flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-2 py-1.5 transition hover:border-slate-300 focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-600/10 sm:min-h-10"
         onClick={() => {
           input.current?.focus();
           setOpen(true);
@@ -120,7 +120,7 @@ export function EmployeeMultiSelect({
       </div>
       {open ? (
         <div
-          className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-float"
+          className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-surface shadow-float"
           onMouseDown={(event) => event.preventDefault()}
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-1.5 text-xs text-slate-500">
@@ -151,7 +151,7 @@ export function EmployeeMultiSelect({
                   <span
                     className={cn(
                       "flex size-4.5 shrink-0 items-center justify-center rounded-md ring-1 ring-inset",
-                      selected ? "bg-teal-700 text-white ring-teal-700" : "bg-white ring-slate-300",
+                      selected ? "bg-teal-700 text-white ring-teal-700" : "bg-surface ring-slate-300",
                     )}
                   >
                     {selected ? <Check size={12} strokeWidth={3} /> : null}

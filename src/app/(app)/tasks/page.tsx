@@ -74,7 +74,7 @@ export default async function TasksPage({
   const returnTo = params({});
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="page-wide">
       <PageHeader
         icon={ListTodo}
         title={t("المهام", "Tasks")}

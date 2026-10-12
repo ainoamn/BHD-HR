@@ -17,7 +17,7 @@ export default async function ActivityPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="page-wide">
       <PageHeader
         icon={History}
         title={t("سجل العمليات", "Activity log")}
@@ -26,13 +26,13 @@ export default async function ActivityPage() {
       {logs.length === 0 ? (
         <EmptyState icon={History} title={t("لا توجد عمليات بعد", "No activity yet")} text={t("تظهر هنا كل عملية إضافة أو تعديل أو صرف.", "Every addition, change and payment appears here.")} />
       ) : (
-        <ol className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card sm:p-6">
+        <ol className="rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card sm:p-6">
           {logs.map((log) => {
             const actor = log.user?.name || t("النظام", "System");
             return (
               <li key={log.id} className="relative flex gap-3 pb-5 last:pb-0 sm:gap-4">
                 <span className="absolute top-10 bottom-0 start-[1.1rem] w-px bg-slate-200 [li:last-child_&]:hidden" aria-hidden="true" />
-                <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-sm font-bold text-teal-800 ring-4 ring-white">
+                <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-sm font-bold text-teal-800 ring-4 ring-surface">
                   {actor.trim().slice(0, 1)}
                 </span>
                 <div className="min-w-0 flex-1 pt-0.5">

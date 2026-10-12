@@ -5,6 +5,15 @@ export function cn(...parts: Array<string | false | null | undefined>) {
 /** Desktop sidebar state: "collapsed" shows the icon rail. */
 export const SIDEBAR_COOKIE = "hr_sidebar";
 
+/** "light" or "dark"; no cookie follows the device setting. */
+export const THEME_COOKIE = "hr_theme";
+
+export type ThemeChoice = "light" | "dark" | "system";
+
+export function normalizeTheme(value: string | undefined): ThemeChoice {
+  return value === "light" || value === "dark" ? value : "system";
+}
+
 export function round3(value: number) {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }

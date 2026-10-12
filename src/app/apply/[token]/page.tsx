@@ -42,7 +42,7 @@ export default async function ApplyPage({ params, searchParams }: { params: Prom
 
   return (
     <div className="min-h-dvh bg-slate-50">
-      <header className="relative overflow-hidden bg-gradient-to-l from-slate-900 to-teal-800 text-white">
+      <header className="relative overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 text-white">
         <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
         <div className="relative mx-auto flex max-w-2xl items-start justify-between gap-3 px-4 pb-7 pt-5">
           <div className="flex min-w-0 items-center gap-3">

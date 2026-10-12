@@ -131,7 +131,7 @@ export function SearchSelect({
         <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </div>
       {open ? (
-        <ul ref={list} className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg" role="listbox">
+        <ul ref={list} className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-surface py-1 shadow-lg" role="listbox">
           {filtered.length === 0 ? <li className="px-3 py-2 text-sm text-slate-500">{t("لا توجد نتائج", "No results")}</li> : null}
           {filtered.map((option, index) => (
             <li

@@ -26,7 +26,7 @@ export function LangToggle({ className }: { className?: string }) {
       type="button"
       className={
         className ||
-        "inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-700 shadow-card transition hover:border-slate-300 hover:text-slate-900 sm:px-3"
+        "inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-2.5 text-sm font-semibold text-slate-700 shadow-card transition hover:border-slate-300 hover:text-slate-900 sm:px-3"
       }
       lang={next}
       aria-label={next === "en" ? "Switch to English" : "التبديل إلى العربية"}

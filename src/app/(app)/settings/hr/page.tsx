@@ -229,7 +229,7 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
   );
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="page-wide">
       <Link href="/settings" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {t("الإعدادات", "Settings")}
@@ -248,7 +248,7 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
           {tabs.map((item) => (
             <Link key={item.id} href={`/settings/hr?tab=${item.id}`} aria-current={item.id === tab ? "page" : undefined}>
               {item.label}
-              <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === tab ? "bg-teal-50 text-teal-800" : "bg-white/70 text-slate-500")}>{item.count}</span>
+              <span className={cn("tabular rounded-full px-1.5 text-xs leading-5", item.id === tab ? "bg-teal-50 text-teal-800" : "bg-surface/70 text-slate-500")}>{item.count}</span>
             </Link>
           ))}
         </div>

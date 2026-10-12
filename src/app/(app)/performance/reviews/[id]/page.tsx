@@ -38,7 +38,7 @@ export default async function ReviewPage({ params, searchParams }: { params: Pro
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="page-wide space-y-5">
       <Link href={`/performance/${review.cycleId}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
         {review.cycle.name}
@@ -87,7 +87,7 @@ export default async function ReviewPage({ params, searchParams }: { params: Pro
                           >
                             <input type="radio" name={`score_${item.key}`} value={score} defaultChecked={scores[item.key] === score} className="sr-only" />
                             <span className="tabular text-base font-bold leading-5">{score}</span>
-                            <span className="hidden text-[0.65rem] leading-4 opacity-80 sm:block">{pick(SCORE_LABEL[score], lang)}</span>
+                            <span className="hidden text-xs leading-4 opacity-80 sm:block">{pick(SCORE_LABEL[score], lang)}</span>
                           </label>
                         ))}
                       </div>

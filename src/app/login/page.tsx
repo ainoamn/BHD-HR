@@ -1,12 +1,15 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BellRing, Banknote, Files, LogIn, ShieldCheck, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
 import { SubmitButton } from "@/components/submit-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Field, fieldClass } from "@/components/ui";
 import { isSsoConfigured, safeReturnPath } from "@/lib/bhd/identity";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { THEME_COOKIE, normalizeTheme } from "@/lib/utils";
 import { login } from "@/server/auth-actions";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +38,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      <aside className="relative hidden overflow-hidden bg-gradient-to-b from-slate-900 to-slate-950 text-white lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <aside className="relative hidden overflow-hidden bg-gradient-to-b from-ink-900 to-ink-950 text-white lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="pointer-events-none absolute -top-24 -end-24 size-80 rounded-full bg-teal-500/20 blur-3xl" aria-hidden="true" />
         <div className="higher-horizon pointer-events-none absolute -bottom-10 -end-10 h-80 w-[28rem] bg-[length:100%] opacity-[0.07]" aria-hidden="true" />
         <div className="relative flex items-center gap-3">
@@ -68,7 +71,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <span className="official-logo official-logo-mark official-logo-ink w-10" aria-hidden="true" />
             <span className="text-sm font-bold text-slate-900">{t("الموظفون والرواتب", "HR & Payroll")}</span>
           </span>
-          <LangToggle />
+          <div className="flex items-center gap-2">
+            <ThemeToggle initial={normalizeTheme((await cookies()).get(THEME_COOKIE)?.value)} />
+            <LangToggle />
+          </div>
         </div>
         <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
           <div className="w-full max-w-md animate-fade-up">
@@ -77,7 +83,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <p className="mt-2 text-sm leading-6 text-slate-500">{t("سجّل الدخول لمتابعة الموظفين والرواتب.", "Sign in to manage your people and payroll.")}</p>
             </div>
             <Flash error={sp.error} />
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-raised sm:p-8">
+            <div className="rounded-3xl border border-slate-200/90 bg-surface p-6 shadow-raised sm:p-8">
               {sso ? (
                 <div className="mb-6 space-y-3">
                   <a href={startHref} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-teal-800">

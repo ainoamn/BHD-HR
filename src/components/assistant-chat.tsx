@@ -73,7 +73,7 @@ export function AssistantChat({ suggestions }: { suggestions: string[] }) {
   };
 
   return (
-    <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card lg:h-[calc(100dvh-14rem)]">
+    <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card lg:h-[calc(100dvh-14rem)]">
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6" aria-live="polite">
         {messages.length === 0 ? (
           <div className="mx-auto flex max-w-xl flex-col items-center py-6 text-center">
@@ -93,7 +93,7 @@ export function AssistantChat({ suggestions }: { suggestions: string[] }) {
                   key={suggestion}
                   type="button"
                   onClick={() => send(suggestion)}
-                  className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-700 transition duration-200 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800"
+                  className="rounded-full border border-slate-200 bg-surface px-3.5 py-2 text-sm text-slate-700 transition duration-200 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800"
                 >
                   {suggestion}
                 </button>
@@ -121,7 +121,7 @@ export function AssistantChat({ suggestions }: { suggestions: string[] }) {
                 {message.links?.length ? (
                   <div className="flex flex-wrap gap-1.5">
                     {message.links.map((item) => (
-                      <Link key={item.href} href={item.href} className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-800 ring-1 ring-inset ring-slate-200 transition hover:bg-teal-50">
+                      <Link key={item.href} href={item.href} className="rounded-lg bg-surface px-2.5 py-1 text-xs font-semibold text-teal-800 ring-1 ring-inset ring-slate-200 transition hover:bg-teal-50">
                         {item.label}
                       </Link>
                     ))}
@@ -153,7 +153,7 @@ export function AssistantChat({ suggestions }: { suggestions: string[] }) {
       </div>
 
       <form
-        className="border-t border-slate-100 bg-white p-3 sm:p-4"
+        className="border-t border-slate-100 bg-surface p-3 sm:p-4"
         onSubmit={(event) => {
           event.preventDefault();
           send(draft);
@@ -174,7 +174,7 @@ export function AssistantChat({ suggestions }: { suggestions: string[] }) {
             maxLength={2000}
             placeholder={t("اكتب سؤالك أو ما تريد إنجازه...", "Ask a question or say what you need...")}
             aria-label={t("رسالتك", "Your message")}
-            className="min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+            className="min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-surface px-3.5 py-2.5 text-sm leading-6 text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
           />
           <button
             type="submit"
@@ -220,7 +220,7 @@ function ProposalCard({
   const Icon = proposal.kind === "task" ? ListTodo : proposal.kind === "note" ? NotebookPen : CalendarPlus;
   const heading = proposal.kind === "task" ? t("مهمة جديدة", "New task") : proposal.kind === "note" ? t("ملاحظة في ملف الموظف", "Note on the employee's file") : t("تذكير في التقويم", "Calendar reminder");
   return (
-    <div className="rounded-2xl border border-teal-200 bg-white p-3.5 shadow-card">
+    <div className="rounded-2xl border border-teal-200 bg-surface p-3.5 shadow-card">
       <div className="flex items-start gap-3">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
           <Icon size={17} />
@@ -287,7 +287,7 @@ function ProposalCard({
               type="button"
               onClick={onDismiss}
               disabled={state.status === "busy"}
-              className="flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              className="flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-surface px-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
               <X size={15} />
               {t("تجاهل", "Dismiss")}

@@ -129,7 +129,7 @@ export function LeaveRangeForm({
           <p>{t("هذه الحالة لا تُخصم من رصيد الإجازات.", "This type does not use a leave balance.")}</p>
         )}
         {insufficient ? (
-          <div className="mt-2 rounded-lg bg-white/70 p-2.5">
+          <div className="mt-2 rounded-lg bg-surface/70 p-2.5">
             <p className="font-bold">
               {t(
                 `⚠ تجاوز الرصيد بـ ${daysLabel(-(after ?? 0))} يوم.`,

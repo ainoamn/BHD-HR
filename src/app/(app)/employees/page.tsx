@@ -87,7 +87,7 @@ export default async function EmployeesPage({
   const filtered = Boolean(q || employerId || status !== "ALL");
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader icon={Users} title={t("الموظفون", "Employees")} description={t("سجل العمال وبيانات الراتب وحالة الوثائق.", "Staff records, salaries and document status.")}>
         {allow.create ? (
           <Link href="/employees/new" className={primaryBtn}>

@@ -39,7 +39,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
   const jobTitle = (job: { title: string; titleEn: string | null }) => (lang === "en" && job.titleEn ? job.titleEn : job.title);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="page-wide">
       <PageHeader
         icon={UserPlus}
         title={t("التوظيف", "Recruitment")}
@@ -58,7 +58,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
       </div>
 
       {catalog ? (
-        <details open={jobs.length === 0} className="group mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+        <details open={jobs.length === 0} className="group mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
             <span className="flex items-center gap-3 font-bold text-slate-900">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
@@ -98,7 +98,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
                   <li key={job.id}>
                     <Link
                       href={`/recruitment/${job.id}`}
-                      className="block rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-raised sm:p-5"
+                      className="block rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-raised sm:p-5"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -113,7 +113,7 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
                         {counts.map(({ stage, count }) => (
                           <div key={stage} className={cn("rounded-lg px-2 py-1.5 text-center ring-1 ring-inset", count ? "bg-teal-50/60 ring-teal-100" : "bg-slate-50 ring-slate-100")}>
                             <p className="tabular text-sm font-bold text-slate-900">{count}</p>
-                            <p className="truncate text-[0.68rem] text-slate-500">{pick(STAGE_LABEL[stage], lang)}</p>
+                            <p className="truncate text-xs text-slate-500">{pick(STAGE_LABEL[stage], lang)}</p>
                           </div>
                         ))}
                       </div>

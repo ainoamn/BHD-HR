@@ -129,7 +129,7 @@ export default async function EmployersPage({
   const resultCount = view === "contacts" ? (contacts?.sponsors.length || 0) + (contacts?.employees.length || 0) : employers.length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="page-wide space-y-5">
       <PageHeader
         icon={BookUser}
         title={t("دفتر العناوين", "Address book")}
@@ -170,7 +170,7 @@ export default async function EmployersPage({
       </div>
 
       {can(user, "employers.create") ? (
-      <details id="new" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-card">
+      <details id="new" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
           <span className="flex items-center gap-3 font-bold text-slate-900">
             <span className="flex size-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
@@ -186,7 +186,7 @@ export default async function EmployersPage({
       </details>
       ) : null}
 
-      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-card sm:p-4">
+      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <GetForm className="flex w-full gap-2 md:max-w-md">
             {view !== "cards" ? <input type="hidden" name="view" value={view} /> : null}
@@ -368,7 +368,7 @@ export default async function EmployersPage({
                         <Link
                           key={employee.id}
                           href={`/employees/${employee.id}`}
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-sm ring-1 ring-slate-200 hover:text-teal-800 hover:ring-teal-200"
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-surface px-2.5 py-1 text-sm ring-1 ring-slate-200 hover:text-teal-800 hover:ring-teal-200"
                         >
                           <StatusDot status={employee.status} />
                           <span className="truncate">{personName(employee)}</span>
@@ -420,7 +420,7 @@ export default async function EmployersPage({
             {employers.map((employer) => {
               const active = employer.employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION").length;
               return (
-                <div key={employer.id} className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-card">
+                <div key={employer.id} className="rounded-2xl border border-slate-200/90 bg-surface p-3.5 shadow-card">
                   <div className="flex items-start gap-3">
                     <SponsorAvatar logoUrl={employer.logoUrl} title={sponsorName(employer)} size="sm" />
                     <div className="min-w-0 flex-1">
@@ -628,7 +628,7 @@ function ContactsDirectory({
     <>
       <div className="space-y-2 md:hidden">
         {rows.map((row) => (
-          <div key={row.key} className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-card">
+          <div key={row.key} className="rounded-2xl border border-slate-200/90 bg-surface p-3.5 shadow-card">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <Link href={row.href} className="block break-words font-bold text-slate-900">

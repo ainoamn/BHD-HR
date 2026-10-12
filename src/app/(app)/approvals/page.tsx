@@ -67,7 +67,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     attendanceLabel({ type: choice === "UNPAID_LEAVE" ? "UNPAID_LEAVE" : "CUSTOM_LEAVE", balanceKey: choice === "UNPAID_LEAVE" ? null : choice.slice(6) }, leaveTypes, lang);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="page-wide">
       <PageHeader
         icon={Inbox}
         title={t("طلبات الموظفين", "Employee requests")}

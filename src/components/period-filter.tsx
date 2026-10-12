@@ -19,7 +19,7 @@ export async function PeriodFilter({
   const years = Array.from(new Set([year - 2, year - 1, year, year + 1, new Date().getFullYear()])).sort();
   return (
     <GetForm
-      className="no-print grid w-full grid-cols-[1fr_1fr_auto] gap-2 rounded-2xl border border-slate-200/90 bg-white p-2 shadow-card sm:flex sm:w-auto sm:flex-wrap sm:items-center"
+      className="no-print grid w-full grid-cols-[1fr_1fr_auto] gap-2 rounded-2xl border border-slate-200/90 bg-surface p-2 shadow-card sm:flex sm:w-auto sm:flex-wrap sm:items-center"
     >
       {employers ? (
         <select
