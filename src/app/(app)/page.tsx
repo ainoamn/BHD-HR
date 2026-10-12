@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { DailyBriefCard, DailyBriefSkeleton } from "@/components/daily-brief";
 import { ArrowLeft, ArrowRight, Banknote, BookUser, CalendarDays, CalendarX2, CircleDollarSign, FileClock, FileWarning, Hourglass, PieChart, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { Card, SectionTitle, Stat, ToneBadge, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
@@ -122,6 +124,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </section>
 
       <Flash error={sp.error} message={sp.message} />
+
+      {totalCount > 0 ? (
+        <Suspense fallback={<DailyBriefSkeleton lang={lang} />}>
+          <DailyBriefCard user={user} lang={lang} />
+        </Suspense>
+      ) : null}
 
       {totalCount === 0 && allow.addEmployee ? (
         <Card>

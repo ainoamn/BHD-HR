@@ -1,11 +1,12 @@
 import { cache } from "react";
+import type { Company } from "@prisma/client";
 import { can, getSessionUser } from "./auth";
 import type { Permission } from "./permissions";
 import { reminderDayIn, payDayFor } from "./calendar";
 import { DOC_LABEL, monthName } from "./constants";
 import { daysUntil, describeExpiry } from "./expiry";
 import { getLeaveTypes } from "./hr-catalog";
-import { pick } from "./i18n";
+import { type Lang, makeT, pick } from "./i18n";
 import { getI18n } from "./lang";
 import { attendanceLabel, computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "./leave";
 import { prisma } from "./prisma";
@@ -30,10 +31,16 @@ function severityFor(key: string): AlertItem["severity"] {
 const BIRTHDAY_NOTICE_DAYS = 7;
 
 export const getAlerts = cache(async () => {
-  const { lang, t } = await getI18n();
+  const { lang } = await getI18n();
   const user = await getSessionUser();
   if (!user) return [] as AlertItem[];
-  const company = user.company;
+  return computeAlerts(user.company, user.permissions, lang);
+});
+
+/** Alerts for one company as seen by someone holding `permissions`; also used by the scheduled job, which has no session. */
+export async function computeAlerts(company: Company, permissions: readonly string[], lang: Lang): Promise<AlertItem[]> {
+  const t = makeT(lang);
+  const user = { permissions };
   const limits = {
     urgent: company.alertUrgentDays,
     warning: company.alertWarningDays,
@@ -260,7 +267,7 @@ export const getAlerts = cache(async () => {
   }
 
   return alerts.filter((alert) => can(user, alertPermission(alert.id))).sort((a, b) => a.days - b.days);
-});
+}
 
 function alertPermission(id: string): Permission {
   if (id.endsWith("-contract") || id.startsWith("birthday-")) return "employees.view";

@@ -13,6 +13,7 @@ import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { formatDate, text } from "@/lib/utils";
 import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
+import { DocumentScan } from "@/components/document-scan";
 
 const VIEW_IDS = ["all", "expired", "warning", "early"];
 
@@ -72,6 +73,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           </summary>
           <form action={addDocument} className="grid gap-3 border-t border-slate-100 px-4 py-5 sm:grid-cols-3 sm:px-5">
             <input type="hidden" name="returnTo" value={returnTo} />
+            <div className="sm:col-span-3">
+              <DocumentScan mode="document" />
+            </div>
             <label className="space-y-1 text-sm">
               <span className="text-slate-600">{t("الموظف", "Employee")}</span>
               <select className={`${fieldClass} w-full`} name="employeeId" required>

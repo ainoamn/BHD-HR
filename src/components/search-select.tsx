@@ -8,6 +8,9 @@ import { fieldClass } from "./ui";
 
 export type SelectOption = { value: string; label: string; hint?: string | null };
 
+/** Dispatch on the hidden input (`detail` = option value) to change the selection from outside, e.g. after reading a scan. */
+export const SEARCH_SELECT_SET = "searchselect:set";
+
 /** A select with a search box that matches both languages; submits the chosen value under `name`. */
 export function SearchSelect({
   name,
@@ -35,7 +38,21 @@ export function SearchSelect({
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLUListElement>(null);
+  const hidden = useRef<HTMLInputElement>(null);
   const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    const input = hidden.current;
+    if (!input) return;
+    const set = (event: Event) => {
+      const next = String((event as CustomEvent<string>).detail ?? "");
+      if (next && !options.some((option) => option.value === next)) return;
+      setValue(next);
+      onChange?.(next);
+    };
+    input.addEventListener(SEARCH_SELECT_SET, set);
+    return () => input.removeEventListener(SEARCH_SELECT_SET, set);
+  }, [options, onChange]);
 
   const filtered = useMemo(() => {
     const needle = normalizeSearch(query);
@@ -67,7 +84,7 @@ export function SearchSelect({
 
   return (
     <div ref={box} className="relative">
-      <input type="hidden" name={name} value={value} />
+      <input ref={hidden} type="hidden" name={name} value={value} />
       <div className="relative">
         <input
           className={`${fieldClass} w-full pe-9`}

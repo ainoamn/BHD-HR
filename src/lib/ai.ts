@@ -80,6 +80,83 @@ export async function aiTaskChecklist(title: string, description?: string | null
     .slice(0, 7);
 }
 
+/** A few lines telling the owner what needs attention today, ordered by urgency. Only the given facts may be used. */
+export async function aiDailyBrief(input: { lang: Lang; companyName: string; today: string; facts: string[] }) {
+  const { text } = await generateText({
+    model: MODEL,
+    temperature: 0.2,
+    system: [
+      "You are the HR assistant of a company in the Sultanate of Oman. Write the owner's morning brief from the facts given, and nothing else: never invent numbers, names or dates.",
+      input.lang === "en" ? "Write in clear, plain English." : "Write in clear Modern Standard Arabic as used in Omani companies.",
+      "Start with one sentence on the overall situation, then at most 5 short lines, each starting with '- ', most urgent first, each saying what to do. Group similar items (e.g. 'three residence cards expire this week'). No markdown other than the '- ' lines, no greeting, no sign-off.",
+      "If there is nothing needing attention, say so in one sentence.",
+    ].join(" "),
+    prompt: JSON.stringify({ company: input.companyName, today: input.today, facts: input.facts }),
+  });
+  return text.trim().slice(0, 1500);
+}
+
+/** Reading scanned documents needs a stronger model than the short text tasks above. */
+const VISION_MODEL = process.env.AI_VISION_MODEL || "google/gemini-2.5-flash";
+
+export const READ_DOC_TYPES = ["ID_CARD", "PASSPORT", "RESIDENCE", "DRIVING_LICENSE", "CONTRACT", "INSURANCE", "CERTIFICATE", "OTHER"] as const;
+
+export type ReadDocument = {
+  type: (typeof READ_DOC_TYPES)[number];
+  number: string;
+  expiry: string;
+  fullName: string;
+  nameEn: string;
+  nationality: string;
+  dateOfBirth: string;
+  gender: "" | "MALE" | "FEMALE";
+};
+
+/** Fields printed on an identity or HR document image / PDF. Unreadable fields come back empty, never guessed. */
+export async function aiReadDocument(data: Uint8Array, mediaType: string): Promise<ReadDocument | null> {
+  const { text } = await generateText({
+    model: VISION_MODEL,
+    temperature: 0,
+    system: [
+      "You read identity and HR documents for an HR system in the Sultanate of Oman and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
+      `type is one of ${READ_DOC_TYPES.join(", ")}. An Omani citizen's national ID card is ID_CARD; a resident card / labour card issued to a non-Omani is RESIDENCE.`,
+      "number is the document number exactly as printed (Latin digits, no spaces). For passports use the passport number, not the personal number.",
+      "Dates are YYYY-MM-DD with Gregorian dates; convert Hijri only if no Gregorian date is printed. expiry is the expiry date of the document.",
+      "fullName is the holder's full name in Arabic script, nameEn in Latin script as printed. nationality is the ISO 3166 alpha-2 code (e.g. OM, IN, PK, BD, EG, PH). gender is MALE or FEMALE.",
+      'Reply with JSON only: {"type":"","number":"","expiry":"","fullName":"","nameEn":"","nationality":"","dateOfBirth":"","gender":""}',
+    ].join(" "),
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Read this document." },
+          { type: "file", data, mediaType },
+        ],
+      },
+    ],
+  });
+  const parsed = parseJson<Record<string, unknown>>(text, "{");
+  if (!parsed) return null;
+  const field = (key: string, max = 120) => (typeof parsed[key] === "string" ? (parsed[key] as string).trim().slice(0, max) : "");
+  const date = (key: string) => {
+    const value = field(key, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : "";
+  };
+  const type = field("type").toUpperCase();
+  const gender = field("gender").toUpperCase();
+  const nationality = field("nationality", 2).toUpperCase();
+  return {
+    type: (READ_DOC_TYPES as readonly string[]).includes(type) ? (type as ReadDocument["type"]) : "OTHER",
+    number: field("number", 60).replace(/\s+/g, ""),
+    expiry: date("expiry"),
+    fullName: field("fullName"),
+    nameEn: field("nameEn"),
+    nationality: /^[A-Z]{2}$/.test(nationality) ? nationality : "",
+    dateOfBirth: date("dateOfBirth"),
+    gender: gender === "MALE" || gender === "FEMALE" ? gender : "",
+  };
+}
+
 /** Translates many terms in one request; entries the model skips come back as null. */
 export async function aiTranslateMany(texts: string[], to: Lang) {
   if (!texts.length) return [];

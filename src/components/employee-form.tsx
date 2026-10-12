@@ -10,6 +10,7 @@ import { leaveOverrides } from "@/lib/leave";
 import { DEFAULT_NATIONALITY, findNationality, nationalityOptions } from "@/lib/nationalities";
 import { currentPeriod, daysLabel, toDateInput } from "@/lib/utils";
 import { BilingualFields } from "./bilingual-fields";
+import { DocumentScan } from "./document-scan";
 import { EmployerPicker } from "./employer-picker";
 import { PhoneField } from "./phone-input";
 import { SalaryFields } from "./salary-fields";
@@ -181,6 +182,7 @@ export async function EmployeeForm({
           t("تواريخ الانتهاء هنا هي مصدر التنبيهات. أرفق نسخة من كل وثيقة بجانب تاريخها.", "Expiry dates here drive the alerts. Attach a copy of each document next to its date."),
         )}
         <div className="space-y-3">
+          <DocumentScan mode="employee" />
           {docRow("id", t("رقم البطاقة الشخصية", "ID number"), t("انتهاء البطاقة", "ID expiry"), employee?.idFileUrl)}
           {docRow("passport", t("رقم الجواز", "Passport number"), t("انتهاء الجواز", "Passport expiry"), employee?.passportFileUrl)}
           {docRow("residence", t("رقم الإقامة", "Residence number"), t("انتهاء الإقامة", "Residence expiry"), employee?.residenceFileUrl)}

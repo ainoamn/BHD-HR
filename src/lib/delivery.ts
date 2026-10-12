@@ -28,19 +28,24 @@ type Payload = {
 
 const escapeHtml = (value: string) => value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!);
 
-async function sendEmail(payload: Payload) {
+/** Plain-text email through Resend; throws when the provider rejects it. Check channelReady("EMAIL") first. */
+export async function sendEmailMessage(message: { to: string; subject: string; text: string; dir?: "rtl" | "ltr" }) {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       from: process.env.MAIL_FROM,
-      to: [payload.target],
-      subject: payload.subject,
-      text: payload.text,
-      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.8;white-space:pre-line">${escapeHtml(payload.text)}</div>`,
+      to: [message.to],
+      subject: message.subject,
+      text: message.text,
+      html: `<div dir="${message.dir || "rtl"}" style="font-family:Arial,sans-serif;line-height:1.8;white-space:pre-line">${escapeHtml(message.text)}</div>`,
     }),
   });
   if (!response.ok) throw new Error(`Email ${response.status}: ${(await response.text()).slice(0, 300)}`);
+}
+
+async function sendEmail(payload: Payload) {
+  await sendEmailMessage({ to: payload.target, subject: payload.subject, text: payload.text });
 }
 
 async function sendWhatsApp(payload: Payload) {

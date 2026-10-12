@@ -32,6 +32,7 @@ import { packageGross, totalDeductions, totalEarnings } from "@/lib/salary";
 import { cn, currentPeriod, daysLabel, formatDate, money, round3, text, todayInputValue } from "@/lib/utils";
 import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
 import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
+import { DocumentScan } from "@/components/document-scan";
 import { deleteEmployee } from "@/server/employee-actions";
 import { addLeaveCredit } from "@/server/leave-actions";
 import { savePayItem } from "@/server/pay-item-actions";
@@ -588,6 +589,9 @@ export default async function EmployeePage({
                 <form action={addDocument} className="grid gap-3 sm:grid-cols-2">
                   <input type="hidden" name="employeeId" value={employee.id} />
                   <input type="hidden" name="returnTo" value={`${base}?tab=docs`} />
+                  <div className="sm:col-span-2">
+                    <DocumentScan mode="document" />
+                  </div>
                   <label className="space-y-1 text-sm">
                     <span className="text-slate-600">{t("النوع", "Type")}</span>
                     <select className={`${fieldClass} w-full`} name="type" defaultValue="DRIVING_LICENSE">

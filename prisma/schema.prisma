@@ -42,8 +42,24 @@ model Company {
   tasks              Task[]
   employeeNotes      EmployeeNote[]
   letters            Letter[]
+  briefs             DailyBrief[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+}
+
+/// AI summary of the day's priorities, cached per company, day, language and permission set.
+model DailyBrief {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  day       String
+  lang      String
+  /// Short hash of the viewer's permissions, so nobody sees a brief built from data they cannot open.
+  scope     String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, day, lang, scope])
 }
 
 model User {
