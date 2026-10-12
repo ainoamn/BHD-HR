@@ -4,6 +4,7 @@ import { useState } from "react";
 import { EMPLOYER_KIND, NEW_EMPLOYER } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { useLang } from "./lang-provider";
+import { PhoneField } from "./phone-input";
 import { Field, fieldClass } from "./ui";
 
 export function EmployerPicker({
@@ -52,9 +53,7 @@ export function EmployerPicker({
           <Field label={t("السجل التجاري / الرقم المدني", "CR / civil ID")}>
             <input className={`${fieldClass} w-full`} name="newEmployerIdNumber" />
           </Field>
-          <Field label={t("الهاتف", "Phone")}>
-            <input className={`${fieldClass} w-full`} name="newEmployerPhone" />
-          </Field>
+          <PhoneField label={t("الهاتف", "Phone")} name="newEmployerPhone" />
         </div>
       ) : null}
     </div>

@@ -2,6 +2,7 @@ import type { Employer } from "@prisma/client";
 import { EMPLOYER_KIND } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { PhoneField } from "./phone-input";
 import { SubmitButton } from "./submit-button";
 import { Field, fieldClass } from "./ui";
 
@@ -47,9 +48,7 @@ export async function EmployerForm({
       <fieldset className="border-t border-slate-100 pt-5">
         <legend className={legend}>{t("بيانات التواصل", "Contact details")}</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("الهاتف", "Phone")}>
-            <input className={`${fieldClass} w-full`} name="phone" type="tel" dir="ltr" defaultValue={employer?.phone || ""} />
-          </Field>
+          <PhoneField label={t("الهاتف", "Phone")} name="phone" defaultValue={employer?.phone} />
           <Field label={t("البريد الإلكتروني", "Email")}>
             <input className={`${fieldClass} w-full`} name="email" type="email" dir="ltr" defaultValue={employer?.email || ""} />
           </Field>

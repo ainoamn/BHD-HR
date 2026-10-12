@@ -11,6 +11,7 @@ import { DEFAULT_NATIONALITY, findNationality, nationalityOptions } from "@/lib/
 import { currentPeriod, daysLabel, toDateInput } from "@/lib/utils";
 import { BilingualFields } from "./bilingual-fields";
 import { EmployerPicker } from "./employer-picker";
+import { PhoneField } from "./phone-input";
 import { SalaryFields } from "./salary-fields";
 import { SearchSelect } from "./search-select";
 import { SubmitButton } from "./submit-button";
@@ -163,9 +164,7 @@ export async function EmployeeForm({
           <Field label={t("تاريخ الميلاد", "Date of birth")}>
             <input className={`${fieldClass} w-full`} type="date" name="dateOfBirth" defaultValue={toDateInput(employee?.dateOfBirth)} />
           </Field>
-          <Field label={t("رقم الهاتف", "Phone")}>
-            <input className={`${fieldClass} w-full`} type="tel" name="phone" dir="ltr" defaultValue={employee?.phone || ""} />
-          </Field>
+          <PhoneField label={t("رقم الهاتف", "Phone")} name="phone" defaultValue={employee?.phone} />
           <Field label={t("البريد الإلكتروني", "Email")}>
             <input className={`${fieldClass} w-full`} type="email" name="email" dir="ltr" defaultValue={employee?.email || ""} />
           </Field>

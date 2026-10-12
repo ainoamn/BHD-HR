@@ -7,6 +7,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { removeLogoIfUnused, saveUpload } from "@/lib/uploads";
+import { normalizePhone } from "@/lib/phone";
 import { clip, req, str } from "@/lib/utils";
 
 function readEmployer(formData: FormData) {
@@ -16,7 +17,7 @@ function readEmployer(formData: FormData) {
     nameEn: clip(str(formData, "nameEn"), 150),
     kind: EMPLOYER_KIND[kind] ? kind : "COMPANY",
     idNumber: clip(str(formData, "idNumber"), 40),
-    phone: clip(str(formData, "phone"), 30),
+    phone: clip(normalizePhone(str(formData, "phone")), 30),
     email: clip(str(formData, "email"), 80),
     address: clip(str(formData, "address"), 250),
     notes: clip(str(formData, "notes"), 500),

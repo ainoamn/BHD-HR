@@ -13,6 +13,7 @@ import { describeExpiry, worstExpiry } from "@/lib/expiry";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { formatPhone, phoneHref } from "@/lib/phone";
 import {
   attendanceChoiceOf,
   attendanceChoices,
@@ -249,9 +250,9 @@ export default async function EmployeePage({
             <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-amber-800 ring-1 ring-amber-100">{t("بدون كفيل", "No sponsor")}</span>
           )}
           {employee.phone ? (
-            <a href={`tel:${employee.phone}`} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
+            <a href={phoneHref(employee.phone)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-200 hover:text-teal-700" dir="ltr">
               <Phone size={13} className="text-slate-400" />
-              {employee.phone}
+              {formatPhone(employee.phone)}
             </a>
           ) : null}
           {employee.email ? (
@@ -363,7 +364,7 @@ export default async function EmployeePage({
                   <Info label={t("الجنسية", "Nationality")} value={text(nationalityName(employee.nationality, lang))} />
                   <Info label={t("الجنس", "Gender")} value={employee.gender ? pick(GENDER_LABEL[employee.gender], lang, employee.gender) : "—"} />
                   <Info label={t("تاريخ الميلاد", "Date of birth")} value={formatDate(employee.dateOfBirth)} />
-                  <Info label={t("الهاتف", "Phone")} value={text(employee.phone)} dir="ltr" />
+                  <Info label={t("الهاتف", "Phone")} value={text(formatPhone(employee.phone))} dir="ltr" />
                   <Info label={t("البريد الإلكتروني", "Email")} value={text(employee.email)} dir="ltr" />
                   <Info label={t("العنوان", "Address")} value={text(employee.address)} wide />
                 </dl>

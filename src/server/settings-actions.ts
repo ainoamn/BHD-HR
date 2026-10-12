@@ -10,6 +10,7 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import { normalizePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { removeLogoIfUnused, saveUpload } from "@/lib/uploads";
+import { normalizePhone } from "@/lib/phone";
 import { clip, intValue, req, str } from "@/lib/utils";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,7 +54,7 @@ export async function updateCompanySettings(formData: FormData) {
       name: clip(name, 120) || name,
       nameEn: clip(str(formData, "nameEn"), 120),
       crNumber: clip(str(formData, "crNumber"), 40),
-      phone: clip(str(formData, "phone"), 30),
+      phone: clip(normalizePhone(str(formData, "phone")), 30),
       email: clip(str(formData, "email"), 80),
       address: clip(str(formData, "address"), 250),
       currency: clip(str(formData, "currency"), 12) || "ر.ع",

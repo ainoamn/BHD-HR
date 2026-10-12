@@ -2,6 +2,7 @@ import type { AllowanceRowValue } from "@/components/allowances-editor";
 import { ALLOWANCE_BASES, ALLOWANCE_CALCS, ALLOWANCE_FREQUENCIES } from "./allowances";
 import { STATUS_LABEL } from "./constants";
 import { findNationality } from "./nationalities";
+import { normalizePhone } from "./phone";
 import { clip, num, parseDateInput, req, str } from "./utils";
 
 export function readEmployeeInput(formData: FormData) {
@@ -14,7 +15,7 @@ export function readEmployeeInput(formData: FormData) {
     nationality: nationality ? findNationality(nationality)?.code || clip(nationality, 80) : null,
     gender: gender === "MALE" || gender === "FEMALE" ? gender : null,
     dateOfBirth: parseDateInput(str(formData, "dateOfBirth")),
-    phone: clip(str(formData, "phone"), 30),
+    phone: clip(normalizePhone(str(formData, "phone")), 30),
     email: clip(str(formData, "email"), 120),
     address: clip(str(formData, "address"), 300),
     idNumber: clip(str(formData, "idNumber"), 40),

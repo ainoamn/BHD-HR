@@ -9,6 +9,7 @@ import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { formatPhone, phoneHref } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { currentPeriod, money, text } from "@/lib/utils";
@@ -41,7 +42,7 @@ export default async function EmployerPage({
   const period = `${year}-${String(month).padStart(2, "0")}`;
   const contacts = [
     employer.idNumber ? { icon: FileText, value: employer.idNumber, href: null, ltr: true } : null,
-    employer.phone ? { icon: Phone, value: employer.phone, href: `tel:${employer.phone}`, ltr: true } : null,
+    employer.phone ? { icon: Phone, value: formatPhone(employer.phone), href: phoneHref(employer.phone), ltr: true } : null,
     employer.email ? { icon: Mail, value: employer.email, href: `mailto:${employer.email}`, ltr: true } : null,
     employer.address ? { icon: MapPin, value: employer.address, href: null, ltr: false } : null,
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));

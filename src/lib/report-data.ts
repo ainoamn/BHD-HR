@@ -7,6 +7,7 @@ import { pick, type Lang } from "./i18n";
 import { salaryDayWeight } from "./leave";
 import { prisma } from "./prisma";
 import { monthKey, payItemProgress } from "./pay-items";
+import { formatPhone } from "./phone";
 import { packageGross, totalDeductions, totalEarnings } from "./salary";
 import { monthRange, round3 } from "./utils";
 
@@ -136,7 +137,7 @@ export async function buildMonthlyReport(user: SessionUser, year: number, month:
         employer: employee.employer ? (lang === "en" && employee.employer.nameEn ? employee.employer.nameEn : employee.employer.name) : "",
         status: pick(STATUS_LABEL[employee.status], lang, employee.status),
         joiningDate: employee.joiningDate,
-        phone: employee.phone || "",
+        phone: formatPhone(employee.phone) || "",
         gross: show.salaries ? packageGross(employee) : null,
       }))
     : [];

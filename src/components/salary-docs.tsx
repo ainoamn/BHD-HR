@@ -1,5 +1,6 @@
 import type { Company, Employer } from "@prisma/client";
 import { PAYMENT_LABEL, PAY_KIND_LABEL, termBoth, monthName } from "@/lib/constants";
+import { formatPhone } from "@/lib/phone";
 import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { daysLabel, formatDate, money } from "@/lib/utils";
 
@@ -55,7 +56,7 @@ export function headerFor(
       nameEn: salary.employerNameEn ?? employer?.nameEn ?? null,
       logoUrl: employer?.logoUrl || null,
       idNumber: employer?.idNumber || null,
-      phone: employer?.phone || null,
+      phone: formatPhone(employer?.phone),
       address: employer?.address || null,
     };
   }
@@ -64,7 +65,7 @@ export function headerFor(
     nameEn: company.nameEn,
     logoUrl: company.logoUrl,
     idNumber: company.crNumber,
-    phone: company.phone,
+    phone: formatPhone(company.phone),
     address: company.address,
   };
 }
@@ -96,7 +97,8 @@ export function HeaderBar({ header, titleAr, titleEn, number }: { header: DocHea
             </p>
           ) : null}
           <p className="mt-1 text-xs leading-5 text-teal-50">
-            {[header.address, header.phone, header.idNumber ? `CR / س.ت ${header.idNumber}` : null].filter(Boolean).join(" — ")}
+            {/* LRI…PDI keeps "+968 9…" in order inside Arabic text. */}
+            {[header.address, header.phone ? `\u2066${header.phone}\u2069` : null, header.idNumber ? `CR / س.ت ${header.idNumber}` : null].filter(Boolean).join(" — ")}
           </p>
         </div>
       </div>

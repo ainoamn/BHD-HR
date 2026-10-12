@@ -5,6 +5,7 @@ import { AccessEditor } from "@/components/access-editor";
 import { Flash } from "@/components/flash";
 import { InviteLink } from "@/components/invite-link";
 import { Modal } from "@/components/modal";
+import { PhoneField } from "@/components/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
@@ -139,9 +140,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <Field label={t("السجل التجاري", "CR number")}>
                   <input className={`${fieldClass} w-full`} name="crNumber" defaultValue={company.crNumber || ""} />
                 </Field>
-                <Field label={t("الهاتف", "Phone")}>
-                  <input className={`${fieldClass} w-full`} name="phone" dir="ltr" defaultValue={company.phone || ""} />
-                </Field>
+                <PhoneField label={t("الهاتف", "Phone")} name="phone" defaultValue={company.phone} />
                 <Field label={t("البريد", "Email")}>
                   <input className={`${fieldClass} w-full`} name="email" dir="ltr" defaultValue={company.email || ""} />
                 </Field>

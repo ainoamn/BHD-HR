@@ -12,6 +12,7 @@ import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { removeUpload, saveUpload } from "@/lib/uploads";
+import { normalizePhone } from "@/lib/phone";
 import { clip, money, req, str } from "@/lib/utils";
 
 type Catalog = Awaited<ReturnType<typeof getHrCatalog>>;
@@ -95,7 +96,7 @@ async function resolveEmployer(formData: FormData, user: { companyId: string; pe
         nameEn: clip(str(formData, "newEmployerNameEn"), 150),
         kind: EMPLOYER_KIND[kind] ? kind : "COMPANY",
         idNumber: clip(str(formData, "newEmployerIdNumber"), 40),
-        phone: clip(str(formData, "newEmployerPhone"), 30),
+        phone: clip(normalizePhone(str(formData, "newEmployerPhone")), 30),
       },
     });
     return employer.id;

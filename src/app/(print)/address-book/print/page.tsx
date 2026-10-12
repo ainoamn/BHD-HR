@@ -7,6 +7,7 @@ import { EMPLOYER_KIND, STATUS_LABEL, termBoth } from "@/lib/constants";
 import { loadContacts, readContactKind } from "@/lib/contacts";
 import { both } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { formatPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { formatLongDate } from "@/lib/utils";
 
@@ -165,7 +166,7 @@ export default async function ContactsPrintPage({
               </p>
               <p>
                 <span className="text-slate-500">الهاتف / Phone: </span>
-                <Ltr value={employer.phone} />
+                <Ltr value={formatPhone(employer.phone)} />
               </p>
               <p>
                 <span className="text-slate-500">البريد / Email: </span>
@@ -210,7 +211,7 @@ export default async function ContactsPrintPage({
                     <td className={cell}>
                       <strong>{sponsor.contactCount}</strong> جهة اتصال / contact(s)
                     </td>
-                    <td className={`${cell} whitespace-nowrap`}><Ltr value={sponsor.phone} /></td>
+                    <td className={`${cell} whitespace-nowrap`}><Ltr value={formatPhone(sponsor.phone)} /></td>
                     <td className={`${cell} break-all`}><Ltr value={sponsor.email} /></td>
                     <td className={cell}>
                       {sponsor.idNumber ? (
@@ -239,7 +240,7 @@ export default async function ContactsPrintPage({
                         "بدون كفيل / No sponsor"
                       )}
                     </td>
-                    <td className={`${cell} whitespace-nowrap`}><Ltr value={employee.phone} /></td>
+                    <td className={`${cell} whitespace-nowrap`}><Ltr value={formatPhone(employee.phone)} /></td>
                     <td className={`${cell} break-all`}><Ltr value={employee.email} /></td>
                     <td className={cell}>
                       <span dir="ltr">{employee.employeeNumber}</span>
@@ -268,7 +269,7 @@ export default async function ContactsPrintPage({
                         <p className="text-[11px] text-slate-600">
                           {both(EMPLOYER_KIND[sponsor.kind] || EMPLOYER_KIND.COMPANY)}
                           {sponsor.idNumber ? <> · CR: <span dir="ltr">{sponsor.idNumber}</span></> : null}
-                          {sponsor.phone ? <> · <span dir="ltr">{sponsor.phone}</span></> : null}
+                          {sponsor.phone ? <> · <span dir="ltr">{formatPhone(sponsor.phone)}</span></> : null}
                           {sponsor.email ? <> · <span dir="ltr">{sponsor.email}</span></> : null}
                         </p>
                       ) : null}
@@ -301,7 +302,7 @@ export default async function ContactsPrintPage({
                                 <span dir="ltr">{employee.employeeNumber}</span>
                                 {employee.jobTitle ? <span className="block text-[10px] text-slate-500">{termBoth(employee.jobTitle, employee.jobTitleEn)}</span> : null}
                               </td>
-                              <td className={`${cell} whitespace-nowrap`}><Ltr value={employee.phone} /></td>
+                              <td className={`${cell} whitespace-nowrap`}><Ltr value={formatPhone(employee.phone)} /></td>
                               <td className={`${cell} break-all`}><Ltr value={employee.email} /></td>
                               <td className={cell}>{statusText(employee.status)}</td>
                             </tr>

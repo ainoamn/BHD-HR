@@ -28,6 +28,7 @@ import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/consta
 import { type ContactKind, loadContacts, readContactKind } from "@/lib/contacts";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { formatPhone, phoneHref } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { cn, currentPeriod, money } from "@/lib/utils";
@@ -283,7 +284,7 @@ export default async function EmployersPage({
             const monthly = active.reduce((sum, employee) => sum + packageGross(employee), 0);
             const details = [
               employer.idNumber ? { icon: FileText, label: t("السجل / الرقم المدني", "CR / civil ID"), value: employer.idNumber, href: null } : null,
-              employer.phone ? { icon: Phone, label: t("الهاتف", "Phone"), value: employer.phone, href: `tel:${employer.phone}` } : null,
+              employer.phone ? { icon: Phone, label: t("الهاتف", "Phone"), value: formatPhone(employer.phone), href: phoneHref(employer.phone) } : null,
               employer.email ? { icon: Mail, label: t("البريد", "Email"), value: employer.email, href: `mailto:${employer.email}` } : null,
               employer.address ? { icon: MapPin, label: t("العنوان", "Address"), value: employer.address, href: null } : null,
             ].filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -433,9 +434,9 @@ export default async function EmployersPage({
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
                     {employer.phone ? (
-                      <a href={`tel:${employer.phone}`} className="inline-flex items-center gap-1" dir="ltr">
+                      <a href={phoneHref(employer.phone)} className="inline-flex items-center gap-1" dir="ltr">
                         <Phone size={13} className="text-slate-400" />
-                        {employer.phone}
+                        {formatPhone(employer.phone)}
                       </a>
                     ) : null}
                     {employer.email ? (
@@ -478,8 +479,8 @@ export default async function EmployersPage({
                       <td className="px-4 py-3" dir="ltr">{employer.idNumber || "—"}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {employer.phone ? (
-                          <a href={`tel:${employer.phone}`} className="hover:text-teal-800" dir="ltr">
-                            {employer.phone}
+                          <a href={phoneHref(employer.phone)} className="hover:text-teal-800" dir="ltr">
+                            {formatPhone(employer.phone)}
                           </a>
                         ) : (
                           "—"
@@ -580,7 +581,7 @@ function ContactsDirectory({
             {t(`${sponsor.contactCount} جهة اتصال مرتبطة`, `${sponsor.contactCount} linked contact(s)`)}
           </Link>
         ),
-        phone: sponsor.phone,
+        phone: formatPhone(sponsor.phone),
         email: sponsor.email,
         extra: sponsor.idNumber,
       };
@@ -603,7 +604,7 @@ function ContactsDirectory({
         ) : (
           <span className="text-amber-700">{t("بدون كفيل", "No sponsor")}</span>
         ),
-        phone: employee.phone,
+        phone: formatPhone(employee.phone),
         email: employee.email,
         extra: [employee.employeeNumber, termText(employee.jobTitle, employee.jobTitleEn, lang)].filter(Boolean).join(" · "),
         status: employee.status,
@@ -644,7 +645,7 @@ function ContactsDirectory({
             <p className="mt-1.5 text-sm text-slate-600">{row.relation}</p>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
               {row.phone ? (
-                <a href={`tel:${row.phone}`} className="inline-flex items-center gap-1" dir="ltr">
+                <a href={phoneHref(row.phone)} className="inline-flex items-center gap-1" dir="ltr">
                   <Phone size={13} className="text-slate-400" />
                   {row.phone}
                 </a>
@@ -690,7 +691,7 @@ function ContactsDirectory({
                 <td className="px-4 py-3">{row.relation}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {row.phone ? (
-                    <a href={`tel:${row.phone}`} className="hover:text-teal-800" dir="ltr">
+                    <a href={phoneHref(row.phone)} className="hover:text-teal-800" dir="ltr">
                       {row.phone}
                     </a>
                   ) : (
