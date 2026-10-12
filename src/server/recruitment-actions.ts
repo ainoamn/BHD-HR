@@ -1,6 +1,7 @@
 "use server";
 
 import path from "path";
+import { openAndSend, sendSummary } from "@/lib/accounts";
 import { aiScreenCandidate, isRateLimited } from "@/lib/ai";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
@@ -11,6 +12,7 @@ import { getI18n } from "@/lib/lang";
 import { normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_STAGES, EMPLOYMENT_TYPES, JOB_STATUSES, STAGES, STAGE_LABEL, newApplyToken } from "@/lib/recruitment";
+import { requestOrigin } from "@/lib/request-origin";
 import { removeUpload, saveUpload } from "@/lib/uploads";
 import { clip, intValue, num, parseDateInput, req, round3, safeReturn, str, todayInputValue } from "@/lib/utils";
 
@@ -386,8 +388,20 @@ export async function hireCandidate(formData: FormData) {
       `Hired candidate ${candidate!.fullName} as ${employee.employeeNumber} ("${job.title}")`,
     ),
   });
+  const { sent } = await openAndSend({
+    companyId: user.companyId,
+    role: "EMPLOYEE",
+    person: { name: employee.fullName, email: employee.email, phone: employee.phone },
+    employeeId: employee.id,
+    actorId: user.id,
+    companyName: user.company.name,
+    origin: await requestOrigin(),
+    label: "موظف",
+  });
   refreshAll();
-  go(`/employees/${employee.id}/edit`, { message: t("أُنشئ ملف الموظف من المرشح — أكمل بياناته", "Employee created from the candidate — complete the details") });
+  go(`/employees/${employee.id}/edit`, {
+    message: t("أُنشئ ملف الموظف من المرشح وفُتح له حساب دخول — أكمل بياناته", "Employee created from the candidate with a sign-in account — complete the details") + sendSummary(sent, t),
+  });
 }
 
 export async function deleteCandidate(formData: FormData) {

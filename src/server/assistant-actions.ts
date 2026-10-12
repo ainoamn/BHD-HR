@@ -2,7 +2,7 @@
 
 import { runAssistant, type AssistantProposal, type AssistantReply, type AssistantTurn } from "@/lib/assistant";
 import { writeAudit } from "@/lib/audit";
-import { can, getSessionUser } from "@/lib/auth";
+import { can, getSessionUser, isStaffRole } from "@/lib/auth";
 import { refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
@@ -16,6 +16,7 @@ export async function askAssistant(history: AssistantTurn[]): Promise<AssistantR
   const { lang, t } = await getI18n();
   const user = await getSessionUser();
   if (!user) return { error: t("انتهت الجلسة. سجّل الدخول من جديد.", "Your session ended. Sign in again.") };
+  if (!isStaffRole(user.role)) return { error: t("المساعد متاح لفريق الموارد البشرية فقط.", "The assistant is for the HR team only.") };
   const turns = (Array.isArray(history) ? history : [])
     .filter((turn) => turn && (turn.role === "user" || turn.role === "assistant") && typeof turn.text === "string" && turn.text.trim())
     .slice(-MAX_TURNS)

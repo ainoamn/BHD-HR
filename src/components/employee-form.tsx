@@ -249,6 +249,15 @@ export async function EmployeeForm({
               ))}
             </select>
           </Field>
+          {employee ? null : (
+            <Field label={t("حساب الدخول", "Sign-in account")} hint={t("يُنشأ اسم مستخدم وكلمة مرور مؤقتة فور الحفظ", "A username and temporary password are created on save")}>
+              <select className={`${fieldClass} w-full`} name="accountRole" defaultValue="EMPLOYEE">
+                <option value="EMPLOYEE">{t("موظف — صفحته الشخصية", "Employee — own page")}</option>
+                <option value="TEAM_MANAGER">{t("مدير فريق — صفحته وفريقه", "Team manager — own page and team")}</option>
+                <option value="NONE">{t("بدون حساب الآن", "No account for now")}</option>
+              </select>
+            </Field>
+          )}
         </div>
       </Card>
 

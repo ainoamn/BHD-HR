@@ -14,7 +14,7 @@ import { login } from "@/server/auth-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; local?: string; next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string; local?: string; next?: string }> }) {
   const sp = await searchParams;
   const next = safeReturnPath(sp.next);
   const sso = isSsoConfigured();
@@ -82,7 +82,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t("أهلاً بعودتك", "Welcome back")}</h1>
               <p className="mt-2 text-sm leading-6 text-slate-500">{t("سجّل الدخول لمتابعة الموظفين والرواتب.", "Sign in to manage your people and payroll.")}</p>
             </div>
-            <Flash error={sp.error} />
+            <Flash error={sp.error} message={sp.message} />
             <div className="rounded-3xl border border-slate-200/90 bg-surface p-6 shadow-raised sm:p-8">
               {sso ? (
                 <div className="mb-6 space-y-3">
@@ -92,15 +92,25 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
                   </a>
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <span className="h-px flex-1 bg-slate-200" />
-                    {t("دخول طوارئ محلي للمسؤول فقط", "Local emergency sign-in for administrators only")}
+                    {t("أو باسم المستخدم الذي أرسلته لك المنشأة", "Or with the username your company sent you")}
                     <span className="h-px flex-1 bg-slate-200" />
                   </div>
                 </div>
               ) : null}
               <form action={login} className="space-y-4">
                 <input type="hidden" name="next" value={next} />
-                <Field label={t("البريد", "Email")}>
-                  <input className={`${fieldClass} w-full`} name="email" type="email" dir="ltr" autoComplete="username" required defaultValue={firstRun ? "admin@bhd.local" : undefined} />
+                <Field label={t("اسم المستخدم أو البريد", "Username or email")}>
+                  <input
+                    className={`${fieldClass} w-full`}
+                    name="email"
+                    type="text"
+                    dir="ltr"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    defaultValue={firstRun ? "admin@bhd.local" : undefined}
+                  />
                 </Field>
                 <Field label={t("كلمة المرور", "Password")}>
                   <input className={`${fieldClass} w-full`} name="password" type="password" dir="ltr" autoComplete="current-password" required />

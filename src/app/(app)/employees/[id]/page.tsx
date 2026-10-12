@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AccountCard } from "@/components/account-card";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
@@ -961,6 +962,13 @@ export default async function EmployeePage({
         </div>
 
         <aside className="min-w-0 space-y-4">
+          <AccountCard
+            user={user}
+            kind="employee"
+            personId={employee.id}
+            person={{ name: employee.fullName, email: employee.email, phone: employee.phone, active: employee.status !== "TERMINATED" }}
+            hasReports={employee.reports.length > 0}
+          />
           {allow.edit ? (
             <Card id="portal" className="scroll-mt-24">
               <SectionTitle

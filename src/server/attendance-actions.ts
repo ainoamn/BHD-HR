@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { writeAudit } from "@/lib/audit";
-import { requirePermission } from "@/lib/auth";
+import { requireActor, requirePermission } from "@/lib/auth";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -20,9 +20,11 @@ export async function updateAttendance(formData: FormData) {
 }
 
 async function saveAttendance(formData: FormData, replaceId: string | null) {
-  const user = await requirePermission(replaceId ? "attendance.edit" : "attendance.create", "/attendance");
+  const { user, scope } = replaceId
+    ? await requireActor("attendance.edit", null, "/attendance")
+    : await requireActor("attendance.create", "team.attendance.create", "/attendance");
   const { lang, t } = await getI18n();
-  const returnTo = safeReturn(formData.get("returnTo"), "/attendance");
+  const returnTo = safeReturn(formData.get("returnTo"), scope ? "/team" : "/attendance");
   let replacedIds: string[] = [];
   let replacedKey: string | null = null;
   let employeeId = req(formData, "employeeId");
@@ -47,6 +49,7 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
   if (dates.length > 366) go(returnTo, { error: t("المدة أطول من سنة. قسّمها إلى فترات أقصر.", "Period is longer than a year. Split it.") });
   if (type === "HALF_DAY" && dates.length !== 1) go(returnTo, { error: t("نصف اليوم يُسجل في يوم واحد فقط", "A half day can only be one date") });
   const days = type === "HALF_DAY" ? 0.5 : dates.length;
+  if (scope && !scope.includes(employeeId)) go(returnTo, { error: t("الموظف غير موجود", "Employee not found") });
   const employee = await prisma.employee.findFirst({
     where: { id: employeeId, companyId: user.companyId },
     include: { attendance: true, leaveCredits: true },

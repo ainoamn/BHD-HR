@@ -43,6 +43,8 @@ model Company {
   workLng              Float?
   workRadius           Int                 @default(200)
   workStart            String?
+  /// Permission lists the admin set per role (src/lib/permissions.ts); a role that is missing uses the built-in preset.
+  rolePermissions      Json?
   employees            Employee[]
   leaveRequests        LeaveRequest[]
   clockEntries         ClockEntry[]
@@ -94,6 +96,10 @@ model User {
   password           String
   mustChangePassword Boolean      @default(true)
   bhdSub             String?      @unique
+  /// Sign-in name of an account the system opened for an employee or sponsor (src/lib/accounts.ts).
+  username           String?      @unique
+  /// That account's first password, encrypted so HR can share it again; cleared once the person sets their own.
+  tempPassword       String?
   picture            String?
   lastLoginAt        DateTime?
   memberships        Membership[]
@@ -116,6 +122,11 @@ model Membership {
   invitedById String?
   invitedAt   DateTime?
   acceptedAt  DateTime?
+  /// The employee or sponsor this account belongs to; EMPLOYEE / TEAM_MANAGER / EMPLOYER see only their own people.
+  employeeId  String?   @unique
+  employee    Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employerId  String?   @unique
+  employer    Employer? @relation(fields: [employerId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
 
   @@unique([companyId, email])
@@ -124,10 +135,10 @@ model Membership {
 }
 
 model Employer {
-  id        String     @id @default(cuid())
+  id        String      @id @default(cuid())
   companyId String
-  company   Company    @relation(fields: [companyId], references: [id])
-  kind      String     @default("COMPANY")
+  company   Company     @relation(fields: [companyId], references: [id])
+  kind      String      @default("COMPANY")
   name      String
   nameEn    String?
   idNumber  String?
@@ -138,8 +149,9 @@ model Employer {
   notes     String?
   employees Employee[]
   salaries  Salary[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  account   Membership?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model Employee {
@@ -217,6 +229,7 @@ model Employee {
   reviews            PerformanceReview[]
   assets             Asset[]
   expenseClaims      ExpenseClaim[]
+  account            Membership?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

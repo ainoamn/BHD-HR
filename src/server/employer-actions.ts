@@ -1,11 +1,13 @@
 "use server";
 
+import { openAndSend, sendSummary } from "@/lib/accounts";
 import { writeAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { requestOrigin } from "@/lib/request-origin";
 import { removeLogoIfUnused, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
 import { clip, req, str } from "@/lib/utils";
@@ -47,8 +49,22 @@ export async function createEmployer(formData: FormData) {
   const logoUrl = await uploadLogo(formData, user.companyId, null, "/employers");
   const employer = await prisma.employer.create({ data: { ...data, logoUrl, companyId: user.companyId } });
   await writeAudit({ userId: user.id, action: "EMPLOYER_CREATE", message: t(`أضاف الكفيل ${employer.name}`, `Added sponsor ${employer.name}`) });
+  let accountNote = "";
+  if (req(formData, "openAccount") === "1") {
+    const { sent } = await openAndSend({
+      companyId: user.companyId,
+      role: "EMPLOYER",
+      person: { name: employer.name, email: employer.email, phone: employer.phone },
+      employerId: employer.id,
+      actorId: user.id,
+      companyName: user.company.name,
+      origin: await requestOrigin(),
+      label: "صاحب عمل",
+    });
+    accountNote = t(" وفُتح له حساب دخول", " with a sign-in account") + sendSummary(sent, t);
+  }
   refreshAll();
-  go(`/employers/${employer.id}`, { message: t("تمت إضافة الكفيل", "Sponsor added") });
+  go(`/employers/${employer.id}`, { message: t("تمت إضافة الكفيل", "Sponsor added") + accountNote });
 }
 
 export async function updateEmployer(formData: FormData) {

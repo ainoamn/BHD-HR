@@ -1,3 +1,4 @@
+import { isPlaceholderEmail } from "@/lib/accounts";
 import { getDailyBrief } from "@/lib/brief";
 import { channelReady, sendEmailMessage, sendPendingCopies } from "@/lib/delivery";
 import { permissionsFor } from "@/lib/permissions";
@@ -26,9 +27,9 @@ export async function GET(request: Request) {
     if (emailReady) {
       for (const member of memberships) {
         const to = member.user?.email || member.email;
-        if (!to) continue;
+        if (!to || isPlaceholderEmail(to)) continue;
         try {
-          const brief = await getDailyBrief(company, permissionsFor(member.role, member.permissions), "ar");
+          const brief = await getDailyBrief(company, permissionsFor(member.role, member.permissions, company.rolePermissions), "ar");
           if (!brief.alertCount) continue;
           await sendEmailMessage({
             to,

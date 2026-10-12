@@ -3,7 +3,7 @@
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { writeAudit } from "@/lib/audit";
-import { isRole, requireAdmin, requireUser } from "@/lib/auth";
+import { isStaffRole, requireAdmin, requireUser } from "@/lib/auth";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -114,7 +114,7 @@ function newInviteToken() {
 async function readAccess(formData: FormData) {
   const { t } = await getI18n();
   const role = req(formData, "role");
-  if (!isRole(role)) go(MEMBERS, { error: t("صلاحية غير معروفة", "Unknown role") });
+  if (!isStaffRole(role)) go(MEMBERS, { error: t("صلاحية غير معروفة", "Unknown role") });
   const permissions = role === "CUSTOM" ? normalizePermissions(formData.getAll("perm")) : null;
   if (role === "CUSTOM" && !permissions!.length) go(MEMBERS, { error: t("اختر صلاحية واحدة على الأقل", "Choose at least one permission") });
   return { role, permissions };

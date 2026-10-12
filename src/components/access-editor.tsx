@@ -7,18 +7,85 @@ import { useLang } from "./lang-provider";
 
 type Role = "ADMIN" | "MANAGER" | "VIEWER" | "CUSTOM";
 
+/** The permission lists of one role for the whole company (Settings → roles). */
+export function PermissionGrid({ defaultPermissions }: { defaultPermissions: string[] }) {
+  const { lang, t } = useLang();
+  const [granted, setGranted] = useState<string[]>(normalizePermissions(defaultPermissions));
+  const set = new Set(granted);
+  function toggle(module: Module, action: string) {
+    const next = new Set(granted);
+    const key = `${module}.${action}`;
+    if (next.has(key)) {
+      next.delete(key);
+      if (action === "view") MODULE_ACTIONS[module].forEach((item) => next.delete(`${module}.${item}`));
+    } else next.add(key);
+    setGranted(normalizePermissions([...next]));
+  }
+  return (
+    <div className="table-shell shadow-none">
+      {granted.map((permission) => (
+        <input key={permission} type="hidden" name="perm" value={permission} />
+      ))}
+      <table className="text-sm">
+        <thead>
+          <tr>
+            <th className="px-3 py-2 text-start">{t("القسم", "Section")}</th>
+            {ACTION_COLUMNS.map((action) => (
+              <th key={action} className="px-2 py-2 text-center">
+                {pick(ACTION_LABEL[action], lang)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {MODULES.map((module) => (
+            <tr key={module}>
+              <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-800">{pick(MODULE_LABEL[module], lang)}</td>
+              {ACTION_COLUMNS.map((action) => (
+                <td key={action} className="px-2 py-2 text-center">
+                  {MODULE_ACTIONS[module].includes(action) ? (
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-teal-700"
+                      checked={set.has(`${module}.${action}`)}
+                      onChange={() => toggle(module, action)}
+                      aria-label={`${pick(MODULE_LABEL[module], lang)} — ${pick(ACTION_LABEL[action], lang)}`}
+                    />
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** Role presets plus a module × action grid. Ticking a box on a preset switches to CUSTOM, starting from that preset. */
-export function AccessEditor({ defaultRole = "VIEWER", defaultPermissions = [] }: { defaultRole?: string; defaultPermissions?: string[] }) {
+export function AccessEditor({
+  defaultRole = "VIEWER",
+  defaultPermissions = [],
+  presetPermissions,
+}: {
+  defaultRole?: string;
+  defaultPermissions?: string[];
+  /** This company's MANAGER and VIEWER lists when the admin changed them. */
+  presetPermissions?: { MANAGER: string[]; VIEWER: string[] };
+}) {
   const { lang, t } = useLang();
   const initialRole = (["ADMIN", "MANAGER", "VIEWER", "CUSTOM"].includes(defaultRole) ? defaultRole : "VIEWER") as Role;
+  const presetOf = (role: Exclude<Role, "CUSTOM">) => (role === "ADMIN" ? ROLE_PRESETS.ADMIN : presetPermissions?.[role] ?? ROLE_PRESETS[role]);
   const [role, setRole] = useState<Role>(initialRole);
-  const [custom, setCustom] = useState<string[]>(initialRole === "CUSTOM" ? normalizePermissions(defaultPermissions) : ROLE_PRESETS[initialRole as "VIEWER"]);
-  const granted = new Set(role === "CUSTOM" ? custom : ROLE_PRESETS[role]);
+  const [custom, setCustom] = useState<string[]>(initialRole === "CUSTOM" ? normalizePermissions(defaultPermissions) : presetOf(initialRole));
+  const granted = new Set(role === "CUSTOM" ? custom : presetOf(role));
 
   const presets: { id: Role; title: string; text: string }[] = [
     { id: "ADMIN", title: t("مسؤول", "Admin"), text: t("كل شيء + الإعدادات والأعضاء", "Everything + settings and members") },
-    { id: "MANAGER", title: t("مدير", "Manager"), text: t("كل العمليات عدا الإعدادات", "All operations, no settings") },
-    { id: "VIEWER", title: t("مستخدم", "User"), text: t("عرض وطباعة وتصدير فقط", "View, print and export only") },
+    { id: "MANAGER", title: t("مدير الموارد البشرية", "HR manager"), text: t("صلاحيات دور المدير في المنشأة", "The company's HR manager role") },
+    { id: "VIEWER", title: t("مستخدم", "User"), text: t("صلاحيات دور المستخدم في المنشأة", "The company's user role") },
     { id: "CUSTOM", title: t("مخصص", "Custom"), text: t("تختار كل صلاحية بنفسك", "Pick each permission yourself") },
   ];
 

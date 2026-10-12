@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, Clock3, FileUp, Files, ReceiptText, ScrollText, ShieldOff, Target, Wallet } from "lucide-react";
+import { CalendarCheck2, Clock3, FileUp, Files, KeyRound, LayoutDashboard, LogOut, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { getSessionUser, isStaffRole } from "@/lib/auth";
+import { isTeamRole } from "@/lib/permissions";
+import { logout } from "@/server/auth-actions";
 import { ClockButton } from "@/components/clock-button";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
@@ -52,6 +55,9 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
 
   const company = employee.company;
   const base = `/portal/${token}`;
+  const session = await getSessionUser();
+  const signedIn = session && session.employeeId === employee.id ? session : null;
+  const headerPill = "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20";
   const today = muscatDay();
   const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims] = await Promise.all([
     getLeaveTypes(company.id),
@@ -133,9 +139,33 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
+            {signedIn ? (
+              <>
+                {isTeamRole(signedIn.role) ? (
+                  <Link href="/team" className={headerPill}>
+                    <Users size={15} />
+                    {signedIn.role === "EMPLOYER" ? t("عمّالي", "My workers") : t("فريقي", "My team")}
+                  </Link>
+                ) : isStaffRole(signedIn.role) ? (
+                  <Link href="/" className={headerPill}>
+                    <LayoutDashboard size={15} />
+                    {t("النظام", "System")}
+                  </Link>
+                ) : null}
+                <Link href="/password" className={headerPill} title={t("تغيير كلمة المرور", "Change password")}>
+                  <KeyRound size={15} />
+                </Link>
+                <form action={logout}>
+                  <button type="submit" className={headerPill}>
+                    <LogOut size={15} />
+                    {t("خروج", "Sign out")}
+                  </button>
+                </form>
+              </>
+            ) : null}
           </div>
         </div>
       </header>

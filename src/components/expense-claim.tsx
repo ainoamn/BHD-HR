@@ -29,7 +29,22 @@ type Claim = {
 export type ClaimPermissions = { decide: boolean; pay: boolean; salaryPay: boolean; remove: boolean };
 
 /** One expense claim with the next step for its status: approve or reject, then pay. */
-export function ExpenseClaimCard({ claim, lang, currency, allow, returnTo }: { claim: Claim; lang: Lang; currency: string; allow: ClaimPermissions; returnTo: string }) {
+export function ExpenseClaimCard({
+  claim,
+  lang,
+  currency,
+  allow,
+  returnTo,
+  employeeBase,
+}: {
+  claim: Claim;
+  lang: Lang;
+  currency: string;
+  allow: ClaimPermissions;
+  returnTo: string;
+  /** Link prefix for the employee name; defaults to the HR employee page. */
+  employeeBase?: string;
+}) {
   const t = makeT(lang);
   const name = claim.employee ? (lang === "en" && claim.employee.nameEn ? claim.employee.nameEn : claim.employee.fullName) : null;
   const methods = EXPENSE_PAY_METHODS.filter((method) => method !== "SALARY" || allow.salaryPay);
@@ -38,7 +53,7 @@ export function ExpenseClaimCard({ claim, lang, currency, allow, returnTo }: { c
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 text-sm">
           {name ? (
-            <Link href={`/employees/${claim.employee!.id}?tab=hr`} className="font-bold text-slate-900 hover:text-teal-700">
+            <Link href={employeeBase ? `${employeeBase}${claim.employee!.id}` : `/employees/${claim.employee!.id}?tab=hr`} className="font-bold text-slate-900 hover:text-teal-700">
               {name}
             </Link>
           ) : null}

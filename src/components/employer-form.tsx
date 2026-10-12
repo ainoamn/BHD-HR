@@ -83,6 +83,17 @@ export async function EmployerForm({
         </div>
       </fieldset>
 
+      {employer ? null : (
+        <label className="flex items-start gap-2.5 rounded-xl bg-teal-50/60 px-3 py-2.5 text-sm text-slate-700 ring-1 ring-inset ring-teal-100">
+          <input type="checkbox" name="openAccount" value="1" defaultChecked className="mt-0.5 size-4 accent-teal-700" />
+          <span>
+            <span className="font-semibold text-slate-900">{t("فتح حساب دخول لصاحب العمل", "Open a sign-in account for the sponsor")}</span>
+            <span className="block text-xs leading-5 text-slate-500">
+              {t("يرى به عمّاله المكفولين. تُرسل البيانات لبريده أو واتساب إن كانت القناة مفعّلة، أو تشاركها من صفحته.", "They see their sponsored workers. Details go to their email or WhatsApp when a channel is on, or share them from their page.")}
+            </span>
+          </span>
+        </label>
+      )}
       <div className="border-t border-slate-100 pt-4">
         <SubmitButton>{submitLabel}</SubmitButton>
       </div>

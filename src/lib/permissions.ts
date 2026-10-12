@@ -85,9 +85,82 @@ export function normalizePermissions(input: unknown): Permission[] {
   return ALL_PERMISSIONS.filter((permission) => wanted.has(permission));
 }
 
-export function permissionsFor(role: string, stored: unknown): Permission[] {
-  if (role === "ADMIN" || role === "MANAGER" || role === "VIEWER") return ROLE_PRESETS[role];
-  return normalizePermissions(stored);
+/**
+ * People who were given an account because they are an employee or a sponsor. They never open the main system:
+ * EMPLOYEE gets the personal portal; TEAM_MANAGER (their reports) and EMPLOYER (their sponsored workers) get /team.
+ */
+export const TEAM_ROLES = ["TEAM_MANAGER", "EMPLOYER"] as const;
+export type TeamRole = (typeof TEAM_ROLES)[number];
+
+export const TEAM_PERMISSIONS = [
+  "team.attendance.view",
+  "team.attendance.create",
+  "team.leave.approve",
+  "team.documents.view",
+  "team.salaries.view",
+  "team.expenses.approve",
+  "team.performance.view",
+] as const;
+export type TeamPermission = (typeof TEAM_PERMISSIONS)[number];
+
+export const TEAM_PERMISSION_LABEL: Record<TeamPermission, Bi> = {
+  "team.attendance.view": { ar: "عرض الحضور والإجازات والأرصدة", en: "View attendance, leave and balances" },
+  "team.attendance.create": { ar: "تسجيل غياب أو إجازة", en: "Record an absence or leave" },
+  "team.leave.approve": { ar: "الموافقة على طلبات الإجازة", en: "Approve leave requests" },
+  "team.documents.view": { ar: "عرض الوثائق وتواريخ انتهائها", en: "View documents and expiry dates" },
+  "team.salaries.view": { ar: "عرض الرواتب", en: "View salaries" },
+  "team.expenses.approve": { ar: "اعتماد طلبات المصروفات", en: "Approve expense claims" },
+  "team.performance.view": { ar: "عرض تقييمات الأداء", en: "View performance reviews" },
+};
+
+export const TEAM_PRESETS: Record<TeamRole, TeamPermission[]> = {
+  TEAM_MANAGER: ["team.attendance.view", "team.leave.approve", "team.documents.view", "team.expenses.approve", "team.performance.view"],
+  EMPLOYER: ["team.attendance.view", "team.attendance.create", "team.documents.view", "team.salaries.view"],
+};
+
+/** Roles whose permissions the admin can change for the whole company. ADMIN keeps everything; CUSTOM is set per member. */
+export const TUNABLE_ROLES = ["MANAGER", "VIEWER", "TEAM_MANAGER", "EMPLOYER"] as const;
+export type TunableRole = (typeof TUNABLE_ROLES)[number];
+export type RolePermissionMap = Partial<Record<TunableRole, string[]>>;
+
+export function isTeamRole(role: string): role is TeamRole {
+  return (TEAM_ROLES as readonly string[]).includes(role);
+}
+
+export function normalizeTeamPermissions(input: unknown): TeamPermission[] {
+  const wanted = new Set(Array.isArray(input) ? input.map(String) : []);
+  if (wanted.has("team.attendance.create") || wanted.has("team.leave.approve")) wanted.add("team.attendance.view");
+  return TEAM_PERMISSIONS.filter((permission) => wanted.has(permission));
+}
+
+export function readRoleMap(value: unknown): RolePermissionMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const map: RolePermissionMap = {};
+  for (const role of TUNABLE_ROLES) {
+    const list = (value as Record<string, unknown>)[role];
+    if (Array.isArray(list)) map[role] = list.map(String);
+  }
+  return map;
+}
+
+/** The main-system permissions a preset role has in this company. */
+export function rolePreset(role: "ADMIN" | "MANAGER" | "VIEWER", map: RolePermissionMap = {}): Permission[] {
+  if (role === "ADMIN") return ALL_PERMISSIONS;
+  return map[role] ? normalizePermissions(map[role]) : ROLE_PRESETS[role];
+}
+
+export function teamPreset(role: TeamRole, map: RolePermissionMap = {}): TeamPermission[] {
+  return map[role] ? normalizeTeamPermissions(map[role]) : TEAM_PRESETS[role];
+}
+
+export function permissionsFor(role: string, stored: unknown, companyRoles?: unknown): Permission[] {
+  if (role === "ADMIN" || role === "MANAGER" || role === "VIEWER") return rolePreset(role, readRoleMap(companyRoles));
+  if (role === "CUSTOM") return normalizePermissions(stored);
+  return [];
+}
+
+export function teamPermissionsFor(role: string, companyRoles?: unknown): TeamPermission[] {
+  return isTeamRole(role) ? teamPreset(role, readRoleMap(companyRoles)) : [];
 }
 
 /** Pages a member can open, used for the side navigation. */

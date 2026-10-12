@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin, requirePermission } from "@/lib/auth";
+import { requireActor, requireAdmin, requirePermission } from "@/lib/auth";
 import { parseWorkStart, validCoords } from "@/lib/clock";
 import { DOC_LABEL } from "@/lib/constants";
 import { getLeaveTypes } from "@/lib/hr-catalog";
@@ -17,11 +17,11 @@ import { clip, daysLabel, formatDate, num, req, safeReturn, str } from "@/lib/ut
 
 /** Approving records the period in attendance exactly like HR would; rejecting keeps the request with the reason. */
 export async function decideLeaveRequest(formData: FormData) {
-  const user = await requirePermission("attendance.create", "/approvals");
+  const { user, scope } = await requireActor("attendance.create", "team.leave.approve", "/approvals");
   const { lang, t } = await getI18n();
-  const back = safeReturn(formData.get("returnTo"), "/approvals");
+  const back = safeReturn(formData.get("returnTo"), scope ? "/team" : "/approvals");
   const request = await prisma.leaveRequest.findFirst({
-    where: { id: req(formData, "id"), companyId: user.companyId },
+    where: { id: req(formData, "id"), companyId: user.companyId, ...(scope ? { employeeId: { in: scope } } : {}) },
     include: { employee: { include: { attendance: true, leaveCredits: true } } },
   });
   if (!request) go(back, { error: t("الطلب غير موجود", "Request not found") });

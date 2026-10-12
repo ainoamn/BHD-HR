@@ -1,6 +1,7 @@
 "use server";
 
 import type { Prisma } from "@prisma/client";
+import { ensureTeamManager, openAndSend, sendSummary } from "@/lib/accounts";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, NEW_EMPLOYER } from "@/lib/constants";
@@ -11,6 +12,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
+import { requestOrigin } from "@/lib/request-origin";
 import { packageGross } from "@/lib/salary";
 import { removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
@@ -71,7 +73,7 @@ async function saveAllowances(tx: Prisma.TransactionClient, employeeId: string, 
   }
 }
 
-async function resolveEmployer(formData: FormData, user: { companyId: string; permissions: readonly string[] }, errorPath: string) {
+async function resolveEmployer(formData: FormData, user: { id: string; companyId: string; permissions: readonly string[]; company: { name: string } }, errorPath: string) {
   const { t } = await getI18n();
   const companyId = user.companyId;
   const value = req(formData, "employerId");
@@ -90,6 +92,16 @@ async function resolveEmployer(formData: FormData, user: { companyId: string; pe
         idNumber: clip(str(formData, "newEmployerIdNumber"), 40),
         phone: clip(normalizePhone(str(formData, "newEmployerPhone")), 30),
       },
+    });
+    await openAndSend({
+      companyId,
+      role: "EMPLOYER",
+      person: { name: employer.name, email: null, phone: employer.phone },
+      employerId: employer.id,
+      actorId: user.id,
+      companyName: user.company.name,
+      origin: await requestOrigin(),
+      label: "صاحب عمل",
     });
     return employer.id;
   }
@@ -150,8 +162,26 @@ export async function createEmployee(formData: FormData) {
     action: "EMPLOYEE_CREATE",
     message: t(`أضاف الموظف ${employee.fullName} برقم ${employee.employeeNumber}`, `Added employee ${employee.fullName} (${employee.employeeNumber})`),
   });
+  const origin = await requestOrigin();
+  const choice = req(formData, "accountRole") || "EMPLOYEE";
+  let accountNote = "";
+  if (choice !== "NONE" && employee.status !== "TERMINATED") {
+    const role = choice === "TEAM_MANAGER" ? "TEAM_MANAGER" : "EMPLOYEE";
+    const { sent } = await openAndSend({
+      companyId: user.companyId,
+      role,
+      person: { name: employee.fullName, email: employee.email, phone: employee.phone },
+      employeeId: employee.id,
+      actorId: user.id,
+      companyName: user.company.name,
+      origin,
+      label: role === "TEAM_MANAGER" ? "مدير فريق" : "موظف",
+    });
+    accountNote = t(" وفُتح له حساب دخول", " with a sign-in account") + sendSummary(sent, t);
+  }
+  if (managerId) await ensureTeamManager({ companyId: user.companyId, employeeId: managerId, actorId: user.id, companyName: user.company.name, origin });
   refreshAll();
-  go(`/employees/${employee.id}`, { message: t("تمت إضافة الموظف", "Employee added") });
+  go(`/employees/${employee.id}`, { message: t("تمت إضافة الموظف", "Employee added") + accountNote });
 }
 
 export async function updateEmployee(formData: FormData) {
@@ -208,6 +238,13 @@ export async function updateEmployee(formData: FormData) {
         )
       : t(`عدّل بيانات الموظف ${input.fullName}`, `Updated employee ${input.fullName}`);
   await writeAudit({ userId: user.id, employeeId: id, action: "EMPLOYEE_UPDATE", message });
+  if (managerId && managerId !== existing!.managerId) {
+    await ensureTeamManager({ companyId: user.companyId, employeeId: managerId, actorId: user.id, companyName: user.company.name, origin: await requestOrigin() });
+  }
+  if (input.status === "TERMINATED" && existing!.status !== "TERMINATED") {
+    const closed = await prisma.membership.deleteMany({ where: { employeeId: id, role: { in: ["EMPLOYEE", "TEAM_MANAGER"] } } });
+    if (closed.count) await writeAudit({ userId: user.id, employeeId: id, action: "ACCOUNT_CLOSE", message: `أُوقف حساب دخول ${input.fullName} لانتهاء خدمته` });
+  }
   refreshAll();
   go(`/employees/${id}`, { message: t("تم حفظ البيانات", "Saved") });
 }

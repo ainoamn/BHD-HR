@@ -1,22 +1,26 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
+import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound } from "lucide-react";
 import { WorkSitePicker } from "@/components/work-site-picker";
 import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
 import { bankOptions } from "@/lib/banks";
 import { updateSocialProtection } from "@/server/compliance-actions";
-import { AccessEditor } from "@/components/access-editor";
+import { AccessEditor, PermissionGrid } from "@/components/access-editor";
 import { Flash } from "@/components/flash";
 import { InviteLink } from "@/components/invite-link";
 import { Modal } from "@/components/modal";
 import { PhoneField } from "@/components/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { STAFF_ROLES, requireUser } from "@/lib/auth";
 import { channelReady } from "@/lib/delivery";
+import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
-import { normalizePermissions } from "@/lib/permissions";
+import { TEAM_PERMISSIONS, TEAM_PERMISSION_LABEL, normalizePermissions, readRoleMap, rolePreset, teamPreset } from "@/lib/permissions";
+import { ACCOUNT_ROLE_LABEL } from "@/lib/team";
+import { isPlaceholderEmail } from "@/lib/accounts";
+import { openAccountsForAll, saveRolePermissions } from "@/server/account-actions";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
@@ -47,8 +51,66 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const company = user.company;
   const isAdmin = user.role === "ADMIN";
   const members = isAdmin
-    ? await prisma.membership.findMany({ where: { companyId: user.companyId }, include: { user: true }, orderBy: { createdAt: "asc" } })
+    ? await prisma.membership.findMany({
+        where: { companyId: user.companyId, role: { in: [...STAFF_ROLES] } },
+        include: { user: true, employee: { select: { id: true, fullName: true } }, employer: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "asc" },
+      })
     : [];
+  const roleMap = readRoleMap(company.rolePermissions);
+  const [roleCounts, employeesWithout, employersWithout] = isAdmin
+    ? await Promise.all([
+        prisma.membership.groupBy({ by: ["role"], where: { companyId: user.companyId }, _count: { _all: true } }),
+        prisma.employee.count({ where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null } }),
+        prisma.employer.count({ where: { companyId: user.companyId, account: null } }),
+      ])
+    : [[], 0, 0];
+  const roleCount = (role: string) => roleCounts.find((row) => row.role === role)?._count._all || 0;
+  const roleRows: { role: string; text: string; tunable: boolean; count: number; granted: string[] }[] = [
+    {
+      role: "EMPLOYEE",
+      text: t("صفحته الشخصية فقط: طلب الإجازات، الرصيد، قسائم الرواتب، المستندات، الخطابات، المصروفات والحضور.", "Their own page only: leave requests, balances, payslips, documents, letters, expenses and clock-in."),
+      tunable: false,
+      count: roleCount("EMPLOYEE"),
+      granted: [],
+    },
+    {
+      role: "TEAM_MANAGER",
+      text: t("صفحته الشخصية + صفحة فريقه: كل من يتبعه في الهيكل التنظيمي بكل مستوياته.", "Their own page + a team page: everyone under them in the org chart, at every level."),
+      tunable: true,
+      count: roleCount("TEAM_MANAGER"),
+      granted: teamPreset("TEAM_MANAGER", roleMap),
+    },
+    {
+      role: "EMPLOYER",
+      text: t("العمّال المكفولون عليه فقط، من دفتر العناوين.", "Only the workers they sponsor, from the address book."),
+      tunable: true,
+      count: roleCount("EMPLOYER"),
+      granted: teamPreset("EMPLOYER", roleMap),
+    },
+    {
+      role: "VIEWER",
+      text: t("داخل النظام الكامل بحسب الصلاحيات أدناه.", "Inside the full system, per the permissions below."),
+      tunable: true,
+      count: roleCount("VIEWER"),
+      granted: rolePreset("VIEWER", roleMap),
+    },
+    {
+      role: "MANAGER",
+      text: t("داخل النظام الكامل بحسب الصلاحيات أدناه، دون الإعدادات والأعضاء.", "Inside the full system per the permissions below, without settings and members."),
+      tunable: true,
+      count: roleCount("MANAGER"),
+      granted: rolePreset("MANAGER", roleMap),
+    },
+    {
+      role: "ADMIN",
+      text: t("كل شيء، مع الإعدادات والأعضاء والأدوار.", "Everything, including settings, members and roles."),
+      tunable: false,
+      count: roleCount("ADMIN"),
+      granted: [],
+    },
+  ];
+  const personAccounts = roleCount("EMPLOYEE") + roleCount("TEAM_MANAGER") + roleCount("EMPLOYER");
   const deliveryCounts = isAdmin
     ? await prisma.letterDelivery.groupBy({ by: ["channel", "status"], where: { letter: { companyId: user.companyId, cancelledAt: null } }, _count: { _all: true } })
     : [];
@@ -60,8 +122,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const pendingTotal = channelRows.reduce((sum, row) => sum + row.pending, 0);
   const origin = await requestOrigin();
   const justInvited = sp.invite ? members.find((member) => member.id === sp.invite) : undefined;
-  const roleShort = (role: string) =>
-    role === "ADMIN" ? t("مسؤول", "Admin") : role === "MANAGER" ? t("مدير", "Manager") : role === "CUSTOM" ? t("مخصص", "Custom") : t("مستخدم", "User");
+  const roleShort = (role: string) => pick(ACCOUNT_ROLE_LABEL[role], lang, role);
   const roleText = (role: string, stored: string[]) =>
     role === "CUSTOM" ? t(`مخصص — ${normalizePermissions(stored).length} صلاحية`, `Custom — ${normalizePermissions(stored).length} permissions`) : roleShort(role);
   const sections = [
@@ -77,6 +138,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     ...(isAdmin
       ? [
           { id: "channels", label: t("إرسال الخطابات", "Letter delivery"), icon: Send },
+          { id: "roles", label: t("الأدوار والحسابات", "Roles & accounts"), icon: UsersRound },
           { id: "members", label: t("المستخدمون والصلاحيات", "Users & permissions"), icon: ShieldCheck },
         ]
       : []),
@@ -444,6 +506,101 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           ) : null}
 
           {isAdmin ? (
+            <Card id="roles" className="scroll-mt-24">
+              <SectionHead
+                icon={UsersRound}
+                title={t("الأدوار وحسابات الموظفين", "Roles and staff accounts")}
+                text={t(
+                  "كل موظف أو صاحب عمل تضيفه يُفتح له حساب دخول تلقائياً باسم مستخدم وكلمة مرور مؤقتة. حدّد هنا ما يستطيعه كل دور في منشأتك؛ يسري التغيير فوراً على كل من يحمله. ولترقية موظف إلى مدير افتح ملفه ← «حساب الدخول».",
+                  "Every employee or sponsor you add gets a sign-in account with a username and temporary password. Set what each role can do in your company; changes apply at once to everyone holding it. To promote an employee, open their file → Sign-in account.",
+                )}
+              />
+              <ul className="mt-4 grid gap-3 md:grid-cols-2">
+                {roleRows.map((row) => {
+                  const customized = Boolean(roleMap[row.role as keyof typeof roleMap]);
+                  const label = roleShort(row.role);
+                  const appRole = row.role === "MANAGER" || row.role === "VIEWER";
+                  return (
+                    <li key={row.role} className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-bold text-slate-900">{label}</p>
+                        <span className="flex flex-wrap gap-1.5">
+                          {customized ? <ToneBadge tone="gold">{t("معدّل", "Customized")}</ToneBadge> : null}
+                          <ToneBadge tone="slate">{t(`${row.count} حساب`, `${row.count} account(s)`)}</ToneBadge>
+                        </span>
+                      </div>
+                      <p className="text-xs leading-5 text-slate-500">{row.text}</p>
+                      {row.tunable ? (
+                        <>
+                          <p className="text-xs text-slate-600">
+                            {appRole
+                              ? t(`${row.granted.length} صلاحية في النظام`, `${row.granted.length} system permission(s)`)
+                              : row.granted.map((permission) => pick(TEAM_PERMISSION_LABEL[permission as keyof typeof TEAM_PERMISSION_LABEL], lang)).join(" · ") || t("عرض البيانات الأساسية فقط", "Basic details only")}
+                          </p>
+                          <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                            <Modal label={t("تعديل الصلاحيات", "Edit permissions")} title={t(`صلاحيات دور «${label}»`, `“${label}” role permissions`)} triggerClassName={secondaryBtn}>
+                              <form action={saveRolePermissions} className="space-y-4">
+                                <input type="hidden" name="role" value={row.role} />
+                                {appRole ? (
+                                  <PermissionGrid defaultPermissions={row.granted} />
+                                ) : (
+                                  <fieldset className="space-y-2">
+                                    <legend className="mb-1 text-sm text-slate-600">
+                                      {t("يرى دائماً البيانات الأساسية لمن يتبعه. اختر ما يزيد على ذلك:", "Always sees the basic details of their people. Choose what else:")}
+                                    </legend>
+                                    {TEAM_PERMISSIONS.map((permission) => (
+                                      <label key={permission} className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800">
+                                        <input type="checkbox" name="perm" value={permission} defaultChecked={row.granted.includes(permission)} className="size-4 accent-teal-700" />
+                                        {pick(TEAM_PERMISSION_LABEL[permission], lang)}
+                                      </label>
+                                    ))}
+                                  </fieldset>
+                                )}
+                                <SubmitButton className="w-full">{t("حفظ صلاحيات الدور", "Save role permissions")}</SubmitButton>
+                              </form>
+                              {customized ? (
+                                <form action={saveRolePermissions} className="mt-3 text-center">
+                                  <input type="hidden" name="role" value={row.role} />
+                                  <input type="hidden" name="reset" value="1" />
+                                  <SubmitButton variant="link" confirm={t("إرجاع صلاحيات هذا الدور إلى الافتراضي؟", "Put this role back to its default permissions?")}>
+                                    {t("إرجاع الافتراضي", "Restore default")}
+                                  </SubmitButton>
+                                </form>
+                              ) : null}
+                            </Modal>
+                          </div>
+                        </>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              <form action={openAccountsForAll} className="mt-4 flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-100 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-2 text-sm">
+                  <p className="font-semibold text-slate-900">{t("فتح حسابات لمن ليس لديه حساب", "Open accounts for everyone without one")}</p>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-slate-700">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" name="employees" value="1" defaultChecked={employeesWithout > 0} className="size-4 accent-teal-700" />
+                      {t(`الموظفون (${employeesWithout})`, `Employees (${employeesWithout})`)}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" name="employers" value="1" className="size-4 accent-teal-700" />
+                      {t(`أصحاب العمل (${employersWithout})`, `Sponsors (${employersWithout})`)}
+                    </label>
+                  </div>
+                  <p className="text-xs leading-5 text-slate-500">
+                    {t("من له موظفون يتبعونه يُفتح له حساب مدير فريق. تُرسل البيانات تلقائياً إن كانت قناة البريد أو واتساب مفعّلة.", "People with reports get a team manager account. Details are sent automatically when email or WhatsApp is on.")}
+                  </p>
+                </div>
+                <SubmitButton variant="secondary" className="shrink-0" pendingLabel={t("جارٍ فتح الحسابات...", "Opening accounts...")}>
+                  <UserPlus size={16} />
+                  {t("فتح الحسابات", "Open accounts")}
+                </SubmitButton>
+              </form>
+            </Card>
+          ) : null}
+
+          {isAdmin ? (
             <Card id="members" className="scroll-mt-24">
               <SectionHead
                 icon={ShieldCheck}
@@ -469,7 +626,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     </Field>
                     <div>
                       <p className="mb-2 text-sm font-medium text-slate-700">{t("الصلاحيات", "Permissions")}</p>
-                      <AccessEditor defaultRole="VIEWER" />
+                      <AccessEditor defaultRole="VIEWER" presetPermissions={{ MANAGER: rolePreset("MANAGER", roleMap), VIEWER: rolePreset("VIEWER", roleMap) }} />
                     </div>
                     <SubmitButton className="w-full" pendingLabel={t("جارٍ إنشاء الدعوة...", "Creating invitation...")}>
                       {t("إنشاء الدعوة", "Create invitation")}
@@ -508,10 +665,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                             {self ? <span className="ms-2 text-xs font-normal text-slate-500">{t("(أنت)", "(you)")}</span> : null}
                           </p>
                           <p className="truncate text-sm text-slate-500" dir="ltr">
-                            {member.email}
+                            {member.user?.username && isPlaceholderEmail(member.email) ? member.user.username : member.email}
                           </p>
                           <div className="mt-1.5 flex flex-wrap gap-1.5">
                             <ToneBadge tone="slate">{roleText(member.role, stored)}</ToneBadge>
+                            {member.employee ? (
+                              <Link href={`/employees/${member.employee.id}#account`}>
+                                <ToneBadge tone="teal">{t(`موظف: ${member.employee.fullName}`, `Employee: ${member.employee.fullName}`)}</ToneBadge>
+                              </Link>
+                            ) : member.employer ? (
+                              <Link href={`/employers/${member.employer.id}#account`}>
+                                <ToneBadge tone="teal">{t(`صاحب عمل: ${member.employer.name}`, `Sponsor: ${member.employer.name}`)}</ToneBadge>
+                              </Link>
+                            ) : null}
                             {pending ? (
                               <ToneBadge tone="amber">
                                 {t("دعوة معلّقة", "Invitation pending")}
@@ -530,7 +696,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                           <Modal label={t("الصلاحيات", "Permissions")} title={t(`صلاحيات ${display}`, `Permissions — ${display}`)} triggerClassName={secondaryBtn}>
                             <form action={updateMemberAccess} className="space-y-4">
                               <input type="hidden" name="membershipId" value={member.id} />
-                              <AccessEditor defaultRole={member.role} defaultPermissions={stored} />
+                              <AccessEditor
+                                defaultRole={member.role}
+                                defaultPermissions={stored}
+                                presetPermissions={{ MANAGER: rolePreset("MANAGER", roleMap), VIEWER: rolePreset("VIEWER", roleMap) }}
+                              />
                               <SubmitButton className="w-full">{t("حفظ الصلاحيات", "Save permissions")}</SubmitButton>
                             </form>
                           </Modal>
@@ -561,6 +731,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   );
                 })}
               </ul>
+              {personAccounts ? (
+                <p className="mt-2 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">
+                  {t(
+                    `و${personAccounts} حساب موظفين ومديري فرق وأصحاب عمل — يُدار كل منها من ملف صاحبه، ودور كل نوع من «الأدوار والحسابات».`,
+                    `Plus ${personAccounts} employee, team manager and sponsor account(s) — each is managed from its person's file, and each type's role under Roles & accounts.`,
+                  )}
+                </p>
+              ) : null}
             </Card>
           ) : null}
         </div>

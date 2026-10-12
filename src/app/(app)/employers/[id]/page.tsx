@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Banknote, FileText, Mail, MapPin, PencilLine, Phone, Printer, ReceiptText, Trash2, UserPlus, Users, Wallet } from "lucide-react";
+import { AccountCard } from "@/components/account-card";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
@@ -194,17 +195,20 @@ export default async function EmployerPage({
         )}
       </Card>
 
-      {can(user, "employers.edit") ? (
-        <Card id="details" className="scroll-mt-24">
-          <SectionTitle hint={t("الاسم والشعار وبيانات التواصل.", "Name, logo and contact details.")}>
-            <span className="inline-flex items-center gap-2">
-              <PencilLine size={18} className="text-teal-700" />
-              {t("تعديل بيانات الكفيل", "Edit sponsor details")}
-            </span>
-          </SectionTitle>
-          <EmployerForm action={updateEmployer} employer={employer} submitLabel={t("حفظ التعديلات", "Save changes")} />
-        </Card>
-      ) : null}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        {can(user, "employers.edit") ? (
+          <Card id="details" className="scroll-mt-24">
+            <SectionTitle hint={t("الاسم والشعار وبيانات التواصل.", "Name, logo and contact details.")}>
+              <span className="inline-flex items-center gap-2">
+                <PencilLine size={18} className="text-teal-700" />
+                {t("تعديل بيانات الكفيل", "Edit sponsor details")}
+              </span>
+            </SectionTitle>
+            <EmployerForm action={updateEmployer} employer={employer} submitLabel={t("حفظ التعديلات", "Save changes")} />
+          </Card>
+        ) : null}
+        <AccountCard user={user} kind="employer" personId={employer.id} person={{ name: employer.name, email: employer.email, phone: employer.phone, active: true }} />
+      </div>
 
       {can(user, "employers.delete") ? (
         <Card className="border-red-100 bg-red-50/30">

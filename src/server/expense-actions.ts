@@ -1,7 +1,7 @@
 "use server";
 
 import { writeAudit } from "@/lib/audit";
-import { can, requirePermission } from "@/lib/auth";
+import { can, requireActor, requirePermission } from "@/lib/auth";
 import { monthName } from "@/lib/constants";
 import { muscatDay } from "@/lib/clock";
 import { EXPENSE_CATEGORIES, EXPENSE_PAY_LABEL, EXPENSE_PAY_METHODS, MAX_EXPENSE_AMOUNT } from "@/lib/expenses";
@@ -75,11 +75,11 @@ export async function addExpense(formData: FormData) {
 }
 
 export async function decideExpense(formData: FormData) {
-  const user = await requirePermission("expenses.edit", LIST);
+  const { user, scope } = await requireActor("expenses.edit", "team.expenses.approve", LIST);
   const { t } = await getI18n();
-  const back = safeReturn(formData.get("returnTo"), LIST);
+  const back = safeReturn(formData.get("returnTo"), scope ? "/team" : LIST);
   const claim = await ownClaim(req(formData, "id"), user.companyId);
-  if (!claim) go(back, { error: t("المصروف غير موجود", "Expense not found") });
+  if (!claim || (scope && !scope.includes(claim.employeeId))) go(back, { error: t("المصروف غير موجود", "Expense not found") });
   if (claim!.status !== "PENDING") go(back, { error: t("بُتّ في هذا الطلب من قبل", "This claim was already decided") });
   const approve = req(formData, "decision") === "approve";
   const note = clip(str(formData, "note"), 300);

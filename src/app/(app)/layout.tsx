@@ -8,7 +8,8 @@ import { SiteFooter } from "@/components/bhd/site-footer";
 import { LangToggle } from "@/components/lang-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getAlerts } from "@/lib/alerts";
-import { can, requireUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { can, homePath, isStaffRole, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { MODULES, MODULE_HREF } from "@/lib/permissions";
 import { SIDEBAR_COOKIE, THEME_COOKIE, formatLongDate, normalizeTheme } from "@/lib/utils";
@@ -18,6 +19,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  if (user.username && user.mustChangePassword) redirect("/password");
+  if (!isStaffRole(user.role)) redirect(homePath(user));
   const { lang, t } = await getI18n();
   const alerts = await getAlerts();
   const jar = await cookies();
@@ -28,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     user.role === "ADMIN"
       ? t("مسؤول", "Admin")
       : user.role === "MANAGER"
-        ? t("مدير", "Manager")
+        ? t("مدير الموارد البشرية", "HR manager")
         : user.role === "CUSTOM"
           ? t("صلاحيات مخصصة", "Custom permissions")
           : t("مستخدم — عرض فقط", "User — view only");
