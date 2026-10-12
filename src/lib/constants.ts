@@ -109,6 +109,7 @@ export const PAY_KIND_LABEL: Record<string, Bi> = {
   ENTITLEMENT: { ar: "استحقاق", en: "Entitlement" },
   DEDUCTION: { ar: "خصم", en: "Deduction" },
   RECURRING: { ar: "علاوة", en: "Allowance" },
+  SOCIAL: { ar: "الحماية الاجتماعية", en: "Social protection" },
 };
 
 export const PAY_KIND_HINT: Record<string, Bi> = {

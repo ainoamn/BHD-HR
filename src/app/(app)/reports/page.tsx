@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { Banknote, CalendarX2, FileWarning, HandCoins, PieChart } from "lucide-react";
+import { Banknote, CalendarX2, FileWarning, Flag, HandCoins, PieChart } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PeriodFilter } from "@/components/period-filter";
 import { ReportToolbar } from "@/components/report-toolbar";
 import { PageHeader, ToneBadge } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
+import { omanization } from "@/lib/oman";
+import { prisma } from "@/lib/prisma";
 import { buildMonthlyReport } from "@/lib/report-data";
 import { daysLabel, formatDate, money, readPeriod, text } from "@/lib/utils";
 
@@ -38,7 +40,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const user = await requirePermission("reports.view");
   const { lang, t } = await getI18n();
   const { year, month } = readPeriod(sp);
-  const report = await buildMonthlyReport(user, year, month, lang);
+  const [report, activeStaff] = await Promise.all([
+    buildMonthlyReport(user, year, month, lang),
+    prisma.employee.findMany({ where: { companyId: user.companyId, status: "ACTIVE" }, select: { nationality: true, department: true, departmentEn: true } }),
+  ]);
+  const omani = omanization(activeStaff);
   const currency = report.currency;
   const period = `${year}-${String(month).padStart(2, "0")}`;
   const urgentDocs = report.documents.filter((row) => row.status.key !== "ok" && row.status.key !== "none");
@@ -77,6 +83,47 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </div>
           ))}
         </div>
+
+        <section id="omanization" className="scroll-mt-24">
+          <ReportSection
+            icon={Flag}
+            title={t("نسبة التعمين", "Omanization")}
+            aside={
+              <>
+                {t("الموظفون النشطون", "Active employees")}: <strong className="tabular text-slate-900">{omani.total}</strong> · {t("عمانيون", "Omani")}:{" "}
+                <strong className="tabular text-teal-800">
+                  {omani.omani} ({omani.percent}%)
+                </strong>
+              </>
+            }
+          >
+            {omani.total ? (
+              <div className="space-y-3 px-4 py-4 sm:px-5">
+                {omani.departments.map((group) => (
+                  <div key={group.name || "-"}>
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="font-medium text-slate-800">{(lang === "en" ? group.nameEn || group.name : group.name) || t("بدون قسم", "No department")}</span>
+                      <span className="tabular text-slate-600">
+                        {group.omani} / {group.total} · <strong className="text-slate-900">{group.percent}%</strong>
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-teal-600" style={{ width: `${group.percent}%` }} />
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs leading-5 text-slate-500">
+                  {t(
+                    "النسبة المطلوبة تختلف حسب النشاط والمهنة وتحددها وزارة العمل؛ قارنها بالنسبة المقررة لنشاط منشأتك.",
+                    "The required ratio depends on the activity and profession and is set by the Ministry of Labour; compare with the ratio for your activity.",
+                  )}
+                </p>
+              </div>
+            ) : (
+              <Empty>{t("لا يوجد موظفون نشطون.", "No active employees.")}</Empty>
+            )}
+          </ReportSection>
+        </section>
 
         {report.show.salaries ? (
           <ReportSection icon={Banknote} title={t(`رواتب ${report.title}`, `${report.title} payroll`)}>

@@ -26,6 +26,17 @@ model Company {
   leaveWarningDays   Int                 @default(5)
   /// 0 until the built-in job titles, departments and leave types are seeded (src/lib/hr-catalog.ts).
   catalogVersion     Int                 @default(0)
+  /// Social Protection Fund (src/lib/oman.ts). Rates are percentages; off until the admin turns it on.
+  spfEnabled           Boolean           @default(false)
+  spfEmployeeRate      Float             @default(8)
+  spfEmployerRate      Float             @default(14.5)
+  spfExpatEmployerRate Float             @default(2)
+  spfWageCap           Float             @default(3000)
+  /// GROSS = basic + fixed allowances + recurring allowances; BASIC = basic only.
+  spfBase              String            @default("GROSS")
+  /// Payer bank for the WPS salary file.
+  bankBic              String?
+  bankAccount          String?
   employees          Employee[]
   jobTitles          JobTitle[]
   departments        Department[]
@@ -138,6 +149,9 @@ model Employee {
   residenceNumber    String?
   residenceExpiry    DateTime?
   residenceFileUrl   String?
+  /// SWIFT/BIC of the employee's bank (src/lib/banks.ts) and the account salaries go to; used by the WPS file.
+  bankBic            String?
+  bankAccount        String?
   /// Names copied from the chosen JobTitle / Department so lists and prints need no join.
   jobTitle           String?
   jobTitleEn         String?
@@ -350,6 +364,9 @@ model Salary {
   extraEarnings      Float        @default(0)
   extraDeductions    Float        @default(0)
   netSalary          Float        @default(0)
+  /// Social Protection Fund: employee share (also a SOCIAL deduction line, inside extraDeductions) and the employer's cost, which is not deducted.
+  spfEmployee        Float        @default(0)
+  spfEmployer        Float        @default(0)
   notes              String?
   paid               Boolean      @default(false)
   paidAt             DateTime?

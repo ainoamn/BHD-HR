@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Mail, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
+import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
+import { SearchSelect } from "@/components/search-select";
+import { bankOptions } from "@/lib/banks";
+import { updateSocialProtection } from "@/server/compliance-actions";
 import { AccessEditor } from "@/components/access-editor";
 import { Flash } from "@/components/flash";
 import { InviteLink } from "@/components/invite-link";
@@ -64,6 +67,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       ? [
           { id: "company", label: t("المنشأة", "Company"), icon: Building2 },
           { id: "payroll", label: t("الرواتب والتنبيهات", "Payroll & alerts"), icon: BellRing },
+          { id: "oman", label: t("الحماية الاجتماعية والبنك", "Social protection & bank"), icon: Landmark },
         ]
       : []),
     { id: "profile", label: t("بياناتي", "My details"), icon: UserCog },
@@ -217,7 +221,72 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 </div>
               </Card>
             </form>
-          ) : (
+          ) : null}
+
+          {isAdmin ? (
+            <form action={updateSocialProtection}>
+              <Card id="oman" className="grid scroll-mt-24 gap-4 md:grid-cols-2">
+                <SectionHead
+                  icon={Landmark}
+                  title={t("الحماية الاجتماعية والبنك", "Social protection & bank")}
+                  text={t(
+                    "حصة الموظف العماني تُخصم تلقائياً سطراً في راتبه، وحصة صاحب العمل تظهر في تقرير الاشتراكات ولا تُخصم. غير العماني: حصة صاحب العمل فقط. الحفظ يعيد احتساب الرواتب غير المصروفة.",
+                    "The Omani employee share is deducted automatically as a salary line; the employer share appears in the contributions report and is not deducted. Non-Omanis: employer share only. Saving recalculates unpaid salaries.",
+                  )}
+                />
+                <label className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-sm font-semibold text-slate-800 ring-1 ring-inset ring-slate-100 md:col-span-2">
+                  <input type="checkbox" name="spfEnabled" value="1" defaultChecked={company.spfEnabled} className="size-4 accent-teal-700" />
+                  {t("احتساب اشتراكات صندوق الحماية الاجتماعية في الرواتب", "Calculate Social Protection Fund contributions in payroll")}
+                </label>
+                <Field label={t("حصة الموظف العماني (%)", "Omani employee share (%)")} hint={t("7.5% شيخوخة وعجز ووفاة + 0.5% أمان وظيفي", "7.5% old age, disability & death + 0.5% job security")}>
+                  <input className={`${fieldClass} w-full`} type="number" min="0" max="100" step="0.001" name="spfEmployeeRate" defaultValue={company.spfEmployeeRate} />
+                </Field>
+                <Field label={t("حصة صاحب العمل عن العماني (%)", "Employer share for Omanis (%)")} hint={t("11 + 0.5 + 1 إصابات + 1 أمومة + 1 مرضية (من 19 يوليو 2026)", "11 + 0.5 + 1 injury + 1 maternity + 1 sick leave (from 19 Jul 2026)")}>
+                  <input className={`${fieldClass} w-full`} type="number" min="0" max="100" step="0.001" name="spfEmployerRate" defaultValue={company.spfEmployerRate} />
+                </Field>
+                <Field label={t("حصة صاحب العمل عن غير العماني (%)", "Employer share for non-Omanis (%)")} hint={t("1% أمومة + 1% إجازات مرضية واستثنائية", "1% maternity + 1% sick & extraordinary leave")}>
+                  <input className={`${fieldClass} w-full`} type="number" min="0" max="100" step="0.001" name="spfExpatEmployerRate" defaultValue={company.spfExpatEmployerRate} />
+                </Field>
+                <Field label={t("الحد الأعلى للأجر الخاضع", "Insured wage cap")} hint={t("0 = بلا حد", "0 = no cap")}>
+                  <input className={`${fieldClass} w-full`} type="number" min="0" step="0.001" name="spfWageCap" defaultValue={company.spfWageCap} />
+                </Field>
+                <Field label={t("الأجر الخاضع للاشتراك", "Insured wage")}>
+                  <select className={`${fieldClass} w-full`} name="spfBase" defaultValue={company.spfBase}>
+                    <option value="GROSS">{t("الأساسي + البدلات الثابتة والعلاوات", "Basic + fixed and recurring allowances")}</option>
+                    <option value="BASIC">{t("الأساسي فقط", "Basic only")}</option>
+                  </select>
+                </Field>
+                <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3.5 py-3 text-xs leading-5 text-amber-900 ring-1 ring-inset ring-amber-100 md:col-span-2">
+                  <Info size={15} className="mt-0.5 shrink-0" />
+                  <span>
+                    {t(
+                      "النسب الافتراضية منشورة من صندوق الحماية الاجتماعية (spf.gov.om) حتى يوليو 2026. تحقق منها قبل التفعيل، فالصندوق يعدّلها بقرارات. نظام الادخار لغير العمانيين (9% من الأساسي) يبدأ في موعد أقصاه 19 يوليو 2027 ولم يُضف بعد.",
+                      "Default rates are those published by the Social Protection Fund (spf.gov.om) as of July 2026. Check them before turning this on; the fund changes them by decision. The savings scheme for non-Omanis (9% of basic) starts by 19 July 2027 at the latest and is not included yet.",
+                    )}
+                  </span>
+                </p>
+                <div className="border-t border-slate-100 pt-4 md:col-span-2">
+                  <h3 className="text-sm font-bold text-slate-900">{t("حساب المنشأة لملف الرواتب (WPS)", "Company account for the salary file (WPS)")}</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">{t("يظهر في رأس ملف WPS. رقم السجل التجاري يؤخذ من بيانات المنشأة أو الكفيل.", "Shown in the WPS file header. The CR number comes from the company or sponsor details.")}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-700">{t("بنك المنشأة", "Company bank")}</span>
+                  <SearchSelect name="bankBic" options={bankOptions(lang)} defaultValue={company.bankBic || ""} emptyLabel={t("غير محدد", "Not set")} ariaLabel={t("بنك المنشأة", "Company bank")} />
+                </div>
+                <Field label={t("رقم حساب المنشأة", "Company account number")}>
+                  <input className={`${fieldClass} w-full`} name="bankAccount" dir="ltr" defaultValue={company.bankAccount || ""} />
+                </Field>
+                <div className="flex items-end justify-end md:col-span-2">
+                  <SubmitButton className="w-full sm:w-auto">
+                    <Save size={16} />
+                    {t("حفظ وإعادة احتساب الرواتب غير المصروفة", "Save and recalculate unpaid salaries")}
+                  </SubmitButton>
+                </div>
+              </Card>
+            </form>
+          ) : null}
+
+          {isAdmin ? null : (
             <Card className="flex items-start gap-3 text-sm text-slate-700">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                 <Building2 size={19} />

@@ -112,7 +112,7 @@ export async function createEmployee(formData: FormData) {
   const catalog = await getHrCatalog(user.companyId);
   const input = readEmployeeInput(formData);
   const salaryAccess = can(user, "salaries.edit");
-  if (!salaryAccess) Object.assign(input, { basicSalary: 0, housingAllowance: 0, transportAllowance: 0, otherAllowance: 0 });
+  if (!salaryAccess) Object.assign(input, { basicSalary: 0, housingAllowance: 0, transportAllowance: 0, otherAllowance: 0, bankBic: null, bankAccount: null });
   if (input.fullName.length < 2) go("/employees/new", { error: t("الاسم الكامل مطلوب", "Full name is required") });
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : [];
   const employerId = await resolveEmployer(formData, user, "/employees/new");
@@ -157,6 +157,8 @@ export async function updateEmployee(formData: FormData) {
     input.housingAllowance = existing!.housingAllowance;
     input.transportAllowance = existing!.transportAllowance;
     input.otherAllowance = existing!.otherAllowance;
+    input.bankBic = existing!.bankBic;
+    input.bankAccount = existing!.bankAccount;
   }
   const errorPath = `/employees/${id}/edit`;
   if (input.fullName.length < 2) go(errorPath, { error: t("الاسم الكامل مطلوب", "Full name is required") });
@@ -169,10 +171,8 @@ export async function updateEmployee(formData: FormData) {
         where: { id },
         data: { ...input, ...jobFields(formData, catalog), ...files.data, leaveDays: readLeaveDays(formData, catalog.leaveTypes), employerId },
       });
-      if (allowances) {
-        await saveAllowances(tx, id, user.companyId, allowances);
-        await syncEmployeeSalaries(tx, id, user.company.salaryDays);
-      }
+      if (allowances) await saveAllowances(tx, id, user.companyId, allowances);
+      if (allowances || input.nationality !== existing!.nationality) await syncEmployeeSalaries(tx, id, user.company.salaryDays);
     },
     { maxWait: 10000, timeout: 30000 },
   );

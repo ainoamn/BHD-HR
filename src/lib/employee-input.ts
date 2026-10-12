@@ -1,5 +1,6 @@
 import type { AllowanceRowValue } from "@/components/allowances-editor";
 import { ALLOWANCE_BASES, ALLOWANCE_CALCS, ALLOWANCE_FREQUENCIES } from "./allowances";
+import { cleanAccount, cleanBic } from "./banks";
 import { STATUS_LABEL } from "./constants";
 import { findNationality } from "./nationalities";
 import { normalizePhone } from "./phone";
@@ -31,6 +32,8 @@ export function readEmployeeInput(formData: FormData) {
     housingAllowance: Math.max(0, num(formData, "housingAllowance")),
     transportAllowance: Math.max(0, num(formData, "transportAllowance")),
     otherAllowance: Math.max(0, num(formData, "otherAllowance")),
+    bankBic: cleanBic(str(formData, "bankBic")),
+    bankAccount: cleanAccount(str(formData, "bankAccount")),
     notes: clip(str(formData, "notes"), 1000),
   };
 }

@@ -33,6 +33,9 @@ import { cn, currentPeriod, daysLabel, formatDate, money, round3, text, todayInp
 import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
 import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
 import { DocumentScan } from "@/components/document-scan";
+import { bankName } from "@/lib/banks";
+import { HR_DOC_LABEL, HR_DOC_NEEDS_SALARY, HR_DOC_TYPES } from "@/lib/hr-docs";
+import { gratuity } from "@/lib/oman";
 import { deleteEmployee } from "@/server/employee-actions";
 import { addLeaveCredit } from "@/server/leave-actions";
 import { savePayItem } from "@/server/pay-item-actions";
@@ -160,6 +163,7 @@ export default async function EmployeePage({
     lang,
   );
   const lastSalary = employee.salaries[0];
+  const accrued = gratuity({ joiningDate: employee.joiningDate, endDate: new Date(), basicSalary: employee.basicSalary, nationality: employee.nationality });
   const tabs = [
     { id: "info", label: t("البيانات", "Details"), count: null },
     { id: "notes", label: t("الملاحظات", "Notes"), count: notes.length },
@@ -462,6 +466,13 @@ export default async function EmployeePage({
                   <Info label={t("الحالة", "Status")} value={pick(STATUS_LABEL[employee.status], lang, employee.status)} />
                   <Info label={t("تاريخ الالتحاق", "Joining date")} value={formatDate(employee.joiningDate)} />
                   <Info label={t("نهاية العقد", "Contract end")} value={formatDate(employee.contractEnd)} />
+                  {allow.salaries ? (
+                    <Info
+                      label={t("الحساب البنكي", "Bank account")}
+                      value={employee.bankAccount ? `${bankName(employee.bankBic, lang) || "—"} · ${employee.bankAccount}` : "—"}
+                      dir="ltr"
+                    />
+                  ) : null}
                 </dl>
               </Card>
               {allow.docs ? (
@@ -849,6 +860,28 @@ export default async function EmployeePage({
         </div>
 
         <aside className="min-w-0 space-y-4">
+          <Card>
+            <SectionTitle>{t("مستندات الموارد البشرية", "HR documents")}</SectionTitle>
+            <div className="grid grid-cols-2 gap-2">
+              {HR_DOC_TYPES.filter((type) => !HR_DOC_NEEDS_SALARY[type] || allow.salaries).map((type) => (
+                <Link key={type} href={`${base}/hr-doc?type=${type}`} className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800">
+                  {pick(HR_DOC_LABEL[type], lang)}
+                </Link>
+              ))}
+            </div>
+            {allow.salaries ? (
+              <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600 ring-1 ring-inset ring-slate-100">
+                {accrued.eligible
+                  ? t(
+                      `مكافأة نهاية الخدمة المستحقة حتى اليوم: ${money(accrued.amount, currency)} (${accrued.months} شهر من الأجر الأساسي).`,
+                      `End-of-service gratuity accrued to date: ${money(accrued.amount, currency)} (${accrued.months} month(s) of basic pay).`,
+                    )
+                  : accrued.reason === "OMANI"
+                    ? t("عماني: مشمول بصندوق الحماية الاجتماعية، لا مكافأة نهاية خدمة على صاحب العمل.", "Omani: covered by the Social Protection Fund; no employer gratuity.")
+                    : t("أدخل تاريخ الالتحاق لحساب مكافأة نهاية الخدمة.", "Enter the joining date to calculate the gratuity.")}
+              </p>
+            ) : null}
+          </Card>
           {allow.salaries ? (
           <Card>
             <SectionTitle>{t("الراتب الشهري", "Monthly salary")}</SectionTitle>

@@ -264,6 +264,8 @@ export async function updateSalaryAdjustments(formData: FormData) {
     where: { id },
     data: { ...components, otherDeduction, absenceDeduction: amounts.absenceDeduction, netSalary: amounts.netSalary, notes: clip(str(formData, "notes"), 500) },
   });
+  const synced = await syncSalaryLines(prisma, id, user.company.salaryDays);
+  if (synced) amounts.netSalary = synced.netSalary;
   await writeAudit({
     userId: user.id,
     employeeId: salary.employeeId,

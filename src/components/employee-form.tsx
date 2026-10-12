@@ -2,6 +2,7 @@ import type { Employee, EmployeeAllowance } from "@prisma/client";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { BriefcaseBusiness, Building2, CalendarCheck2, IdCard, NotebookPen, Save, UserRound, Wallet } from "lucide-react";
+import { bankOptions } from "@/lib/banks";
 import { GENDER_LABEL, STATUS_LABEL, termText } from "@/lib/constants";
 import type { getHrCatalog } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
@@ -299,6 +300,15 @@ export async function EmployeeForm({
               canManageTypes: canManageCatalog,
             }}
           />
+          <div className="grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-slate-700">{t("بنك الموظف", "Employee's bank")}</span>
+              <SearchSelect name="bankBic" options={bankOptions(lang)} defaultValue={employee?.bankBic || ""} emptyLabel={t("غير محدد", "Not set")} ariaLabel={t("بنك الموظف", "Employee's bank")} />
+            </div>
+            <Field label={t("رقم الحساب البنكي", "Bank account number")} hint={t("يُستخدم في ملف تحويل الرواتب (WPS) ورسالة تحويل الراتب.", "Used in the WPS salary file and the salary transfer letter.")}>
+              <input className={`${fieldClass} w-full`} name="bankAccount" dir="ltr" defaultValue={employee?.bankAccount || ""} />
+            </Field>
+          </div>
         </Card>
       ) : null}
 

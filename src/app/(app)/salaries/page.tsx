@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Banknote, FileText, HandCoins, Printer, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, Download, FileText, HandCoins, Info, Printer, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { PeriodFilter } from "@/components/period-filter";
 import { DeleteButton } from "@/components/row-forms";
@@ -10,6 +10,7 @@ import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
+import { payrollIssues } from "@/lib/payroll-check";
 import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { daysLabel, money, readPeriod, round3, todayInputValue } from "@/lib/utils";
 import { createSalary, deleteUnpaidSalary, generatePayroll, payAll } from "@/server/salary-actions";
@@ -31,13 +32,15 @@ export default async function SalariesPage({
   });
   const employerId = sp.employerId === "none" || employers.some((item) => item.id === sp.employerId) ? sp.employerId || "" : "";
   const employerFilter = employerId === "none" ? { employerId: null } : employerId ? { employerId } : {};
-  const [salaries, activeCount] = await Promise.all([
+  const previous = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+  const [salaries, activeCount, previousSalaries] = await Promise.all([
     prisma.salary.findMany({
       where: { year, month, employee: { companyId: user.companyId }, ...employerFilter },
       include: { employee: true },
       orderBy: [{ employerName: "asc" }, { employeeName: "asc" }],
     }),
     prisma.employee.count({ where: { companyId: user.companyId, status: { in: ["ACTIVE", "VACATION"] }, ...employerFilter } }),
+    prisma.salary.findMany({ where: { companyId: user.companyId, ...previous, ...employerFilter }, select: { employeeId: true, netSalary: true } }),
   ]);
   const allow = {
     create: can(user, "salaries.create"),
@@ -61,6 +64,21 @@ export default async function SalariesPage({
       liveDays.set(salary.employeeId, await countAbsenceDays(salary.employeeId, year, month));
     }),
   );
+  const activeWithout = await prisma.employee.count({
+    where: { companyId: user.companyId, status: { in: ["ACTIVE", "VACATION"] }, ...employerFilter, id: { notIn: [...withRecord] } },
+  });
+  const issues = payrollIssues({
+    salaries,
+    previousNet: new Map(previousSalaries.map((row) => [row.employeeId, row.netSalary])),
+    liveAbsence: liveDays,
+    withoutRecord: activeWithout,
+    lang,
+  });
+  const spfTotals = {
+    employee: round3(salaries.reduce((sum, row) => sum + row.spfEmployee, 0)),
+    employer: round3(salaries.reduce((sum, row) => sum + row.spfEmployer, 0)),
+  };
+  const fileQuery = `year=${year}&month=${month}${employerId ? `&employerId=${employerId}` : ""}`;
   const totalNet = salaries.reduce((sum, row) => sum + row.netSalary, 0);
   const totalGross = salaries.reduce((sum, row) => sum + totalEarnings(row), 0);
   const totalDeduction = salaries.reduce((sum, row) => sum + totalDeductions(row), 0);
@@ -112,6 +130,48 @@ export default async function SalariesPage({
           <Stat key={item.label} label={item.label} value={item.value} icon={item.icon} tone={item.tone} />
         ))}
       </div>
+
+      {unpaid.length ? (
+        <Card className="mb-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-bold text-slate-900">
+              {issues.some((issue) => issue.level !== "info") ? <ShieldAlert size={18} className="text-amber-600" /> : <CheckCircle2 size={18} className="text-emerald-600" />}
+              {t("مراجعة قبل الصرف", "Check before paying")}
+            </h2>
+            <span className="text-xs text-slate-500">
+              {issues.some((issue) => issue.level !== "info")
+                ? t(`${issues.filter((issue) => issue.level !== "info").length} ملاحظة تحتاج نظرة`, `${issues.filter((issue) => issue.level !== "info").length} item(s) to look at`)
+                : t("لا ملاحظات على الرواتب غير المصروفة", "Nothing unusual in the unpaid salaries")}
+            </span>
+          </div>
+          {issues.length ? (
+            <ul className="space-y-1.5 text-sm">
+              {issues.slice(0, 12).map((issue, index) => {
+                const Icon = issue.level === "info" ? Info : AlertTriangle;
+                const tone = issue.level === "danger" ? "bg-red-50 text-red-800 ring-red-100" : issue.level === "warning" ? "bg-amber-50 text-amber-900 ring-amber-100" : "bg-slate-50 text-slate-700 ring-slate-100";
+                const body = (
+                  <>
+                    <Icon size={15} className="mt-0.5 shrink-0" />
+                    <span className="min-w-0 break-words">{issue.text}</span>
+                  </>
+                );
+                return (
+                  <li key={index}>
+                    {issue.href ? (
+                      <Link href={issue.href} className={`flex items-start gap-2 rounded-xl px-3 py-2 ring-1 ring-inset transition hover:brightness-95 ${tone}`}>
+                        {body}
+                      </Link>
+                    ) : (
+                      <div className={`flex items-start gap-2 rounded-xl px-3 py-2 ring-1 ring-inset ${tone}`}>{body}</div>
+                    )}
+                  </li>
+                );
+              })}
+              {issues.length > 12 ? <li className="px-3 text-xs text-slate-500">{t(`و${issues.length - 12} ملاحظة أخرى`, `and ${issues.length - 12} more`)}</li> : null}
+            </ul>
+          ) : null}
+        </Card>
+      ) : null}
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <Card className="space-y-4">
@@ -221,6 +281,28 @@ export default async function SalariesPage({
           <p className="text-xs text-slate-400">
             {t("لطباعة كشف موظف واحد افتح ملفه ← تبويب الرواتب.", "For one employee, open their profile → Salaries tab.")}
           </p>
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            {allow.pay && salaries.length ? (
+              <a href={`/salaries/wps?${fileQuery}`} className={`${secondaryBtn} w-full`}>
+                <Download size={16} />
+                {t("ملف تحويل الرواتب (WPS)", "Salary transfer file (WPS)")}
+              </a>
+            ) : null}
+            {salaries.length ? (
+              <a href={`/salaries/spf?year=${year}&month=${month}`} className={`${secondaryBtn} w-full`}>
+                <Download size={16} />
+                {t("اشتراكات الحماية الاجتماعية", "Social protection contributions")}
+              </a>
+            ) : null}
+            {user.company.spfEnabled && salaries.length ? (
+              <p className="text-xs leading-5 text-slate-500">
+                {t(
+                  `هذا الشهر: حصة الموظفين ${money(spfTotals.employee, currency)} (مخصومة)، حصة المنشأة ${money(spfTotals.employer, currency)}.`,
+                  `This month: employees ${money(spfTotals.employee, currency)} (deducted), company ${money(spfTotals.employer, currency)}.`,
+                )}
+              </p>
+            ) : null}
+          </div>
         </Card>
       </div>
 

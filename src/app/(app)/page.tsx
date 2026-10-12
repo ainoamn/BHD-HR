@@ -10,6 +10,7 @@ import { monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { salaryDayWeight } from "@/lib/leave";
+import { omanization } from "@/lib/oman";
 import { cn, currentPeriod, daysLabel, formatLongDate, money, monthRange, round3 } from "@/lib/utils";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
@@ -28,10 +29,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   };
   const { year, month } = currentPeriod();
   const { start, end } = monthRange(year, month);
-  const [activeCount, totalCount, employerCount, salaries, absenceCount, alerts] = await Promise.all([
-    prisma.employee.count({ where: { companyId: user.companyId, status: "ACTIVE" } }),
+  const [activeStaff, totalCount, salaries, absenceCount, alerts] = await Promise.all([
+    prisma.employee.findMany({ where: { companyId: user.companyId, status: "ACTIVE" }, select: { nationality: true, department: true, departmentEn: true } }),
     prisma.employee.count({ where: { companyId: user.companyId } }),
-    prisma.employer.count({ where: { companyId: user.companyId } }),
     allow.salaries ? prisma.salary.findMany({ where: { year, month, employee: { companyId: user.companyId } } }) : Promise.resolve([]),
     allow.attendance
       ? prisma.attendance.findMany({
@@ -41,6 +41,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       : Promise.resolve([]),
     getAlerts(),
   ]);
+  const activeCount = activeStaff.length;
+  const omani = omanization(activeStaff);
   const absenceDays = round3(absenceCount.reduce((sum, row) => sum + salaryDayWeight(row), 0));
   const net = salaries.reduce((sum, row) => sum + row.netSalary, 0);
   const paidNet = salaries.filter((row) => row.paid).reduce((sum, row) => sum + row.netSalary, 0);
@@ -157,8 +159,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Stat
             label={t("موظفون نشطون", "Active employees")}
             value={String(activeCount)}
-            hint={t(`${totalCount} في السجل · ${employerCount} صاحب عمل`, `${totalCount} on record · ${employerCount} employer(s)`)}
-            href="/employees"
+            hint={t(
+              `التعمين ${omani.percent}% (${omani.omani} عماني) · ${totalCount} في السجل`,
+              `Omanization ${omani.percent}% (${omani.omani} Omani) · ${totalCount} on record`,
+            )}
+            href={allow.reports ? "/reports#omanization" : "/employees"}
             icon={Users}
           />
         ) : null}

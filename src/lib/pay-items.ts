@@ -1,7 +1,8 @@
 import type { PayItem, Prisma, PrismaClient } from "@prisma/client";
 import { allowanceAmount, allowanceDue } from "./allowances";
 import { payKindDeducts } from "./constants";
-import { buildSalaryAmounts } from "./salary";
+import { isOmani, spfContribution } from "./oman";
+import { buildSalaryAmounts, packageGross } from "./salary";
 import { round3 } from "./utils";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -31,8 +32,9 @@ export function scheduledAmount(item: Pick<PayItem, "kind" | "amount" | "startYe
 
 /** Rebuilds the allowance and pay-item lines and totals of one unpaid salary. Paid salaries are left exactly as they were paid. */
 export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: number) {
-  const salary = await db.salary.findUnique({ where: { id: salaryId } });
-  if (!salary || salary.paid) return salary;
+  const found = await db.salary.findUnique({ where: { id: salaryId }, include: { company: true, employee: { select: { nationality: true } } } });
+  if (!found || found.paid) return found;
+  const { company, employee, ...salary } = found;
   const key = monthKey(salary.year, salary.month);
   const items = await db.payItem.findMany({
     where: { employeeId: salary.employeeId, stoppedAt: null },
@@ -61,7 +63,22 @@ export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: numb
       .reduce((sum, line) => sum + line.amount, 0);
     return { salaryId, payItemId: item.id, kind: item.kind, title: item.title, amount: scheduledAmount(item, key, recovered), deduct: payKindDeducts(item.kind) };
   });
-  const lines = [...allowanceLines, ...itemLines].filter((line) => line.amount > 0);
+  const omani = isOmani(employee.nationality);
+  const recurring = round3(allowanceLines.reduce((sum, line) => sum + line.amount, 0));
+  const spf = spfContribution(company, omani, { basic: salary.basicSalary, gross: round3(packageGross(salary) + recurring) });
+  const spfLine = spf.employee
+    ? [
+        {
+          salaryId,
+          kind: "SOCIAL",
+          title: `الحماية الاجتماعية — حصة الموظف ${company.spfEmployeeRate}%`,
+          titleEn: `Social protection — employee share ${company.spfEmployeeRate}%`,
+          amount: spf.employee,
+          deduct: true,
+        },
+      ]
+    : [];
+  const lines = [...allowanceLines, ...itemLines, ...spfLine].filter((line) => line.amount > 0);
   await db.salaryLine.deleteMany({ where: { salaryId } });
   if (lines.length) await db.salaryLine.createMany({ data: lines });
   const extraEarnings = round3(lines.filter((line) => !line.deduct).reduce((sum, line) => sum + line.amount, 0));
@@ -69,7 +86,14 @@ export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: numb
   const amounts = buildSalaryAmounts({ ...salary, extraEarnings, extraDeductions, salaryDays });
   return db.salary.update({
     where: { id: salaryId },
-    data: { extraEarnings, extraDeductions, absenceDeduction: amounts.absenceDeduction, netSalary: amounts.netSalary },
+    data: {
+      extraEarnings,
+      extraDeductions,
+      absenceDeduction: amounts.absenceDeduction,
+      netSalary: amounts.netSalary,
+      spfEmployee: spf.employee,
+      spfEmployer: spf.employer,
+    },
   });
 }
 
