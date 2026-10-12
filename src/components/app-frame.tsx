@@ -24,6 +24,7 @@ import {
   PieChart,
   ScrollText,
   Settings,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
     items: [
       { href: "/", ar: "الرئيسية", en: "Dashboard", icon: LayoutDashboard },
       { href: "/notifications", ar: "التنبيهات", en: "Alerts", icon: Bell },
+      { href: "/assistant", ar: "المساعد الذكي", en: "AI assistant", icon: Sparkles, short: { ar: "المساعد", en: "Assistant" } },
       { href: "/calendar", ar: "التقويم", en: "Calendar", icon: CalendarClock },
       { href: "/tasks", ar: "المهام", en: "Tasks", icon: ListTodo },
     ],
@@ -76,9 +78,9 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
   },
 ];
 
-const ALWAYS = ["/", "/notifications", "/settings"];
+const ALWAYS = ["/", "/notifications", "/assistant", "/settings"];
 /** Bottom bar on phones: the first four of these the user may open, then "More". */
-const BOTTOM_PREFERENCE = ["/", "/employees", "/tasks", "/salaries", "/attendance", "/documents", "/pay-items", "/reports", "/employers", "/calendar", "/letters"];
+const BOTTOM_PREFERENCE = ["/", "/assistant", "/employees", "/tasks", "/salaries", "/attendance", "/documents", "/pay-items", "/reports", "/employers", "/calendar", "/letters"];
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
