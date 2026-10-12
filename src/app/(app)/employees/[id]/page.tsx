@@ -4,7 +4,7 @@ import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarCheck2, FileBadge, Mail, Pencil, Phone, ReceiptText, Wallet } from "lucide-react";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarCheck2, FileBadge, Mail, Pencil, Phone, ReceiptText, ScrollText, Wallet } from "lucide-react";
 import { AttendanceEditForm, DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { can, requirePermission } from "@/lib/auth";
 import { allowanceAmount, describeAllowance } from "@/lib/allowances";
@@ -38,6 +38,9 @@ import { savePayItem } from "@/server/pay-item-actions";
 import { createSalary } from "@/server/salary-actions";
 import { PayItemForm } from "@/components/pay-item-form";
 import { PayItemsList } from "@/components/pay-items-list";
+import { EmployeeLettersTab, EmployeeNotesTab, EmployeeTasksTab, PinnedNotes } from "@/components/employee-workspace";
+import { WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
+import { employeeOptions, loadBoardTasks } from "@/lib/task-data";
 
 export default async function EmployeePage({
   params,
@@ -75,7 +78,34 @@ export default async function EmployeePage({
     attEdit: can(user, "attendance.edit"),
     attDelete: can(user, "attendance.delete"),
     salaries: can(user, "salaries.view"),
+    tasks: can(user, "tasks.view"),
+    taskAdd: can(user, "tasks.create"),
+    taskEdit: can(user, "tasks.edit"),
+    taskDelete: can(user, "tasks.delete"),
+    letters: can(user, "letters.view"),
+    letterAdd: can(user, "letters.create"),
   };
+  const warningSince = new Date(Date.now() - WARNING_LOOKBACK_DAYS * 86400000);
+  const [notes, employeeTasks, taskEmployees, letters] = await Promise.all([
+    allow.tasks
+      ? prisma.employeeNote.findMany({
+          where: { employeeId: employee.id, companyId: user.companyId },
+          select: { id: true, kind: true, body: true, pinned: true, authorName: true, createdAt: true, updatedAt: true },
+          orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+        })
+      : [],
+    allow.tasks ? loadBoardTasks({ companyId: user.companyId, assignees: { some: { employeeId: employee.id } } }, lang) : [],
+    allow.taskAdd ? employeeOptions(user.companyId, lang) : [],
+    allow.letters
+      ? prisma.letter.findMany({
+          where: { employeeId: employee.id, companyId: user.companyId },
+          select: { id: true, kind: true, refNo: true, subject: true, issuedAt: true, cancelledAt: true, acknowledgedAt: true, viewedAt: true, deliveries: { select: { status: true } } },
+          orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
+        })
+      : [],
+  ]);
+  const activeWarnings = letters.filter((letter) => !letter.cancelledAt && WARNING_KINDS.includes(letter.kind as LetterKind) && letter.issuedAt >= warningSince).length;
+  const openTasks = employeeTasks.filter((task) => task.status !== "DONE").length;
   const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes);
   const annual = balances.find((item) => item.key === "annual") || balances[0];
   const periods = groupAttendance(employee.attendance);
@@ -84,7 +114,16 @@ export default async function EmployeePage({
   const warnedKeys = new Set(warnings.map((item) => item.key));
   const balanceMap = { [employee.id]: remainingByKey(balances) };
   const choices = attendanceChoices(leaveTypes, lang);
-  const tabAllowed: Record<string, boolean> = { info: true, docs: allow.docs, attendance: allow.attendance, salaries: allow.salaries, pay: allow.salaries };
+  const tabAllowed: Record<string, boolean> = {
+    info: true,
+    notes: allow.tasks,
+    tasks: allow.tasks,
+    letters: allow.letters,
+    docs: allow.docs,
+    attendance: allow.attendance,
+    salaries: allow.salaries,
+    pay: allow.salaries,
+  };
   const now = currentPeriod();
   const nowKey = monthKey(now.year, now.month);
   const defaultStart = `${now.year}-${String(now.month).padStart(2, "0")}`;
@@ -122,6 +161,9 @@ export default async function EmployeePage({
   const lastSalary = employee.salaries[0];
   const tabs = [
     { id: "info", label: t("البيانات", "Details"), count: null },
+    { id: "notes", label: t("الملاحظات", "Notes"), count: notes.length },
+    { id: "tasks", label: t("المهام", "Tasks"), count: openTasks },
+    { id: "letters", label: t("الخطابات والإنذارات", "Letters & warnings"), count: letters.length },
     { id: "docs", label: t("الوثائق", "Documents"), count: primaryDocs.filter((doc) => doc.number || doc.expiry || doc.fileUrl).length + employee.documents.length },
     { id: "attendance", label: t("الحضور والإجازات", "Attendance & leave"), count: periods.length },
     { id: "salaries", label: t("الرواتب", "Salaries"), count: employee.salaries.length },
@@ -217,6 +259,12 @@ export default async function EmployeePage({
               <Link href={`${base}?tab=salaries#statement`} className={secondaryBtn}>
                 <ReceiptText size={16} />
                 {t("كشف الرواتب", "Statement")}
+              </Link>
+            ) : null}
+            {allow.letterAdd ? (
+              <Link href={`/letters/new?employeeId=${employee.id}`} className={secondaryBtn}>
+                <ScrollText size={16} />
+                {t("خطاب / إنذار", "Letter / warning")}
               </Link>
             ) : null}
             {allow.remove ? (
@@ -354,8 +402,32 @@ export default async function EmployeePage({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
+          {tab === "notes" ? (
+            <EmployeeNotesTab
+              employeeId={employee.id}
+              notes={notes}
+              lang={lang}
+              returnTo={`${base}?tab=notes`}
+              allow={{ create: allow.taskAdd, edit: allow.taskEdit, remove: allow.taskDelete }}
+            />
+          ) : null}
+
+          {tab === "tasks" ? (
+            <EmployeeTasksTab
+              employeeId={employee.id}
+              tasks={employeeTasks.map(({ dueDate: _dueDate, createdAt: _createdAt, ...task }) => task)}
+              employees={taskEmployees}
+              lang={lang}
+              returnTo={`${base}?tab=tasks`}
+              canCreate={allow.taskAdd}
+            />
+          ) : null}
+
+          {tab === "letters" ? <EmployeeLettersTab employeeId={employee.id} letters={letters} activeWarnings={activeWarnings} lang={lang} canCreate={allow.letterAdd} /> : null}
+
           {tab === "info" ? (
             <>
+              <PinnedNotes notes={notes.filter((note) => note.pinned)} lang={lang} href={`${base}?tab=notes`} />
               <Card>
                 <SectionTitle>{t("البيانات الشخصية", "Personal details")}</SectionTitle>
                 <dl className="grid gap-2 sm:grid-cols-2">

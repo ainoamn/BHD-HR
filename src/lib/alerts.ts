@@ -9,6 +9,7 @@ import { pick } from "./i18n";
 import { getI18n } from "./lang";
 import { attendanceLabel, computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "./leave";
 import { prisma } from "./prisma";
+import { TASK_ALERT_DAYS } from "./tasks";
 import { daysLabel, daysPhrase, formatDate, money, monthRange } from "./utils";
 
 export type AlertItem = {
@@ -42,7 +43,8 @@ export const getAlerts = cache(async () => {
   const thisYear = now.getFullYear();
   const thisMonth = now.getMonth() + 1;
   const { start, end } = monthRange(thisYear, thisMonth);
-  const [employees, leaveTypes, reminders, absences, generated, unpaidRows] = await Promise.all([
+  const taskHorizon = new Date(Date.UTC(thisYear, now.getMonth(), now.getDate() + TASK_ALERT_DAYS + 1));
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
@@ -70,6 +72,14 @@ export const getAlerts = cache(async () => {
       where: { paid: false, employee: { companyId: company.id } },
       select: { year: true, month: true, netSalary: true },
     }),
+    can(user, "tasks.view")
+      ? prisma.task.findMany({
+          where: { companyId: company.id, status: { not: "DONE" }, dueDate: { lt: taskHorizon } },
+          select: { id: true, title: true, dueDate: true, assignees: { select: { employee: { select: { fullName: true, nameEn: true } } } } },
+          orderBy: { dueDate: "asc" },
+          take: 30,
+        })
+      : [],
   ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const alerts: AlertItem[] = [];
@@ -176,6 +186,26 @@ export const getAlerts = cache(async () => {
     });
   }
 
+  for (const task of tasks) {
+    const days = daysUntil(task.dueDate!);
+    const names = task.assignees.map((row) => nameOf(row.employee));
+    const who = names.length ? ` — ${names.length > 2 ? `${names.slice(0, 2).join("، ")} +${names.length - 2}` : names.join(lang === "en" ? ", " : "، ")}` : "";
+    const timing =
+      days < 0
+        ? t(`متأخرة ${daysPhrase(days, "ar")}`, `${daysPhrase(days, "en")} overdue`)
+        : days === 0
+          ? t("تستحق اليوم", "due today")
+          : t(`تستحق بعد ${daysPhrase(days, "ar")}`, `due in ${daysPhrase(days, "en")}`);
+    alerts.push({
+      id: `task-${task.id}`,
+      severity: days <= 0 ? "danger" : "warning",
+      title: days < 0 ? t(`مهمة متأخرة: ${task.title}`, `Overdue task: ${task.title}`) : t(`مهمة: ${task.title}`, `Task: ${task.title}`),
+      message: `${formatDate(task.dueDate)} — ${timing}${who}`,
+      href: `/tasks/${task.id}`,
+      days,
+    });
+  }
+
   for (const period of groupAttendance(absences).slice(0, 8)) {
     const kind = attendanceLabel(period.row, leaveTypes, lang);
     const when =
@@ -237,5 +267,6 @@ function alertPermission(id: string): Permission {
   if (id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
   if (id.startsWith("leave-") || id.startsWith("att-")) return "attendance.view";
   if (id.startsWith("reminder-")) return "calendar.view";
+  if (id.startsWith("task-")) return "tasks.view";
   return "salaries.view";
 }

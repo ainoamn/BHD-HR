@@ -39,6 +39,9 @@ model Company {
   payItems           PayItem[]
   files              StoredFile[]
   auditLogs          AuditLog[]
+  tasks              Task[]
+  employeeNotes      EmployeeNote[]
+  letters            Letter[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -153,6 +156,9 @@ model Employee {
   allowances         EmployeeAllowance[]
   auditLogs          AuditLog[]
   reminders          Reminder[]
+  taskAssignments    TaskAssignee[]
+  noteEntries        EmployeeNote[]
+  letters            Letter[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -403,6 +409,135 @@ model StoredFile {
   createdAt DateTime @default(now())
 
   @@index([companyId])
+}
+
+/// A to-do assigned to one or more employees (src/lib/tasks.ts). `position` orders cards inside a status column.
+model Task {
+  id            String         @id @default(cuid())
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id])
+  title         String
+  description   String?
+  /// TODO, IN_PROGRESS, REVIEW or DONE.
+  status        String         @default("TODO")
+  /// URGENT, HIGH, NORMAL or LOW.
+  priority      String         @default("NORMAL")
+  startDate     DateTime?
+  dueDate       DateTime?
+  completedAt   DateTime?
+  position      Float          @default(0)
+  createdById   String?
+  createdByName String?
+  assignees     TaskAssignee[]
+  items         TaskItem[]
+  comments      TaskComment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([companyId, status])
+}
+
+model TaskAssignee {
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, employeeId])
+  @@index([employeeId])
+}
+
+/// Checklist entry inside a task.
+model TaskItem {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text      String
+  done      Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model TaskComment {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId     String?
+  authorName String
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([taskId])
+}
+
+/// Dated note in an employee's file, written by a system user.
+model EmployeeNote {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// GENERAL, PERFORMANCE, CONDUCT, TRAINING or PRAISE.
+  kind       String   @default("GENERAL")
+  body       String
+  pinned     Boolean  @default(false)
+  authorId   String?
+  authorName String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([employeeId])
+}
+
+/// Warning, notice or letter from management to an employee (src/lib/letters.ts).
+/// `token` opens the read-only copy at /letter/<token> that email and WhatsApp copies link to.
+model Letter {
+  id             String           @id @default(cuid())
+  companyId      String
+  company        Company          @relation(fields: [companyId], references: [id])
+  employeeId     String
+  employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind           String
+  refNo          String
+  issuedAt       DateTime
+  subject        String
+  subjectEn      String?
+  body           String
+  bodyEn         String?
+  signatoryName  String?
+  signatoryTitle String?
+  createdById    String?
+  createdByName  String?
+  token          String           @unique
+  viewedAt       DateTime?
+  acknowledgedAt DateTime?
+  cancelledAt    DateTime?
+  deliveries     LetterDelivery[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([companyId, refNo])
+  @@index([employeeId])
+}
+
+/// One copy of a letter to send by EMAIL or WHATSAPP. Stays PENDING until that channel is configured (src/lib/delivery.ts).
+model LetterDelivery {
+  id        String    @id @default(cuid())
+  letterId  String
+  letter    Letter    @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  channel   String
+  target    String
+  /// PENDING, SENT or FAILED.
+  status    String    @default("PENDING")
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([letterId])
+  @@index([status])
 }
 
 model AuditLog {

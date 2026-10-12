@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Save, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
+import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Mail, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
 import { AccessEditor } from "@/components/access-editor";
 import { Flash } from "@/components/flash";
 import { InviteLink } from "@/components/invite-link";
@@ -9,11 +9,13 @@ import { PhoneField } from "@/components/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
+import { channelReady } from "@/lib/delivery";
 import { getI18n } from "@/lib/lang";
 import { normalizePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
+import { sendPendingLetterCopies } from "@/server/letter-actions";
 import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateMemberAccess, updateProfile } from "@/server/settings-actions";
 
 function SectionHead({ icon: Icon, title, text, children }: { icon: LucideIcon; title: string; text?: string; children?: React.ReactNode }) {
@@ -42,6 +44,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const members = isAdmin
     ? await prisma.membership.findMany({ where: { companyId: user.companyId }, include: { user: true }, orderBy: { createdAt: "asc" } })
     : [];
+  const deliveryCounts = isAdmin
+    ? await prisma.letterDelivery.groupBy({ by: ["channel", "status"], where: { letter: { companyId: user.companyId, cancelledAt: null } }, _count: { _all: true } })
+    : [];
+  const countOf = (channel: string, status: string) => deliveryCounts.find((row) => row.channel === channel && row.status === status)?._count._all || 0;
+  const channelRows = [
+    { id: "EMAIL" as const, label: t("البريد الإلكتروني", "Email"), icon: Mail, env: "RESEND_API_KEY, MAIL_FROM" },
+    { id: "WHATSAPP" as const, label: t("واتساب", "WhatsApp"), icon: MessageCircle, env: "WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE" },
+  ].map((row) => ({ ...row, ready: channelReady(row.id), pending: countOf(row.id, "PENDING"), sent: countOf(row.id, "SENT"), failed: countOf(row.id, "FAILED") }));
+  const pendingTotal = channelRows.reduce((sum, row) => sum + row.pending, 0);
   const origin = await requestOrigin();
   const justInvited = sp.invite ? members.find((member) => member.id === sp.invite) : undefined;
   const roleShort = (role: string) =>
@@ -56,7 +67,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         ]
       : []),
     { id: "profile", label: t("بياناتي", "My details"), icon: UserCog },
-    ...(isAdmin ? [{ id: "members", label: t("المستخدمون والصلاحيات", "Users & permissions"), icon: ShieldCheck }] : []),
+    ...(isAdmin
+      ? [
+          { id: "channels", label: t("إرسال الخطابات", "Letter delivery"), icon: Send },
+          { id: "members", label: t("المستخدمون والصلاحيات", "Users & permissions"), icon: ShieldCheck },
+        ]
+      : []),
   ];
   const Chevron = lang === "en" ? ChevronRight : ChevronLeft;
 
@@ -249,6 +265,67 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </div>
             </Card>
           </form>
+
+          {isAdmin ? (
+            <Card id="channels" className="scroll-mt-24">
+              <SectionHead
+                icon={Send}
+                title={t("إرسال الخطابات للموظفين", "Sending letters to employees")}
+                text={t(
+                  "عند إصدار خطاب أو إنذار تُجهَّز نسخة لكل موظف عبر البريد وواتساب. القناة غير المفعّلة تحفظ النسخ في الانتظار، وتُرسل تلقائياً بعد تفعيلها. إلى ذلك الحين يمكن مشاركة الخطاب يدوياً من صفحته.",
+                  "Each letter or warning queues a copy for the employee by email and WhatsApp. An inactive channel keeps copies waiting and sends them once activated. Until then, share the letter manually from its page.",
+                )}
+              />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {channelRows.map((row) => (
+                  <div key={row.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="flex items-center gap-2 font-bold text-slate-900">
+                        <row.icon size={17} className="text-slate-400" />
+                        {row.label}
+                      </p>
+                      <ToneBadge tone={row.ready ? "green" : "amber"}>{row.ready ? t("مفعّل", "Active") : t("غير مفعّل", "Not active")}</ToneBadge>
+                    </div>
+                    <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                      {[
+                        [t("بالانتظار", "Waiting"), row.pending, "text-amber-700"],
+                        [t("أُرسلت", "Sent"), row.sent, "text-emerald-700"],
+                        [t("تعذّرت", "Failed"), row.failed, "text-red-700"],
+                      ].map(([label, value, tone]) => (
+                        <div key={String(label)} className="rounded-xl bg-slate-50 px-2 py-2">
+                          <dt className="text-slate-500">{label}</dt>
+                          <dd className={`tabular mt-0.5 text-base font-bold ${tone}`}>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {row.ready ? null : (
+                      <p className="mt-3 text-xs leading-5 text-slate-500">
+                        {t("للتفعيل أضف في إعدادات الخادم:", "To activate, set on the server:")}{" "}
+                        <span className="break-all font-mono text-[11px] text-slate-700" dir="ltr">
+                          {row.env}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
+                  {pendingTotal
+                    ? t(`${pendingTotal} نسخة بانتظار الإرسال.`, `${pendingTotal} copies waiting to be sent.`)
+                    : t("لا توجد نسخ بانتظار الإرسال.", "No copies are waiting.")}
+                </p>
+                {pendingTotal && channelRows.some((row) => row.ready) ? (
+                  <form action={sendPendingLetterCopies}>
+                    <SubmitButton variant="secondary" className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
+                      <Send size={16} />
+                      {t("إرسال النسخ المنتظرة الآن", "Send waiting copies now")}
+                    </SubmitButton>
+                  </form>
+                ) : null}
+              </div>
+            </Card>
+          ) : null}
 
           {isAdmin ? (
             <Card id="members" className="scroll-mt-24">

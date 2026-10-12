@@ -47,6 +47,7 @@ export default async function CalendarPage({
     birthday: "employees.view",
     leave: "attendance.view",
     reminder: "calendar.view",
+    task: "tasks.view",
   };
   const allow = { create: can(user, "calendar.create"), edit: can(user, "calendar.edit"), remove: can(user, "calendar.delete") };
   const events = allEvents.filter((event) => shown.has(event.kind) && can(user, kindPermission[event.kind]));

@@ -16,9 +16,11 @@ import {
   HandCoins,
   History,
   LayoutDashboard,
+  ListTodo,
   Menu,
   MoreHorizontal,
   PieChart,
+  ScrollText,
   Settings,
   Users,
   X,
@@ -37,6 +39,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
       { href: "/", ar: "الرئيسية", en: "Dashboard", icon: LayoutDashboard },
       { href: "/notifications", ar: "التنبيهات", en: "Alerts", icon: Bell },
       { href: "/calendar", ar: "التقويم", en: "Calendar", icon: CalendarClock },
+      { href: "/tasks", ar: "المهام", en: "Tasks", icon: ListTodo },
     ],
   },
   {
@@ -46,6 +49,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
       { href: "/employees", ar: "الموظفون", en: "Employees", icon: Users },
       { href: "/attendance", ar: "الحضور والغياب", en: "Attendance & leave", icon: CalendarDays, short: { ar: "الحضور", en: "Attendance" } },
       { href: "/documents", ar: "المستندات", en: "Documents", icon: Files },
+      { href: "/letters", ar: "الإنذارات والخطابات", en: "Warnings & letters", icon: ScrollText, short: { ar: "الخطابات", en: "Letters" } },
       { href: "/employers", ar: "دفتر العناوين", en: "Address book", icon: BookUser },
     ],
   },
@@ -70,7 +74,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
 
 const ALWAYS = ["/", "/notifications", "/settings"];
 /** Bottom bar on phones: the first four of these the user may open, then "More". */
-const BOTTOM_PREFERENCE = ["/", "/employees", "/attendance", "/salaries", "/documents", "/pay-items", "/reports", "/employers", "/calendar"];
+const BOTTOM_PREFERENCE = ["/", "/employees", "/tasks", "/salaries", "/attendance", "/documents", "/pay-items", "/reports", "/employers", "/calendar", "/letters"];
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);

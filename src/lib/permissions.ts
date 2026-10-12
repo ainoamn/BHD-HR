@@ -1,6 +1,6 @@
 import type { Bi } from "./i18n";
 
-export const MODULES = ["employees", "employers", "attendance", "salaries", "documents", "calendar", "reports", "activity"] as const;
+export const MODULES = ["employees", "employers", "attendance", "salaries", "documents", "calendar", "tasks", "letters", "reports", "activity"] as const;
 export type Module = (typeof MODULES)[number];
 
 export const ACTION_LABEL: Record<string, Bi> = {
@@ -21,6 +21,8 @@ export const MODULE_ACTIONS: Record<Module, readonly string[]> = {
   salaries: ["view", "create", "edit", "delete", "pay"],
   documents: ["view", "create", "edit", "delete"],
   calendar: ["view", "create", "edit", "delete"],
+  tasks: ["view", "create", "edit", "delete"],
+  letters: ["view", "create", "edit", "delete"],
   reports: ["view", "export"],
   activity: ["view"],
 };
@@ -32,6 +34,8 @@ export const MODULE_LABEL: Record<Module, Bi> = {
   salaries: { ar: "الرواتب", en: "Payroll" },
   documents: { ar: "المستندات", en: "Documents" },
   calendar: { ar: "التقويم والتذكيرات", en: "Calendar & reminders" },
+  tasks: { ar: "المهام والملاحظات", en: "Tasks & notes" },
+  letters: { ar: "الإنذارات والخطابات", en: "Warnings & letters" },
   reports: { ar: "التقارير", en: "Reports" },
   activity: { ar: "سجل العمليات", en: "Activity log" },
 };
@@ -71,6 +75,8 @@ export const MODULE_HREF: Record<Module, string> = {
   salaries: "/salaries",
   documents: "/documents",
   calendar: "/calendar",
+  tasks: "/tasks",
+  letters: "/letters",
   reports: "/reports",
   activity: "/activity",
 };
