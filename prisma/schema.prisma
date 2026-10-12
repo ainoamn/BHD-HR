@@ -9,53 +9,61 @@ datasource db {
 }
 
 model Company {
-  id                 String              @id @default(cuid())
-  name               String
-  nameEn             String?
-  crNumber           String?
-  phone              String?
-  email              String?
-  address            String?
-  logoUrl            String?
-  currency           String              @default("ر.ع")
-  salaryDays         Int                 @default(30)
-  alertUrgentDays    Int                 @default(7)
-  alertWarningDays   Int                 @default(30)
-  alertEarlyDays     Int                 @default(60)
-  payDay             Int                 @default(0)
-  leaveWarningDays   Int                 @default(5)
+  id                   String              @id @default(cuid())
+  name                 String
+  nameEn               String?
+  crNumber             String?
+  phone                String?
+  email                String?
+  address              String?
+  logoUrl              String?
+  currency             String              @default("ر.ع")
+  salaryDays           Int                 @default(30)
+  alertUrgentDays      Int                 @default(7)
+  alertWarningDays     Int                 @default(30)
+  alertEarlyDays       Int                 @default(60)
+  payDay               Int                 @default(0)
+  leaveWarningDays     Int                 @default(5)
   /// 0 until the built-in job titles, departments and leave types are seeded (src/lib/hr-catalog.ts).
-  catalogVersion     Int                 @default(0)
+  catalogVersion       Int                 @default(0)
   /// Social Protection Fund (src/lib/oman.ts). Rates are percentages; off until the admin turns it on.
-  spfEnabled           Boolean           @default(false)
-  spfEmployeeRate      Float             @default(8)
-  spfEmployerRate      Float             @default(14.5)
-  spfExpatEmployerRate Float             @default(2)
-  spfWageCap           Float             @default(3000)
+  spfEnabled           Boolean             @default(false)
+  spfEmployeeRate      Float               @default(8)
+  spfEmployerRate      Float               @default(14.5)
+  spfExpatEmployerRate Float               @default(2)
+  spfWageCap           Float               @default(3000)
   /// GROSS = basic + fixed allowances + recurring allowances; BASIC = basic only.
-  spfBase              String            @default("GROSS")
+  spfBase              String              @default("GROSS")
   /// Payer bank for the WPS salary file.
   bankBic              String?
   bankAccount          String?
-  employees          Employee[]
-  jobTitles          JobTitle[]
-  departments        Department[]
-  leaveTypes         LeaveType[]
-  allowanceTypes     AllowanceType[]
-  employeeAllowances EmployeeAllowance[]
-  employers          Employer[]
-  memberships        Membership[]
-  reminders          Reminder[]
-  salaries           Salary[]
-  payItems           PayItem[]
-  files              StoredFile[]
-  auditLogs          AuditLog[]
-  tasks              Task[]
-  employeeNotes      EmployeeNote[]
-  letters            Letter[]
-  briefs             DailyBrief[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  /// Clock-in from the employee portal (src/lib/clock.ts): work site, allowed distance in metres, start time "HH:MM" Muscat.
+  clockEnabled         Boolean             @default(false)
+  workLat              Float?
+  workLng              Float?
+  workRadius           Int                 @default(200)
+  workStart            String?
+  employees            Employee[]
+  leaveRequests        LeaveRequest[]
+  clockEntries         ClockEntry[]
+  jobTitles            JobTitle[]
+  departments          Department[]
+  leaveTypes           LeaveType[]
+  allowanceTypes       AllowanceType[]
+  employeeAllowances   EmployeeAllowance[]
+  employers            Employer[]
+  memberships          Membership[]
+  reminders            Reminder[]
+  salaries             Salary[]
+  payItems             PayItem[]
+  files                StoredFile[]
+  auditLogs            AuditLog[]
+  tasks                Task[]
+  employeeNotes        EmployeeNote[]
+  letters              Letter[]
+  briefs               DailyBrief[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 }
 
 /// AI summary of the day's priorities, cached per company, day, language and permission set.
@@ -152,6 +160,12 @@ model Employee {
   /// SWIFT/BIC of the employee's bank (src/lib/banks.ts) and the account salaries go to; used by the WPS file.
   bankBic            String?
   bankAccount        String?
+  /// Direct manager (an employee of the same company), for the org chart.
+  managerId          String?
+  manager            Employee?           @relation("ReportsTo", fields: [managerId], references: [id], onDelete: SetNull)
+  reports            Employee[]          @relation("ReportsTo")
+  /// Key of the employee's personal portal link /portal/<token>; null = no portal.
+  portalToken        String?             @unique
   /// Names copied from the chosen JobTitle / Department so lists and prints need no join.
   jobTitle           String?
   jobTitleEn         String?
@@ -189,6 +203,8 @@ model Employee {
   taskAssignments    TaskAssignee[]
   noteEntries        EmployeeNote[]
   letters            Letter[]
+  leaveRequests      LeaveRequest[]
+  clockEntries       ClockEntry[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -297,16 +313,71 @@ model Reminder {
 }
 
 model EmployeeDocument {
-  id         String    @id @default(cuid())
-  employeeId String
-  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  type       String
-  documentNo String?
-  expiryDate DateTime?
-  fileUrl    String?
-  notes      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        String
+  documentNo  String?
+  expiryDate  DateTime?
+  fileUrl     String?
+  notes       String?
+  /// Sent by the employee from the portal; stays unreviewed (reviewedAt null) until HR accepts it.
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+/// Leave asked for from the employee portal. Approval records the attendance period (attendanceGroupId).
+model LeaveRequest {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId        String
+  employee          Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Attendance choice: "leave:<balance key>" or UNPAID_LEAVE.
+  choice            String
+  fromDate          DateTime
+  toDate            DateTime
+  days              Float
+  reason            String?
+  /// PENDING, APPROVED, REJECTED or CANCELLED (by the employee).
+  status            String    @default("PENDING")
+  decidedById       String?
+  decidedByName     String?
+  decidedAt         DateTime?
+  decisionNote      String?
+  attendanceGroupId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId])
+}
+
+/// One working day's clock-in / clock-out from the portal. `day` is YYYY-MM-DD in Muscat time.
+model ClockEntry {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  day         String
+  inAt        DateTime
+  inLat       Float?
+  inLng       Float?
+  /// Metres from the work site when clocking in / out; null when the company has no site set.
+  inDistance  Float?
+  outAt       DateTime?
+  outLat      Float?
+  outLng      Float?
+  outDistance Float?
+  /// Minutes after the company's start time; 0 when on time or no start time is set.
+  lateMinutes Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@unique([employeeId, day])
+  @@index([companyId, day])
 }
 
 model Attendance {

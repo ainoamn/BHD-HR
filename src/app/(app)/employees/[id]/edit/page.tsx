@@ -20,10 +20,15 @@ export default async function EditEmployeePage({
   const sp = await searchParams;
   const user = await requirePermission("employees.edit");
   const { t } = await getI18n();
-  const [employee, employers, catalog] = await Promise.all([
+  const [employee, employers, catalog, managers] = await Promise.all([
     prisma.employee.findFirst({ where: { id, companyId: user.companyId }, include: { allowances: { orderBy: { createdAt: "asc" } } } }),
     prisma.employer.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true }, orderBy: { name: "asc" } }),
     getHrCatalog(user.companyId),
+    prisma.employee.findMany({
+      where: { companyId: user.companyId, OR: [{ status: { not: "TERMINATED" } }, { reports: { some: { id } } }] },
+      select: { id: true, fullName: true, nameEn: true, employeeNumber: true },
+      orderBy: { fullName: "asc" },
+    }),
   ]);
   if (!employee) notFound();
   return (
@@ -37,6 +42,7 @@ export default async function EditEmployeePage({
         catalog={catalog}
         currency={user.company.currency}
         employers={employers}
+        managers={managers}
         showSalary={can(user, "salaries.edit")}
         canManageCatalog={user.role === "ADMIN"}
       />

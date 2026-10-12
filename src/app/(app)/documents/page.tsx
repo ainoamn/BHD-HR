@@ -42,6 +42,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     include: { documents: true },
     orderBy: { fullName: "asc" },
   });
+  const pendingReview = employees.reduce((sum, employee) => sum + employee.documents.filter((document) => document.submittedAt && !document.reviewedAt).length, 0);
   const rows = collectDocuments(employees, lang)
     .map((row) => ({ ...row, status: describeExpiry(row.expiry, limits, lang) }))
     .filter((row) => {
@@ -60,6 +61,17 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         description={t("البطاقة والجواز والإقامة وبقية الوثائق، مع حالة الانتهاء.", "ID card, passport, residence and other documents, with expiry status.")}
       />
       <Flash error={sp.error} message={sp.message} />
+      {pendingReview ? (
+        <Link
+          href="/approvals#documents"
+          className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
+        >
+          <span>
+            {t(`${pendingReview} مستند أرسله الموظفون من البوابة بانتظار المراجعة`, `${pendingReview} document(s) sent from the employee portal await review`)}
+          </span>
+          <span className="shrink-0 underline underline-offset-2">{t("مراجعة", "Review")}</span>
+        </Link>
+      ) : null}
       {allow.create && employees.length ? (
         <details className="group mb-5 rounded-2xl border border-slate-200/90 bg-white shadow-card">
           <summary className="flex list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">

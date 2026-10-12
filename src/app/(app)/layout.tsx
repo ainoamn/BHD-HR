@@ -31,6 +31,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           : t("مستخدم — عرض فقط", "User — view only");
   const allowed = MODULES.filter((module) => can(user, `${module}.view`)).map((module) => MODULE_HREF[module]);
   if (can(user, "salaries.view")) allowed.push("/pay-items");
+  if (can(user, "employees.view")) allowed.push("/org");
+  if (can(user, "attendance.view") || can(user, "documents.view")) allowed.push("/approvals");
   const companyName = (company: { name: string; nameEn: string | null }) => (lang === "en" && company.nameEn ? company.nameEn : company.name);
 
   return (

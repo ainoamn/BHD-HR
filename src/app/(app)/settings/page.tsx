@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
+import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus } from "lucide-react";
+import { WorkSitePicker } from "@/components/work-site-picker";
+import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
 import { bankOptions } from "@/lib/banks";
 import { updateSocialProtection } from "@/server/compliance-actions";
@@ -68,6 +70,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           { id: "company", label: t("المنشأة", "Company"), icon: Building2 },
           { id: "payroll", label: t("الرواتب والتنبيهات", "Payroll & alerts"), icon: BellRing },
           { id: "oman", label: t("الحماية الاجتماعية والبنك", "Social protection & bank"), icon: Landmark },
+          { id: "clock", label: t("تسجيل الحضور", "Clock-in"), icon: MapPin },
         ]
       : []),
     { id: "profile", label: t("بياناتي", "My details"), icon: UserCog },
@@ -280,6 +283,50 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <SubmitButton className="w-full sm:w-auto">
                     <Save size={16} />
                     {t("حفظ وإعادة احتساب الرواتب غير المصروفة", "Save and recalculate unpaid salaries")}
+                  </SubmitButton>
+                </div>
+              </Card>
+            </form>
+          ) : null}
+
+          {isAdmin ? (
+            <form action={updateClockSettings}>
+              <Card id="clock" className="grid scroll-mt-24 gap-4 md:grid-cols-2">
+                <SectionHead
+                  icon={MapPin}
+                  title={t("تسجيل الحضور من البوابة", "Clock-in from the portal")}
+                  text={t(
+                    "يسجّل الموظف حضوره وانصرافه من رابط بوابته على هاتفه. إن حددت موقع العمل فلن يُقبل التسجيل إلا من داخل النطاق، ويُحفظ البُعد مع كل تسجيل.",
+                    "Employees clock in and out from their portal link on their phone. If you set a work site, punches are only accepted inside the radius, and the distance is saved with each one.",
+                  )}
+                />
+                <label className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-sm font-semibold text-slate-800 ring-1 ring-inset ring-slate-100 md:col-span-2">
+                  <input type="checkbox" name="clockEnabled" value="1" defaultChecked={company.clockEnabled} className="size-4 accent-teal-700" />
+                  {t("تفعيل تسجيل الحضور والانصراف في بوابة الموظف", "Turn on clock-in and clock-out in the employee portal")}
+                </label>
+                <WorkSitePicker lat={company.workLat} lng={company.workLng} />
+                <Field label={t("نطاق القبول (متر)", "Allowed radius (m)")} hint={t("من 30 إلى 5000. اتركه 200 لمبنى عادي.", "30 to 5000. 200 suits a normal building.")}>
+                  <input className={`${fieldClass} w-full`} type="number" min="30" max="5000" name="workRadius" defaultValue={company.workRadius} />
+                </Field>
+                <Field label={t("بداية الدوام", "Work starts at")} hint={t("بتوقيت مسقط. يُحسب التأخير بعده. اتركه فارغاً لعدم احتساب التأخير.", "Muscat time. Lateness counts after it. Leave empty to skip lateness.")}>
+                  <input className={`${fieldClass} w-full`} type="time" name="workStart" defaultValue={company.workStart || ""} />
+                </Field>
+                <p className="flex items-start gap-2 rounded-xl bg-aqua-50 px-3.5 py-3 text-xs leading-5 text-slate-700 ring-1 ring-inset ring-aqua-100 md:col-span-2">
+                  <Info size={15} className="mt-0.5 shrink-0 text-aqua-700" />
+                  <span>
+                    {t(
+                      "اترك الإحداثيات فارغة لقبول التسجيل من أي مكان (للعمل عن بُعد). السجل اليومي يظهر في صفحة الحضور والغياب.",
+                      "Leave the coordinates empty to accept punches from anywhere (remote work). The daily log appears on the Attendance page.",
+                    )}{" "}
+                    <Link href="/attendance#clock" className="font-bold text-teal-800 underline underline-offset-2">
+                      {t("سجل الدوام", "Clock-in log")}
+                    </Link>
+                  </span>
+                </p>
+                <div className="flex items-end justify-end md:col-span-2">
+                  <SubmitButton className="w-full sm:w-auto">
+                    <Save size={16} />
+                    {t("حفظ إعدادات الحضور", "Save clock-in settings")}
                   </SubmitButton>
                 </div>
               </Card>

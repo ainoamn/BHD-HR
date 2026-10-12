@@ -22,6 +22,7 @@ import {
   rowDays,
   salaryDayWeight,
 } from "@/lib/leave";
+import { muscatDay, muscatTime, workedLabel } from "@/lib/clock";
 import { prisma } from "@/lib/prisma";
 import { calendarDays, daysLabel, formatDate, monthRange, readPeriod, round3 } from "@/lib/utils";
 import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
@@ -29,14 +30,16 @@ import { deleteAttendance, markAttendance, updateAttendance } from "@/server/att
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; error?: string; message?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; day?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("attendance.view");
   const { lang, t } = await getI18n();
   const { year, month } = readPeriod(sp);
   const { start, end } = monthRange(year, month);
-  const [employees, records, leaveTypes] = await Promise.all([
+  const clockDay = sp.day && /^\d{4}-\d{2}-\d{2}$/.test(sp.day) ? sp.day : muscatDay(new Date());
+  const clockDate = new Date(`${clockDay}T12:00:00Z`);
+  const [employees, records, leaveTypes, clockEntries, dayAbsences] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: user.companyId, status: { not: "TERMINATED" } },
       include: { attendance: true, leaveCredits: true },
@@ -48,7 +51,12 @@ export default async function AttendancePage({
       orderBy: { date: "desc" },
     }),
     getLeaveTypes(user.companyId),
+    prisma.clockEntry.findMany({ where: { companyId: user.companyId, day: clockDay } }),
+    prisma.attendance.findMany({ where: { date: clockDate, employee: { companyId: user.companyId } }, select: { employeeId: true } }),
   ]);
+  const showClock = user.company.clockEnabled || clockEntries.length > 0;
+  const clockById = new Map(clockEntries.map((entry) => [entry.employeeId, entry]));
+  const onLeave = new Set(dayAbsences.map((row) => row.employeeId));
   const displayName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const warnDays = user.company.leaveWarningDays;
   const figuresById = new Map(employees.map((employee) => [employee.id, computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes)]));
@@ -114,6 +122,79 @@ export default async function AttendancePage({
             defaultType="ABSENT"
             warnDays={warnDays}
           />
+        </Card>
+      ) : null}
+
+      {showClock ? (
+        <Card id="clock" className="mb-6 scroll-mt-24">
+          <SectionTitle
+            hint={t(
+              `${clockEntries.length} من ${employees.length} سجّلوا حضورهم من البوابة`,
+              `${clockEntries.length} of ${employees.length} clocked in from the portal`,
+            )}
+            action={
+              <form method="get" className="flex items-center gap-2">
+                <input type="hidden" name="year" value={year} />
+                <input type="hidden" name="month" value={month} />
+                <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm" aria-label={t("اليوم", "Day")} />
+                <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  {t("عرض", "Show")}
+                </button>
+              </form>
+            }
+          >
+            {t("سجل الدوام", "Clock-in log")} — {formatDate(clockDate)}
+          </SectionTitle>
+          <div className="table-shell">
+            <table className="table-stack min-w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2.5 text-start">{t("الموظف", "Employee")}</th>
+                  <th className="px-4 py-2.5 text-start">{t("الحضور", "In")}</th>
+                  <th className="px-4 py-2.5 text-start">{t("الانصراف", "Out")}</th>
+                  <th className="px-4 py-2.5 text-start">{t("المدة", "Hours")}</th>
+                  <th className="px-4 py-2.5 text-start">{t("الحالة", "Status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((employee) => {
+                  const entry = clockById.get(employee.id);
+                  return (
+                    <tr key={employee.id}>
+                      <td className="cell-title px-4 py-2.5">
+                        <Link href={`/employees/${employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
+                          {displayName(employee)}
+                        </Link>
+                      </td>
+                      <td className="tabular px-4 py-2.5" data-label={t("الحضور", "In")}>
+                        {entry ? muscatTime(entry.inAt) : "—"}
+                        {entry?.inDistance != null ? <span className="ms-1 text-xs text-slate-400">({entry.inDistance} {t("م", "m")})</span> : null}
+                      </td>
+                      <td className="tabular px-4 py-2.5" data-label={t("الانصراف", "Out")}>
+                        {entry?.outAt ? muscatTime(entry.outAt) : "—"}
+                      </td>
+                      <td className="tabular px-4 py-2.5" data-label={t("المدة", "Hours")}>
+                        {entry ? workedLabel(entry.inAt, entry.outAt) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5" data-label={t("الحالة", "Status")}>
+                        {entry ? (
+                          entry.lateMinutes ? (
+                            <ToneBadge tone="amber">{t(`متأخر ${entry.lateMinutes} د`, `${entry.lateMinutes} min late`)}</ToneBadge>
+                          ) : (
+                            <ToneBadge tone="teal">{t("في الوقت", "On time")}</ToneBadge>
+                          )
+                        ) : onLeave.has(employee.id) ? (
+                          <ToneBadge tone="slate">{t("غياب/إجازة مسجّلة", "Absence/leave recorded")}</ToneBadge>
+                        ) : (
+                          <span className="text-xs text-slate-400">{t("لم يسجّل", "Not clocked in")}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </Card>
       ) : null}
 

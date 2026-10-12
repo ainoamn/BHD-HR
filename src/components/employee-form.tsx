@@ -33,11 +33,14 @@ export async function EmployeeForm({
   defaultEmployerId,
   showSalary = true,
   canManageCatalog = false,
+  managers = [],
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employee?: Employee;
   currency: string;
   employers: { id: string; name: string; nameEn: string | null }[];
+  /** Other employees of the company, for the direct-manager field. */
+  managers?: { id: string; fullName: string; nameEn: string | null; employeeNumber: string }[];
   catalog: Catalog;
   allowances?: EmployeeAllowance[];
   defaultEmployerId?: string | null;
@@ -217,6 +220,18 @@ export async function EmployeeForm({
               defaultValue={employee?.departmentId || ""}
               emptyLabel={t("غير محدد", "Not set")}
               ariaLabel={t("القسم", "Department")}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium text-slate-700">{t("المدير المباشر", "Direct manager")}</span>
+            <SearchSelect
+              name="managerId"
+              options={managers
+                .filter((item) => item.id !== employee?.id)
+                .map((item) => ({ value: item.id, label: lang === "en" && item.nameEn ? item.nameEn : item.fullName, hint: item.employeeNumber }))}
+              defaultValue={employee?.managerId || ""}
+              emptyLabel={t("لا يوجد", "None")}
+              ariaLabel={t("المدير المباشر", "Direct manager")}
             />
           </div>
           <Field label={t("تاريخ الالتحاق", "Joining date")}>

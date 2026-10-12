@@ -106,6 +106,22 @@ async function resolveEmployer(formData: FormData, user: { companyId: string; pe
   return employer!.id;
 }
 
+/** The chosen direct manager, refusing the employee itself and any chain that would loop back to it. */
+async function resolveManager(formData: FormData, companyId: string, selfId: string | null, errorPath: string) {
+  const { t } = await getI18n();
+  const value = req(formData, "managerId");
+  if (!value) return null;
+  if (value === selfId) go(errorPath, { error: t("لا يكون الموظف مديراً لنفسه", "An employee cannot be their own manager") });
+  const manager = await prisma.employee.findFirst({ where: { id: value, companyId }, select: { id: true, managerId: true } });
+  if (!manager) go(errorPath, { error: t("المدير غير موجود", "Manager not found") });
+  let cursor = manager!.managerId;
+  for (let step = 0; cursor && selfId && step < 100; step += 1) {
+    if (cursor === selfId) go(errorPath, { error: t("هذا الاختيار يجعل الموظف مديراً لمديره", "This choice would make the employee manage their own manager") });
+    cursor = (await prisma.employee.findUnique({ where: { id: cursor }, select: { managerId: true } }))?.managerId ?? null;
+  }
+  return manager!.id;
+}
+
 export async function createEmployee(formData: FormData) {
   const user = await requirePermission("employees.create", "/employees");
   const { t } = await getI18n();
@@ -116,6 +132,7 @@ export async function createEmployee(formData: FormData) {
   if (input.fullName.length < 2) go("/employees/new", { error: t("الاسم الكامل مطلوب", "Full name is required") });
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : [];
   const employerId = await resolveEmployer(formData, user, "/employees/new");
+  const managerId = await resolveManager(formData, user.companyId, null, "/employees/new");
   const files = await readDocFiles(formData, {}, user.companyId, "/employees/new");
   const employeeNumber = await nextEmployeeNumber(user.companyId);
   const employee = await prisma.$transaction(async (tx) => {
@@ -126,6 +143,7 @@ export async function createEmployee(formData: FormData) {
         ...files.data,
         leaveDays: readLeaveDays(formData, catalog.leaveTypes),
         employerId,
+        managerId,
         employeeNumber,
         companyId: user.companyId,
       },
@@ -164,12 +182,13 @@ export async function updateEmployee(formData: FormData) {
   if (input.fullName.length < 2) go(errorPath, { error: t("الاسم الكامل مطلوب", "Full name is required") });
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : null;
   const employerId = await resolveEmployer(formData, user, errorPath);
+  const managerId = await resolveManager(formData, user.companyId, id, errorPath);
   const files = await readDocFiles(formData, existing!, user.companyId, errorPath);
   await prisma.$transaction(
     async (tx) => {
       await tx.employee.update({
         where: { id },
-        data: { ...input, ...jobFields(formData, catalog), ...files.data, leaveDays: readLeaveDays(formData, catalog.leaveTypes), employerId },
+        data: { ...input, ...jobFields(formData, catalog), ...files.data, leaveDays: readLeaveDays(formData, catalog.leaveTypes), employerId, managerId },
       });
       if (allowances) await saveAllowances(tx, id, user.companyId, allowances);
       if (allowances || input.nationality !== existing!.nationality) await syncEmployeeSalaries(tx, id, user.company.salaryDays);

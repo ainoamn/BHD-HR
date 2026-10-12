@@ -1,4 +1,3 @@
-import path from "path";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
@@ -6,6 +5,7 @@ import { LetterSheet } from "@/components/letter-sheet";
 import { PrintButton } from "@/components/print-button";
 import { headerFor } from "@/components/salary-docs";
 import { SubmitButton } from "@/components/submit-button";
+import { inlineLogo } from "@/lib/inline-logo";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
@@ -14,13 +14,6 @@ import { acknowledgeLetter } from "@/server/letter-actions";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
-
-/** Logos are served only to signed-in members, so the employee's copy embeds it. */
-async function inlineLogo(url: string | null, companyId: string) {
-  if (!url?.startsWith("/files/")) return null;
-  const file = await prisma.storedFile.findFirst({ where: { name: path.basename(url), companyId }, select: { mime: true, data: true } });
-  return file && file.mime.startsWith("image/") ? `data:${file.mime};base64,${Buffer.from(file.data).toString("base64")}` : null;
-}
 
 /** The employee's copy, opened from the email / WhatsApp link. The 32-character token is the only key. */
 export default async function EmployeeLetterPage({ params }: { params: Promise<{ token: string }> }) {

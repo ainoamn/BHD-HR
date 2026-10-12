@@ -45,6 +45,11 @@ import { PayItemsList } from "@/components/pay-items-list";
 import { EmployeeLettersTab, EmployeeNotesTab, EmployeeTasksTab, PinnedNotes } from "@/components/employee-workspace";
 import { WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
 import { employeeOptions, loadBoardTasks } from "@/lib/task-data";
+import { ShareLetter } from "@/components/share-letter";
+import { muscatTime, workedLabel } from "@/lib/clock";
+import { portalUrl } from "@/lib/portal";
+import { requestOrigin } from "@/lib/request-origin";
+import { disablePortalLink, renewPortalLink } from "@/server/request-actions";
 
 export default async function EmployeePage({
   params,
@@ -66,6 +71,10 @@ export default async function EmployeePage({
       leaveCredits: { orderBy: { createdAt: "desc" } },
       salaries: { orderBy: [{ year: "desc" }, { month: "desc" }] },
       allowances: { include: { allowanceType: true }, orderBy: { createdAt: "asc" } },
+      manager: { select: { id: true, fullName: true, nameEn: true } },
+      reports: { where: { status: { not: "TERMINATED" } }, select: { id: true, fullName: true, nameEn: true }, orderBy: { fullName: "asc" } },
+      clockEntries: { orderBy: { day: "desc" }, take: 31 },
+      _count: { select: { leaveRequests: { where: { status: "PENDING" } } } },
     },
   });
   if (!employee) notFound();
@@ -182,6 +191,9 @@ export default async function EmployeePage({
   const jobTitle = termText(employee.jobTitle, employee.jobTitleEn, lang);
   const department = termText(employee.department, employee.departmentEn, lang);
   const base = `/employees/${employee.id}`;
+  const portalLink = employee.portalToken ? portalUrl(await requestOrigin(), employee.portalToken) : null;
+  const personName = (person: { fullName: string; nameEn: string | null }) => (lang === "en" && person.nameEn ? person.nameEn : person.fullName);
+  const companyName = lang === "en" && user.company.nameEn ? user.company.nameEn : user.company.name;
 
   const periodActions = (period: (typeof periods)[number]) =>
     allow.attEdit || allow.attDelete ? (
@@ -463,6 +475,34 @@ export default async function EmployeePage({
                   />
                   <Info label={t("المسمى الوظيفي", "Job title")} value={text(jobTitle)} />
                   <Info label={t("القسم", "Department")} value={text(department)} />
+                  <Info
+                    label={t("المدير المباشر", "Direct manager")}
+                    value={
+                      employee.manager ? (
+                        <Link href={`/employees/${employee.manager.id}`} className="text-teal-800 hover:underline">
+                          {personName(employee.manager)}
+                        </Link>
+                      ) : (
+                        "—"
+                      )
+                    }
+                  />
+                  <Info
+                    label={t("يتبعه مباشرة", "Direct reports")}
+                    value={
+                      employee.reports.length ? (
+                        <span className="flex flex-wrap gap-x-2 gap-y-1">
+                          {employee.reports.map((person) => (
+                            <Link key={person.id} href={`/employees/${person.id}`} className="text-teal-800 hover:underline">
+                              {personName(person)}
+                            </Link>
+                          ))}
+                        </span>
+                      ) : (
+                        "—"
+                      )
+                    }
+                  />
                   <Info label={t("الحالة", "Status")} value={pick(STATUS_LABEL[employee.status], lang, employee.status)} />
                   <Info label={t("تاريخ الالتحاق", "Joining date")} value={formatDate(employee.joiningDate)} />
                   <Info label={t("نهاية العقد", "Contract end")} value={formatDate(employee.contractEnd)} />
@@ -579,7 +619,13 @@ export default async function EmployeePage({
                           {document.notes ? <p className="mt-1 text-xs text-slate-500">{document.notes}</p> : null}
                         </div>
                         <div className="flex flex-wrap items-start justify-between gap-3 sm:justify-end">
-                          <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
+                          {document.submittedAt && !document.reviewedAt ? (
+                            <Link href="/approvals#documents">
+                              <ToneBadge tone="amber">{t("من البوابة — بانتظار المراجعة", "From portal — awaiting review")}</ToneBadge>
+                            </Link>
+                          ) : (
+                            <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
+                          )}
                           {allow.docEdit ? <DocumentEditForm action={updateDocument} returnTo={`${base}?tab=docs`} document={document} /> : null}
                           {allow.docDelete ? (
                             <DeleteButton
@@ -709,6 +755,43 @@ export default async function EmployeePage({
                   </div>
                 ) : null}
               </Card>
+              {employee.clockEntries.length ? (
+                <Card>
+                  <SectionTitle hint={t("من بوابة الموظف، آخر 31 يوماً مسجّلاً", "From the employee portal, last 31 recorded days")}>{t("سجل الدوام", "Clock-in log")}</SectionTitle>
+                  <div className="table-shell">
+                    <table className="table-stack min-w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2.5 text-start">{t("اليوم", "Day")}</th>
+                          <th className="px-4 py-2.5 text-start">{t("الحضور", "In")}</th>
+                          <th className="px-4 py-2.5 text-start">{t("الانصراف", "Out")}</th>
+                          <th className="px-4 py-2.5 text-start">{t("المدة", "Hours")}</th>
+                          <th className="px-4 py-2.5 text-start">{t("التأخير", "Late")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employee.clockEntries.map((entry) => (
+                          <tr key={entry.id}>
+                            <td className="cell-title px-4 py-2.5 font-medium">{formatDate(new Date(`${entry.day}T12:00:00Z`))}</td>
+                            <td className="tabular px-4 py-2.5" data-label={t("الحضور", "In")}>
+                              {muscatTime(entry.inAt)}
+                            </td>
+                            <td className="tabular px-4 py-2.5" data-label={t("الانصراف", "Out")}>
+                              {muscatTime(entry.outAt)}
+                            </td>
+                            <td className="tabular px-4 py-2.5" data-label={t("المدة", "Hours")}>
+                              {workedLabel(entry.inAt, entry.outAt)}
+                            </td>
+                            <td className="px-4 py-2.5" data-label={t("التأخير", "Late")}>
+                              {entry.lateMinutes ? <ToneBadge tone="amber">{t(`${entry.lateMinutes} د`, `${entry.lateMinutes} min`)}</ToneBadge> : <span className="text-slate-400">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              ) : null}
             </>
           ) : null}
 
@@ -860,6 +943,61 @@ export default async function EmployeePage({
         </div>
 
         <aside className="min-w-0 space-y-4">
+          {allow.edit ? (
+            <Card id="portal" className="scroll-mt-24">
+              <SectionTitle
+                action={
+                  employee._count.leaveRequests ? (
+                    <Link href="/approvals#leave">
+                      <ToneBadge tone="amber">{t(`${employee._count.leaveRequests} طلب معلّق`, `${employee._count.leaveRequests} pending`)}</ToneBadge>
+                    </Link>
+                  ) : null
+                }
+              >
+                {t("بوابة الموظف", "Employee portal")}
+              </SectionTitle>
+              <p className="mb-3 text-xs leading-5 text-slate-600">
+                {t(
+                  "رابط شخصي بلا كلمة مرور يفتح به الموظف صفحته: طلب الإجازات ومتابعتها، رصيده، قسائم رواتبه، مستنداته وإرسال المحدّث منها، خطاباته، وتسجيل الحضور إن كان مفعّلاً.",
+                  "A personal, password-free link to the employee's own page: leave requests and balances, payslips, documents (and sending renewed ones), letters, and clock-in when enabled.",
+                )}
+              </p>
+              {portalLink ? (
+                <div className="space-y-3">
+                  <ShareLetter
+                    url={portalLink}
+                    subject={t("رابط صفحتك في نظام الموارد البشرية", "Your HR portal link")}
+                    message={t(
+                      `مرحباً ${employee.fullName}،\nهذا رابط صفحتك في نظام الموارد البشرية لدى ${companyName}:\n${portalLink}\nاحتفظ به ولا تشاركه مع أحد.`,
+                      `Hello ${employee.nameEn || employee.fullName},\nThis is your HR portal link at ${companyName}:\n${portalLink}\nKeep it private.`,
+                    )}
+                    phone={employee.phone}
+                    email={employee.email}
+                    openLabel={t("فتح البوابة", "Open portal")}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                    <form action={renewPortalLink}>
+                      <input type="hidden" name="employeeId" value={employee.id} />
+                      <SubmitButton variant="secondary" confirm={t("سيتوقف الرابط الحالي ويُنشأ رابط جديد. متابعة؟", "The current link will stop working and a new one is created. Continue?")}>
+                        {t("رابط جديد", "New link")}
+                      </SubmitButton>
+                    </form>
+                    <form action={disablePortalLink}>
+                      <input type="hidden" name="employeeId" value={employee.id} />
+                      <SubmitButton variant="link" confirm={t("إيقاف رابط البوابة؟ لن يفتح بعد الآن.", "Turn off the portal link? It will stop opening.")}>
+                        {t("إيقاف البوابة", "Turn off")}
+                      </SubmitButton>
+                    </form>
+                  </div>
+                </div>
+              ) : (
+                <form action={renewPortalLink}>
+                  <input type="hidden" name="employeeId" value={employee.id} />
+                  <SubmitButton className="w-full">{t("إنشاء رابط البوابة", "Create portal link")}</SubmitButton>
+                </form>
+              )}
+            </Card>
+          ) : null}
           <Card>
             <SectionTitle>{t("مستندات الموارد البشرية", "HR documents")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2">

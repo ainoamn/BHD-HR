@@ -6,7 +6,21 @@ import { useLang } from "./lang-provider";
 import { secondaryBtn } from "./ui";
 
 /** Manual sharing until automatic email / WhatsApp sending is switched on. */
-export function ShareLetter({ url, message, subject, phone, email }: { url: string; message: string; subject: string; phone: string | null; email: string | null }) {
+export function ShareLetter({
+  url,
+  message,
+  subject,
+  phone,
+  email,
+  openLabel,
+}: {
+  url: string;
+  message: string;
+  subject: string;
+  phone: string | null;
+  email: string | null;
+  openLabel?: string;
+}) {
   const { t } = useLang();
   const [copied, setCopied] = useState(false);
   const whatsapp = `https://wa.me/${phone ? phone.replace(/\D/g, "") : ""}?text=${encodeURIComponent(message)}`;
@@ -35,7 +49,7 @@ export function ShareLetter({ url, message, subject, phone, email }: { url: stri
       </button>
       <a href={url} target="_blank" rel="noreferrer" className={secondaryBtn}>
         <ExternalLink size={16} />
-        {t("نسخة الموظف", "Employee copy")}
+        {openLabel || t("نسخة الموظف", "Employee copy")}
       </a>
     </div>
   );

@@ -51,7 +51,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
   const thisMonth = now.getMonth() + 1;
   const { start, end } = monthRange(thisYear, thisMonth);
   const taskHorizon = new Date(Date.UTC(thisYear, now.getMonth(), now.getDate() + TASK_ALERT_DAYS + 1));
-  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks] = await Promise.all([
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
@@ -87,6 +87,15 @@ export async function computeAlerts(company: Company, permissions: readonly stri
           take: 30,
         })
       : [],
+    can(user, "attendance.view")
+      ? prisma.leaveRequest.findMany({
+          where: { companyId: company.id, status: "PENDING" },
+          select: { id: true, choice: true, fromDate: true, toDate: true, days: true, employee: { select: { fullName: true, nameEn: true } } },
+          orderBy: { fromDate: "asc" },
+          take: 20,
+        })
+      : [],
+    can(user, "documents.view") ? prisma.employeeDocument.count({ where: { employee: { companyId: company.id }, submittedAt: { not: null }, reviewedAt: null } }) : 0,
   ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const alerts: AlertItem[] = [];
@@ -213,6 +222,29 @@ export async function computeAlerts(company: Company, permissions: readonly stri
     });
   }
 
+  for (const request of leaveRequests) {
+    const kind = attendanceLabel({ type: request.choice === "UNPAID_LEAVE" ? "UNPAID_LEAVE" : "CUSTOM_LEAVE", balanceKey: request.choice === "UNPAID_LEAVE" ? null : request.choice.slice(6) }, leaveTypes, lang);
+    const starts = daysUntil(request.fromDate);
+    alerts.push({
+      id: `request-${request.id}`,
+      severity: starts <= 2 ? "danger" : "warning",
+      title: t("طلب إجازة بانتظار الموافقة", "Leave request awaiting approval"),
+      message: `${nameOf(request.employee)} — ${kind} — ${formatDate(request.fromDate)} → ${formatDate(request.toDate)} (${daysLabel(request.days)} ${t("يوم", "day(s)")})`,
+      href: "/approvals#leave",
+      days: Math.min(starts, 0) - 50,
+    });
+  }
+  if (portalDocs) {
+    alerts.push({
+      id: "review-documents",
+      severity: "warning",
+      title: t("مستندات من البوابة بانتظار المراجعة", "Portal documents awaiting review"),
+      message: t(`${portalDocs} مستند أرسله الموظفون`, `${portalDocs} document(s) sent by employees`),
+      href: "/approvals#documents",
+      days: -40,
+    });
+  }
+
   for (const period of groupAttendance(absences).slice(0, 8)) {
     const kind = attendanceLabel(period.row, leaveTypes, lang);
     const when =
@@ -272,7 +304,8 @@ export async function computeAlerts(company: Company, permissions: readonly stri
 function alertPermission(id: string): Permission {
   if (id.endsWith("-contract") || id.startsWith("birthday-")) return "employees.view";
   if (id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
-  if (id.startsWith("leave-") || id.startsWith("att-")) return "attendance.view";
+  if (id.startsWith("leave-") || id.startsWith("att-") || id.startsWith("request-")) return "attendance.view";
+  if (id === "review-documents") return "documents.view";
   if (id.startsWith("reminder-")) return "calendar.view";
   if (id.startsWith("task-")) return "tasks.view";
   return "salaries.view";

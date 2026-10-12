@@ -14,6 +14,8 @@ export function SubmitButton({
   variant = "primary",
   confirm,
   className,
+  name,
+  value,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
@@ -21,6 +23,9 @@ export function SubmitButton({
   /** Asks before submitting; used for deletes. */
   confirm?: string;
   className?: string;
+  /** Sent with the form when this button submits it, so one form can have several outcomes. */
+  name?: string;
+  value?: string;
 }) {
   const { pending } = useFormStatus();
   const { t } = useLang();
@@ -28,11 +33,29 @@ export function SubmitButton({
   return (
     <button
       type="submit"
+      name={name}
+      value={value}
       disabled={pending}
       aria-busy={pending || undefined}
       className={cn(base, className)}
       onClick={(event) => {
-        if (confirm && !window.confirm(confirm)) event.preventDefault();
+        if (confirm && !window.confirm(confirm)) {
+          event.preventDefault();
+          return;
+        }
+        const form = event.currentTarget.form;
+        if (name && value !== undefined && form) {
+          // Server-action forms don't reliably send the clicked button's name/value, so carry it in a hidden field.
+          let field = form.querySelector<HTMLInputElement>(`input[type="hidden"][data-submitter="${name}"]`);
+          if (!field) {
+            field = document.createElement("input");
+            field.type = "hidden";
+            field.name = name;
+            field.dataset.submitter = name;
+            form.appendChild(field);
+          }
+          field.value = value;
+        }
       }}
     >
       {pending ? (
