@@ -142,7 +142,7 @@ export function Stat({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 text-[0.8rem] font-medium leading-5 text-slate-500 sm:text-sm">{label}</p>
+        <p className="min-w-0 text-xs font-medium leading-5 text-slate-500 sm:text-sm">{label}</p>
         {Icon ? (
           <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset", statTones[tone])}>
             <Icon size={18} strokeWidth={1.9} />
