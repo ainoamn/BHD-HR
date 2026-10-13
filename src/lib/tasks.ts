@@ -34,7 +34,7 @@ export const TASK_PRIORITY: Record<TaskPriority, { label: Bi; tone: string; flag
 };
 
 /** History entries in a task's timeline (TaskComment.kind other than COMMENT). */
-export const TASK_EVENTS = ["STATUS", "PRIORITY", "ASSIGN", "TRANSFER", "INVITE", "POSTPONE", "ARCHIVE"] as const;
+export const TASK_EVENTS = ["STATUS", "PRIORITY", "ASSIGN", "TRANSFER", "INVITE", "POSTPONE", "ARCHIVE", "LEAD"] as const;
 export type TaskEvent = (typeof TASK_EVENTS)[number];
 
 export function isTaskStatus(value: string): value is TaskStatus {

@@ -10,6 +10,7 @@ import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { isEmail, newTaskInviteToken, sendTaskInvite } from "@/lib/task-invites";
+import { mentionedIn, notifyTask, taskMembers } from "@/lib/task-members";
 import { TASK_PRIORITY, TASK_STATUS, isClosedStatus, isTaskPriority, isTaskStatus, type TaskEvent, type TaskPriority, type TaskStatus } from "@/lib/tasks";
 import { clip, formatDate, parseDateInput, req, safeReturn, str } from "@/lib/utils";
 
@@ -163,6 +164,7 @@ export async function updateTask(formData: FormData): Promise<ActionResult> {
         data: {
           ...rest,
           ...(status === task.status ? {} : statusChange(task, status)),
+          leadId: task.leadId && assigneeIds.includes(task.leadId) ? task.leadId : null,
           assignees: { create: assigneeIds.map((employeeId) => ({ employeeId })) },
         },
       }),
@@ -327,6 +329,7 @@ export async function transferTask(formData: FormData): Promise<ActionResult> {
       prisma.taskAssignee.deleteMany({ where: { taskId: task.id, employeeId: { in: leaving.map((row) => row.employeeId) } } }),
       prisma.taskAssignee.createMany({ data: [{ taskId: task.id, employeeId: to.id }], skipDuplicates: true }),
       prisma.taskInvite.updateMany({ where: { taskId: task.id, employeeId: { in: leaving.map((row) => row.employeeId) }, revokedAt: null }, data: { revokedAt: new Date() } }),
+      ...(task.leadId && leaving.some((row) => row.employeeId === task.leadId) ? [prisma.task.update({ where: { id: task.id }, data: { leadId: to.id } })] : []),
     ]);
     const fromNames = leaving.map((row) => personName(row.employee, lang)).join("، ");
     const toName = personName(to, lang);
@@ -386,6 +389,7 @@ export async function removeTaskAssignee(formData: FormData): Promise<ActionResu
     await prisma.$transaction([
       prisma.taskAssignee.delete({ where: { taskId_employeeId: { taskId: task.id, employeeId: row.employeeId } } }),
       prisma.taskInvite.updateMany({ where: { taskId: task.id, employeeId: row.employeeId, revokedAt: null }, data: { revokedAt: new Date() } }),
+      ...(task.leadId === row.employeeId ? [prisma.task.update({ where: { id: task.id }, data: { leadId: null } })] : []),
     ]);
     const name = personName(row.employee, lang);
     await logEvent(task.id, user, "ASSIGN", t(`أزال «${name}» من المهمة`, `Removed “${name}” from the task`));
@@ -525,6 +529,7 @@ export async function duplicateTask(formData: FormData) {
       position: (first?.position ?? 1) - 1,
       createdById: user.id,
       createdByName: user.name,
+      leadId: source!.leadId,
       assignees: { create: source!.assignees.map(({ employeeId }) => ({ employeeId })) },
       items: { create: source!.items.map(({ text }, position) => ({ text, position })) },
     },
@@ -593,16 +598,78 @@ export async function suggestTaskItems(formData: FormData): Promise<ActionResult
   });
 }
 
+/** A comment, a reply (`parentId`) or a comment on a step (`itemId`); anyone named with @ is notified. */
 export async function addTaskComment(formData: FormData): Promise<ActionResult> {
   const user = await requirePermission("tasks.edit", "/tasks");
-  const { t } = await getI18n();
+  const { lang, t } = await getI18n();
   return inPage(async () => {
     const task = await findTask(user.companyId, req(formData, "taskId"), t);
     const body = clip(req(formData, "body"), 3000);
     if (!body) fail(t("اكتب التعليق", "Type a comment"));
-    await prisma.taskComment.create({ data: { taskId: task.id, userId: user.id, authorName: user.name, body } });
+    const thread = await commentThread(task.id, formData, t);
+    const comment = await prisma.taskComment.create({ data: { taskId: task.id, userId: user.id, authorName: user.name, body, parentId: thread.parentId, itemId: thread.itemId } });
+    const members = body.includes("@") ? await taskMembers(task, lang) : [];
+    const notice = await notifyTask({
+      task,
+      commentId: comment.id,
+      kind: "MENTION",
+      people: mentionedIn(body, members),
+      reply: thread.replyTo,
+      author: { userId: user.id, name: user.name },
+      excerpt: body,
+      origin: await requestOrigin(),
+      canInvite: true,
+    });
     refreshAll();
-    return {};
+    return noticeResult(notice, t);
+  });
+}
+
+/** Where a new comment goes: under the top-level comment it answers, and on the step it is about. */
+async function commentThread(taskId: string, formData: FormData, t: T) {
+  const parentId = str(formData, "parentId");
+  const itemId = str(formData, "itemId");
+  const parent = parentId ? await prisma.taskComment.findFirst({ where: { id: parentId, taskId, kind: "COMMENT" } }) : null;
+  if (parentId && !parent) fail(t("التعليق الذي ترد عليه لم يعد موجوداً", "The comment you are replying to no longer exists"));
+  const item = itemId ? await prisma.taskItem.findFirst({ where: { id: itemId, taskId }, select: { id: true } }) : null;
+  if (itemId && !item) fail(t("الخطوة لم تعد موجودة", "That step no longer exists"));
+  return {
+    parentId: parent ? parent.parentId || parent.id : null,
+    itemId: item?.id || parent?.itemId || null,
+    replyTo: parent ? { userId: parent.userId, inviteId: parent.inviteId, name: parent.authorName } : null,
+  };
+}
+
+function noticeResult(notice: { reached: string[]; unreached: string[] }, t: T): ActionResult {
+  const list = (names: string[]) => names.join(t("، ", ", "));
+  if (notice.unreached.length) return { message: t(`لا توجد وسيلة لتنبيه ${list(notice.unreached)} (لا حساب ولا بريد)؛ التعليق ظاهر للجميع في المهمة.`, `There is no way to notify ${list(notice.unreached)} (no account or email); the comment is visible to everyone on the task.`) };
+  if (notice.reached.length) return { message: t(`وصل التنبيه إلى ${list(notice.reached)}`, `${list(notice.reached)} notified`) };
+  return {};
+}
+
+/** Makes one assignee the task lead, or clears it when they already are. */
+export async function setTaskLead(formData: FormData): Promise<ActionResult> {
+  const user = await requirePermission("tasks.edit", "/tasks");
+  const { lang, t } = await getI18n();
+  return inPage(async () => {
+    const task = await liveTask(user.companyId, req(formData, "id"), t);
+    const row = await prisma.taskAssignee.findUnique({
+      where: { taskId_employeeId: { taskId: task.id, employeeId: req(formData, "employeeId") } },
+      include: { employee: { select: { id: true, fullName: true, nameEn: true } } },
+    });
+    if (!row) fail(t("المسؤول الرئيسي يجب أن يكون من المكلّفين بالمهمة", "The lead must be one of the task's assignees"));
+    const name = personName(row.employee, lang);
+    if (task.leadId === row.employeeId) {
+      await prisma.task.update({ where: { id: task.id }, data: { leadId: null } });
+      await logEvent(task.id, user, "LEAD", t(`ألغى تعيين «${name}» مسؤولاً رئيسياً`, `Removed “${name}” as the task lead`));
+      refreshAll();
+      return { message: t("لم يعد للمهمة مسؤول رئيسي", "The task has no lead now") };
+    }
+    await prisma.task.update({ where: { id: task.id }, data: { leadId: row.employeeId } });
+    const event = await prisma.taskComment.create({ data: { taskId: task.id, userId: user.id, authorName: user.name, kind: "LEAD", body: t(`عيّن «${name}» مسؤولاً رئيسياً عن المهمة`, `Made “${name}” the task lead`) } });
+    await notifyTask({ task, commentId: event.id, kind: "LEAD", people: [{ key: `e:${row.employeeId}`, name }], author: { userId: user.id, name: user.name }, excerpt: "", origin: await requestOrigin(), canInvite: true });
+    refreshAll();
+    return { message: t(`${name} المسؤول الرئيسي عن المهمة`, `${name} leads the task`) };
   });
 }
 

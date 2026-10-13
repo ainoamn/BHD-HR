@@ -5,7 +5,9 @@ import { writeAudit } from "@/lib/audit";
 import { refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { requestOrigin } from "@/lib/request-origin";
 import { inviteByToken } from "@/lib/task-invites";
+import { mentionedIn, notifyTask, taskMembers } from "@/lib/task-members";
 import { GUEST_STATUSES, TASK_STATUS, isClosedStatus, type TaskStatus } from "@/lib/tasks";
 import { clip, req, str } from "@/lib/utils";
 
@@ -69,12 +71,33 @@ export async function guestToggleTaskItem(formData: FormData): Promise<ActionRes
 }
 
 export async function guestAddTaskComment(formData: FormData): Promise<ActionResult> {
-  const { t } = await getI18n();
+  const { lang, t } = await getI18n();
   const guest = await guestTask(req(formData, "token"), t);
   if ("error" in guest) return refused(guest.error);
   const body = clip(str(formData, "body"), 3000);
   if (!body) return refused(t("اكتب التعليق", "Type a comment"));
-  await prisma.taskComment.create({ data: { taskId: guest.invite.task.id, authorName: guest.author, body } });
+  const task = guest.invite.task;
+  const parentId = str(formData, "parentId");
+  const itemId = str(formData, "itemId");
+  const parent = parentId ? await prisma.taskComment.findFirst({ where: { id: parentId, taskId: task.id, kind: "COMMENT" } }) : null;
+  if (parentId && !parent) return refused(t("التعليق الذي ترد عليه لم يعد موجوداً", "The comment you are replying to no longer exists"));
+  const item = itemId ? await prisma.taskItem.findFirst({ where: { id: itemId, taskId: task.id }, select: { id: true } }) : null;
+  if (itemId && !item) return refused(t("الخطوة لم تعد موجودة", "That step no longer exists"));
+  const comment = await prisma.taskComment.create({
+    data: { taskId: task.id, inviteId: guest.invite.id, authorName: guest.author, body, parentId: parent ? parent.parentId || parent.id : null, itemId: item?.id || parent?.itemId || null },
+  });
+  const members = body.includes("@") ? await taskMembers(task, lang, true) : [];
+  await notifyTask({
+    task,
+    commentId: comment.id,
+    kind: "MENTION",
+    people: mentionedIn(body, members),
+    reply: parent ? { userId: parent.userId, inviteId: parent.inviteId, name: parent.authorName } : null,
+    author: { inviteId: guest.invite.id, name: guest.invite.name || guest.invite.email },
+    excerpt: body,
+    origin: await requestOrigin(),
+    canInvite: false,
+  });
   refreshAll();
   return {};
 }

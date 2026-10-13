@@ -231,16 +231,25 @@ export const HELP_TOPICS: HelpTopic[] = [
         "Actions: “Postpone” (1 day, 3 days, a week, two weeks or a date), “Hold” with a reason then “Resume”, “Close” without completion with a reason, “Reopen”, “Duplicate”, “Archive” and “Delete”.",
       ),
       b("كل تغيير يُسجَّل في «السجل والتعليقات» باسم من قام به ووقته.", "Every change is recorded in “History & comments” with who made it and when."),
+      b(
+        "النجمة ☆ بجانب موظف في «الأشخاص» تجعله المسؤول الرئيسي عن المهمة؛ يظهر أولاً ويصله تنبيه. اضغطها مرة أخرى لإلغاء التعيين.",
+        "The star ☆ next to an employee in “People” makes them the task lead; they show first and get a notice. Tap it again to remove it.",
+      ),
+      b(
+        "في التعليق اكتب @ واختر الشخص (أو زر «إشارة»): يصله تنبيه بأن التعليق موجّه إليه، ويبقى التعليق ظاهراً للجميع. «رد» تحت أي تعليق للرد عليه، وزر 💬 بجانب كل خطوة للتعليق عليها.",
+        "In a comment type @ and pick a person (or the “Mention” button): they get a notice that the comment is for them, and everyone can still see it. “Reply” under any comment answers it, and 💬 next to each step comments on that step.",
+      ),
       b("ابحث وصفِّ بالموظف أو الأولوية أو الحالة أو الاستحقاق، و«المؤرشفة» أسفل الصفحة لعرض المؤرشفة واستعادتها.", "Search and filter by employee, priority, status or due date; “Archived” at the bottom shows archived tasks to restore."),
     ],
     tips: [
       b("المهام المتأخرة تظهر في التنبيهات، وكل مهمة في التقويم يوم استحقاقها. المعلّقة لا تُحتسب متأخرة.", "Late tasks appear in alerts, and every task shows in the calendar on its due date. Tasks on hold are not counted as late."),
       b("إن لم يكن البريد الآلي مفعّلاً فانسخ رابط المدعو أو أرسله ببريدك أو واتساب من قائمة «المدعوّون بالبريد».", "If automatic email isn't set up, copy an invitee's link or send it by your own mail or WhatsApp from “Invited by email”."),
       b("الأرشفة تخفي المهمة دون حذفها؛ استخدمها للمهام القديمة بدل الحذف.", "Archiving hides a task without deleting it; use it for old tasks instead of deleting."),
+      b("ما وُجّه إليك أو رُدّ به عليك أو عُيّنت فيه مسؤولاً رئيسياً يظهر في التنبيهات تحت «لك»، ويختفي بعد فتح المهمة. المدعو بالبريد يراه شريطاً أعلى صفحة المهمة.", "Comments addressed to you, replies to you and tasks you now lead appear in Alerts under “For you” and clear once you open the task. Email invitees see them as a banner at the top of the task page."),
       b("زر «ترجمة فورية» أعلى الشاشة يُظهر ترجمة العنوان والوصف والخطوات والسجل والتعليقات وكل الملاحظات تحتها. وعند الكتابة في أي حقل اضغط «ذكاء» على زاويته للترجمة أو تحسين الصياغة أو اقتراحات، مع «تراجع».", "The “Translate” button at the top shows the translation of the title, description, steps, history, comments and all notes under them. While typing in any field, tap “AI” on its corner to translate, improve the wording or get suggestions, with Undo."),
     ],
     related: ["calendar", "employee-file"],
-    keywords: "مهام لوحة مهمة تحويل دعوة بريد تأجيل تعليق إغلاق أرشفة أولوية عاجلة tasks board kanban transfer invite email postpone hold close archive priority urgent",
+    keywords: "مهام لوحة مهمة تحويل دعوة بريد تأجيل تعليق إغلاق أرشفة أولوية عاجلة مسؤول رئيسي إشارة منشن رد ردود tasks board kanban transfer invite email postpone hold close archive priority urgent lead mention reply",
   },
 
   // ───────────── People

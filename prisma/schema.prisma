@@ -234,6 +234,7 @@ model Employee {
   auditLogs          AuditLog[]
   reminders          Reminder[]
   taskAssignments    TaskAssignee[]
+  ledTasks           Task[]              @relation("TaskLead")
   noteEntries        EmployeeNote[]
   letters            Letter[]
   leaveRequests      LeaveRequest[]
@@ -620,10 +621,14 @@ model Task {
   position      Float          @default(0)
   createdById   String?
   createdByName String?
+  /// The assignee who leads the task (one of `assignees`); cleared when they leave it.
+  leadId        String?
+  lead          Employee?      @relation("TaskLead", fields: [leadId], references: [id], onDelete: SetNull)
   assignees     TaskAssignee[]
   items         TaskItem[]
   comments      TaskComment[]
   invites       TaskInvite[]
+  mentions      TaskMention[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -667,28 +672,64 @@ model TaskAssignee {
 
 /// Checklist entry inside a task.
 model TaskItem {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
   text      String
-  done      Boolean  @default(false)
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
+  done      Boolean       @default(false)
+  position  Int           @default(0)
+  comments  TaskComment[]
+  createdAt DateTime      @default(now())
 
   @@index([taskId])
 }
 
 model TaskComment {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   taskId     String
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task       Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId     String?
+  /// Set when someone invited by email wrote it, so replies can notify them.
+  inviteId   String?
   authorName String
-  /// COMMENT, or a history entry: STATUS, PRIORITY, ASSIGN, TRANSFER, INVITE, POSTPONE, ARCHIVE (see TASK_EVENT).
-  kind       String   @default("COMMENT")
+  /// COMMENT, or a history entry: STATUS, PRIORITY, ASSIGN, TRANSFER, INVITE, POSTPONE, ARCHIVE, LEAD (see TASK_EVENT).
+  kind       String        @default("COMMENT")
   body       String
-  createdAt  DateTime @default(now())
+  /// A reply belongs to a top-level comment (one level deep); deleting the comment deletes its replies.
+  parentId   String?
+  parent     TaskComment?  @relation("TaskReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    TaskComment[] @relation("TaskReplies")
+  /// A comment about one checklist step; it stays in the history if the step is deleted.
+  itemId     String?
+  item       TaskItem?     @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  mentions   TaskMention[]
+  createdAt  DateTime      @default(now())
 
+  @@index([taskId])
+  @@index([parentId])
+  @@index([itemId])
+}
+
+/// A personal notice about a task: named with @ in a comment (MENTION), a reply to their comment (REPLY) or made
+/// the task lead (LEAD). Everyone on the task still sees the comment. Staff get it in their alerts (`userId`),
+/// people invited by email at the top of their link page (`inviteId`); `readAt` is set when they open the task.
+model TaskMention {
+  id         String       @id @default(cuid())
+  taskId     String
+  task       Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  commentId  String?
+  comment    TaskComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  kind       String       @default("MENTION")
+  userId     String?
+  inviteId   String?
+  employeeId String?
+  name       String
+  byName     String
+  readAt     DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([userId, readAt])
+  @@index([inviteId, readAt])
   @@index([taskId])
 }
 

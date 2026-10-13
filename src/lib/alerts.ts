@@ -22,6 +22,8 @@ export type AlertItem = {
   message: string;
   href: string;
   days: number;
+  /** Meant for this user alone (a comment addressed to them, a reply, made task lead), not the whole company. */
+  personal?: boolean;
 };
 
 function severityFor(key: string): AlertItem["severity"] {
@@ -36,8 +38,37 @@ export const getAlerts = cache(async () => {
   const { lang } = await getI18n();
   const user = await getSessionUser();
   if (!user) return [] as AlertItem[];
-  return computeAlerts(user.company, user.permissions, lang);
+  const [personal, shared] = await Promise.all([taskNotices(user.id, user.companyId, lang), computeAlerts(user.company, user.permissions, lang)]);
+  return [...personal, ...shared];
 });
+
+/** Unread task notices for one user; they clear when the user opens the task. */
+async function taskNotices(userId: string, companyId: string, lang: Lang): Promise<AlertItem[]> {
+  const t = makeT(lang);
+  const rows = await prisma.taskMention.findMany({
+    where: { userId, readAt: null, task: { companyId } },
+    include: { task: { select: { id: true, title: true } }, comment: { select: { body: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+  return rows.map((row) => {
+    const body = row.comment?.body.replace(/\s+/g, " ").trim() || "";
+    return {
+      id: `mention-${row.id}`,
+      severity: "warning",
+      personal: true,
+      title:
+        row.kind === "LEAD"
+          ? t(`عيّنك ${row.byName} مسؤولاً رئيسياً: ${row.task.title}`, `${row.byName} made you the lead: ${row.task.title}`)
+          : row.kind === "REPLY"
+            ? t(`ردّ ${row.byName} على تعليقك: ${row.task.title}`, `${row.byName} replied to you: ${row.task.title}`)
+            : t(`${row.byName} وجّه إليك تعليقاً: ${row.task.title}`, `${row.byName} mentioned you: ${row.task.title}`),
+      message: row.kind === "LEAD" || !body ? formatDate(row.createdAt) : body.length > 160 ? `${body.slice(0, 160)}…` : body,
+      href: `/tasks/${row.task.id}${row.commentId ? `#c-${row.commentId}` : ""}`,
+      days: -1000,
+    };
+  });
+}
 
 /** Alerts for one company as seen by someone holding `permissions`; also used by the scheduled job, which has no session. */
 export async function computeAlerts(company: Company, permissions: readonly string[], lang: Lang): Promise<AlertItem[]> {

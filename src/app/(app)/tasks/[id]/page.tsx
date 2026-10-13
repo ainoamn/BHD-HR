@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Star,
   UserPlus,
   Users,
   X,
@@ -30,10 +31,10 @@ import { Modal } from "@/components/modal";
 import { DeleteButton } from "@/components/row-forms";
 import { SearchSelect } from "@/components/search-select";
 import { SubmitButton } from "@/components/submit-button";
-import { TaskChecklist } from "@/components/task-checklist";
+import { TaskChecklist, type StepComment } from "@/components/task-checklist";
 import { TaskForm } from "@/components/task-form";
 import { LiveBadges, LiveStrip, LiveTitle, PriorityChips, StatusActionButton, StatusButtons, TaskLive, WhenStatus } from "@/components/task-live";
-import { TaskTimeline } from "@/components/task-timeline";
+import { TaskTimeline, type TimelineEntry } from "@/components/task-timeline";
 import { Card, Field, InfoItem, SectionTitle, ToneBadge, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { channelReady } from "@/lib/delivery";
@@ -43,6 +44,7 @@ import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { employeeOptions } from "@/lib/task-data";
 import { taskInviteMessage, taskInviteSubject, taskInviteUrl } from "@/lib/task-invites";
+import { taskMembers } from "@/lib/task-members";
 import { dueInfo, isClosedStatus, isTaskPriority, isTaskStatus, type TaskStatus } from "@/lib/tasks";
 import { cn, formatDate, formatDateTime, toDateInput } from "@/lib/utils";
 import {
@@ -59,6 +61,7 @@ import {
   removeTaskAssignee,
   resendTaskInvite,
   revokeTaskInvite,
+  setTaskLead,
   setTaskPriority,
   setTaskStatus,
   suggestTaskItems,
@@ -90,12 +93,21 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
       company: { select: { name: true, nameEn: true } },
       assignees: { include: { employee: { select: { id: true, fullName: true, nameEn: true, photoUrl: true, employeeNumber: true, jobTitle: true, jobTitleEn: true, email: true } } } },
       items: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
-      comments: { orderBy: { createdAt: "asc" } },
+      comments: {
+        orderBy: { createdAt: "asc" },
+        include: { mentions: { where: { kind: "MENTION" }, select: { name: true, userId: true } }, item: { select: { id: true, text: true } } },
+      },
       invites: { where: { revokedAt: null }, orderBy: { createdAt: "asc" } },
     },
   });
   if (!task) notFound();
   const allow = { edit: can(user, "tasks.edit"), create: can(user, "tasks.create"), remove: can(user, "tasks.delete") };
+  const [employees, origin, members] = await Promise.all([
+    allow.edit ? employeeOptions(user.companyId, lang) : [],
+    task.invites.length ? requestOrigin() : "",
+    allow.edit ? taskMembers(task, lang) : [],
+    prisma.taskMention.updateMany({ where: { taskId: task.id, userId: user.id, readAt: null }, data: { readAt: new Date() } }),
+  ]);
   const archived = Boolean(task.archivedAt);
   const canAct = allow.edit && !archived;
   const status = isTaskStatus(task.status) ? task.status : "TODO";
@@ -104,19 +116,37 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const base = `/tasks/${task.id}`;
   const fields = { id: task.id };
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
-  const employees = allow.edit ? await employeeOptions(user.companyId, lang) : [];
   const assignedIds = new Set(task.assignees.map((row) => row.employeeId));
   const others = employees.filter((option) => !assignedIds.has(option.value));
-  const origin = task.invites.length ? await requestOrigin() : "";
   const company = lang === "en" && task.company.nameEn ? task.company.nameEn : task.company.name;
   const emailReady = channelReady("EMAIL");
-  const hiddenEntries = sp.log === "all" ? 0 : Math.max(0, task.comments.length - TIMELINE_RECENT);
+  const lead = task.assignees.find((row) => row.employeeId === task.leadId)?.employee || null;
+  const assignees = [...task.assignees].sort((a, b) => Number(b.employeeId === task.leadId) - Number(a.employeeId === task.leadId));
+  const toEntry = (row: (typeof task.comments)[number]): TimelineEntry => ({
+    ...row,
+    mentions: row.mentions.map((mention) => ({ name: mention.name, mine: mention.userId === user.id })),
+    step: row.item,
+  });
+  const replies = new Map<string, TimelineEntry[]>();
+  const threads: Record<string, StepComment[]> = {};
+  for (const row of task.comments) {
+    if (row.parentId) replies.set(row.parentId, [...(replies.get(row.parentId) || []), toEntry(row)]);
+    if (row.kind === "COMMENT" && row.itemId) {
+      threads[row.itemId] = [
+        ...(threads[row.itemId] || []),
+        { id: row.id, authorName: row.authorName, body: row.body, when: formatDateTime(row.createdAt), names: row.mentions.map((mention) => mention.name), mine: row.mentions.some((mention) => mention.userId === user.id) },
+      ];
+    }
+  }
+  const timeline = task.comments.filter((row) => !row.parentId).map((row) => ({ ...toEntry(row), replies: replies.get(row.id) || [] }));
+  const hiddenEntries = sp.log === "all" ? 0 : Math.max(0, timeline.length - TIMELINE_RECENT);
   const aiContext = [
     `Task: ${task.title}`,
     task.description ? `Details: ${task.description.slice(0, 600)}` : "",
     `Status: ${status}, priority: ${priority}`,
     task.dueDate ? `Due: ${formatDate(task.dueDate)}` : "",
     task.assignees.length ? `Assigned to: ${task.assignees.map(({ employee }) => nameOf(employee)).join(", ")}` : "",
+    lead ? `Lead: ${nameOf(lead)}` : "",
   ]
     .filter(Boolean)
     .join(". ");
@@ -360,6 +390,8 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
                 add={canAct ? addTaskItem : undefined}
                 remove={canAct ? deleteTaskItem : undefined}
                 emptyText={t("لا توجد خطوات بعد.", "No steps yet.")}
+                threads={threads}
+                discuss={allow.edit ? { action: addTaskComment, fields: { taskId: task.id }, members, authorName: user.name } : undefined}
               />
             </Card>
 
@@ -376,25 +408,47 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
                 </Link>
               ) : null}
               <TaskTimeline
-                entries={hiddenEntries ? task.comments.slice(hiddenEntries) : task.comments}
+                entries={hiddenEntries ? timeline.slice(hiddenEntries) : timeline}
                 emptyText={t("لا توجد تعليقات بعد.", "No comments yet.")}
                 action={(entry) =>
                   allow.edit && entry.kind === "COMMENT" && (entry.userId === user.id || allow.remove) ? (
                     <ActionForm action={deleteTaskComment} quiet>
                       <input type="hidden" name="id" value={entry.id} />
-                      <SubmitButton variant="link" confirm={t("حذف هذا التعليق؟", "Delete this comment?")} pendingLabel={t("جارٍ الحذف...", "Deleting...")}>
+                      <SubmitButton
+                        variant="link"
+                        confirm={entry.replies?.length ? t("حذف هذا التعليق مع ردوده؟", "Delete this comment and its replies?") : t("حذف هذا التعليق؟", "Delete this comment?")}
+                        pendingLabel={t("جارٍ الحذف...", "Deleting...")}
+                      >
                         {t("حذف", "Delete")}
                       </SubmitButton>
                     </ActionForm>
                   ) : null
+                }
+                reply={
+                  allow.edit
+                    ? (entry) =>
+                        entry.kind === "COMMENT" ? (
+                          <CommentComposer
+                            action={addTaskComment}
+                            fields={{ taskId: task.id, parentId: entry.id }}
+                            members={members}
+                            authorName={user.name}
+                            placeholder={t(`ردّ على ${entry.authorName}…`, `Reply to ${entry.authorName}…`)}
+                            submitLabel={t("رد", "Reply")}
+                            toggle={t("رد", "Reply")}
+                            compact
+                          />
+                        ) : null
+                    : undefined
                 }
               />
               {allow.edit ? (
                 <CommentComposer
                   action={addTaskComment}
                   fields={{ taskId: task.id }}
+                  members={members}
                   authorName={user.name}
-                  placeholder={t("اكتب تعليقاً أو تحديثاً عن سير المهمة…", "Write a comment or progress update…")}
+                  placeholder={t("اكتب تعليقاً أو تحديثاً… واكتب @ لتوجيهه إلى شخص", "Write a comment or update… type @ to address someone")}
                   submitLabel={t("إضافة تعليق", "Add comment")}
                 />
               ) : null}
@@ -403,7 +457,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
 
           <aside className="min-w-0 space-y-4">
             <Card id="people" className="scroll-mt-24">
-              <SectionTitle hint={t("المكلّفون ومن دُعي بالبريد لمتابعة المهمة", "Assignees and people invited by email")}>
+              <SectionTitle hint={t("المكلّفون — النجمة تحدد المسؤول الرئيسي — ومن دُعي بالبريد", "Assignees — the star marks the lead — and people invited by email")}>
                 <span className="inline-flex items-center gap-2">
                   <Users size={18} className="text-teal-700" />
                   {t("الأشخاص", "People")}
@@ -411,20 +465,36 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
               </SectionTitle>
               {task.assignees.length === 0 ? <p className="mb-2 text-sm text-slate-500">{t("لم يُسند لأي موظف بعد.", "Not assigned yet.")}</p> : null}
               <ul className="space-y-1.5">
-                {task.assignees.map(({ employee }) => (
-                  <li key={employee.id} className="flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-50">
+                {assignees.map(({ employee }) => {
+                  const leads = employee.id === task.leadId;
+                  return (
+                  <li key={employee.id} className={cn("flex items-center gap-2 rounded-xl p-1.5", leads ? "bg-gold-50 ring-1 ring-inset ring-gold-200" : "hover:bg-slate-50")}>
                     <Link href={`/employees/${employee.id}?tab=tasks`} className="flex min-w-0 flex-1 items-center gap-2.5">
                       <EmployeeAvatar name={nameOf(employee)} photo={employee.photoUrl} className="size-8 rounded-full bg-teal-700 text-sm text-white" />
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-slate-900">{nameOf(employee)}</span>
                         <span className="block truncate text-xs text-slate-500">
+                          {leads ? <span className="font-semibold text-gold-700">{t("المسؤول الرئيسي", "Task lead")} · </span> : null}
                           {employee.employeeNumber}
                           {employee.jobTitle ? ` · ${lang === "en" && employee.jobTitleEn ? employee.jobTitleEn : employee.jobTitle}` : ""}
                         </span>
                       </span>
                     </Link>
+                    {!canAct && leads ? <Star size={16} className="shrink-0 fill-current text-gold-600" aria-label={t("المسؤول الرئيسي", "Task lead")} /> : null}
                     {canAct ? (
                       <div className="flex shrink-0 items-center gap-1">
+                        <ActionForm action={setTaskLead}>
+                          <input type="hidden" name="id" value={task.id} />
+                          <input type="hidden" name="employeeId" value={employee.id} />
+                          <button
+                            aria-pressed={leads}
+                            aria-label={leads ? t(`إلغاء تعيين ${nameOf(employee)} مسؤولاً رئيسياً`, `Remove ${nameOf(employee)} as lead`) : t(`اجعل ${nameOf(employee)} المسؤول الرئيسي`, `Make ${nameOf(employee)} the lead`)}
+                            title={leads ? t("المسؤول الرئيسي — اضغط للإلغاء", "Task lead — click to remove") : t("اجعله المسؤول الرئيسي", "Make lead")}
+                            className={cn("flex size-9 items-center justify-center rounded-xl transition", leads ? "text-gold-600 hover:bg-gold-100" : "text-slate-400 hover:bg-gold-50 hover:text-gold-600")}
+                          >
+                            <Star size={16} className={leads ? "fill-current" : ""} />
+                          </button>
+                        </ActionForm>
                         <WhenStatus not={CLOSED}>
                           <Modal
                             size="sm"
@@ -471,7 +541,8 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
                       </div>
                     ) : null}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
 
               {canAct ? (
@@ -606,6 +677,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
             <Card>
               <SectionTitle>{t("التفاصيل", "Details")}</SectionTitle>
               <dl className="grid gap-2">
+                <InfoItem label={t("المسؤول الرئيسي", "Task lead")} value={lead ? nameOf(lead) : "—"} />
                 <InfoItem label={t("تاريخ البداية", "Start date")} value={formatDate(task.startDate)} />
                 <InfoItem label={t("تاريخ الاستحقاق", "Due date")} value={formatDate(task.dueDate)} />
                 {task.postponeCount ? <InfoItem label={t("مرات التأجيل", "Times postponed")} value={task.postponeCount} /> : null}

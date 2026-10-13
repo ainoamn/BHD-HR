@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, BellOff, CalendarClock, CircleAlert, Clock, Info } from "lucide-react";
+import { AtSign, Bell, BellOff, CalendarClock, CircleAlert, Clock, Info } from "lucide-react";
 import { EmptyState, PageHeader, ToneBadge, secondaryBtn } from "@/components/ui";
 import { getAlerts } from "@/lib/alerts";
 import { getI18n } from "@/lib/lang";
@@ -9,6 +9,14 @@ export default async function NotificationsPage() {
   const alerts = await getAlerts();
   const { t } = await getI18n();
   const groups = [
+    {
+      key: "personal" as const,
+      title: t("لك: تعليقات موجّهة إليك وردود ومهام تقودها", "For you: comments addressed to you, replies and tasks you lead"),
+      tone: "teal",
+      badge: t("لك", "For you"),
+      icon: AtSign,
+      iconClass: "bg-teal-50 text-teal-700 ring-teal-200",
+    },
     {
       key: "danger" as const,
       title: t("عاجل: منتهٍ أو متأخر أو تجاوز الإجازة", "Urgent: expired, overdue or leave exceeded"),
@@ -52,7 +60,7 @@ export default async function NotificationsPage() {
       {alerts.length === 0 ? <EmptyState icon={BellOff} title={t("لا توجد تنبيهات", "No alerts")} text={t("كل شيء على ما يرام حالياً.", "Everything is in order right now.")} /> : null}
       <div className="space-y-8">
         {groups.map((group) => {
-          const items = alerts.filter((item) => item.severity === group.key);
+          const items = alerts.filter((item) => (group.key === "personal" ? item.personal : !item.personal && item.severity === group.key));
           if (!items.length) return null;
           const Icon = group.icon;
           return (

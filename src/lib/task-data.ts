@@ -26,7 +26,9 @@ export async function loadBoardTasks(where: Prisma.TaskWhereInput, lang: Lang): 
     due: dueInfo(task.dueDate, task.status, lang),
     dueDate: task.dueDate,
     createdAt: task.createdAt,
-    assignees: task.assignees.map((item) => ({ id: item.employee.id, name: nameOf(item.employee, lang) })),
+    assignees: [...task.assignees]
+      .sort((a, b) => Number(b.employeeId === task.leadId) - Number(a.employeeId === task.leadId))
+      .map((item) => ({ id: item.employee.id, name: nameOf(item.employee, lang) })),
     items: { done: task.items.filter((item) => item.done).length, total: task.items.length },
     comments: task._count.comments,
   }));

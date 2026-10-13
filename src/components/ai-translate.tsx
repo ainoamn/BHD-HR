@@ -95,8 +95,8 @@ function useTranslate() {
 
 const same = (a: string, b: string) => a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
 
-/** User-written text that gets its AI translation underneath while instant translation is on. */
-export function Tr({ text, size = "text-[0.92em]", tone = "light" }: { text: string | null | undefined; size?: string; tone?: "light" | "dark" }) {
+/** User-written text that gets its AI translation underneath while instant translation is on. `children` replaces how the original shows (e.g. with @mentions marked). */
+export function Tr({ text, size = "text-[0.92em]", tone = "light", children }: { text: string | null | undefined; size?: string; tone?: "light" | "dark"; children?: React.ReactNode }) {
   const live = useTranslate();
   const value = (text || "").trim();
   const wanted = Boolean(live?.on && value && /[\p{L}]/u.test(value));
@@ -108,7 +108,7 @@ export function Tr({ text, size = "text-[0.92em]", tone = "light" }: { text: str
   const translation = wanted ? live?.get(value) : undefined;
   return (
     <>
-      {text}
+      {children ?? text}
       {wanted && translation === undefined ? <span className={cn("mt-1 block h-3 w-2/3 max-w-60 animate-pulse rounded-full", tone === "dark" ? "bg-white/20" : "bg-teal-100/80")} aria-hidden="true" /> : null}
       {wanted && translation && !same(translation, value) ? (
         <span
