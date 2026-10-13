@@ -1,7 +1,10 @@
 "use client";
 
+import { useRef } from "react";
+import type { ActionResult } from "@/lib/action-result";
 import { pick } from "@/lib/i18n";
 import { TASK_PRIORITIES, TASK_PRIORITY, TASK_STATUS, TASK_STATUSES } from "@/lib/tasks";
+import { toast } from "./action-form";
 import { EmployeeMultiSelect } from "./employee-multi-select";
 import { useLang } from "./lang-provider";
 import type { SelectOption } from "./search-select";
@@ -28,8 +31,9 @@ export function TaskForm({
   returnTo,
   openAfterCreate,
   submitLabel,
+  inPage,
 }: {
-  action: (formData: FormData) => void | Promise<void>;
+  action: ((formData: FormData) => void | Promise<void>) | ((formData: FormData) => Promise<ActionResult>);
   employees: SelectOption[];
   task?: TaskFormValues;
   defaultAssignees?: string[];
@@ -37,10 +41,25 @@ export function TaskForm({
   returnTo: string;
   openAfterCreate?: boolean;
   submitLabel: string;
+  /** The action returns a result instead of redirecting: show it and close the dialog. */
+  inPage?: boolean;
 }) {
   const { lang, t } = useLang();
+  const form = useRef<HTMLFormElement>(null);
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form
+      ref={form}
+      action={
+        inPage
+          ? async (formData) => {
+              const result = (await action(formData)) || undefined;
+              toast(result);
+              if (!result?.error) form.current?.closest("dialog")?.close();
+            }
+          : (action as (formData: FormData) => void | Promise<void>)
+      }
+      className="grid gap-4 sm:grid-cols-2"
+    >
       {task ? <input type="hidden" name="id" value={task.id} /> : null}
       <input type="hidden" name="returnTo" value={returnTo} />
       {openAfterCreate ? <input type="hidden" name="open" value="1" /> : null}
