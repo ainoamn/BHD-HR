@@ -18,6 +18,7 @@ const HELP_FOR_PATH: [string, string][] = [
   ["/tasks", "tasks"],
   ["/approvals", "approvals"],
   ["/attendance", "attendance"],
+  ["/documents/custody", "custody"],
   ["/documents", "documents"],
   ["/letters", "letters"],
   ["/recruitment", "recruitment"],

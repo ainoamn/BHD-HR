@@ -5,6 +5,7 @@ import type { Permission } from "./permissions";
 import { reminderDayIn, payDayFor } from "./calendar";
 import { muscatDateTime } from "./clock";
 import { DOC_LABEL, monthName } from "./constants";
+import { heldDocLabel } from "./custody";
 import { daysUntil, describeExpiry } from "./expiry";
 import { getLeaveTypes } from "./hr-catalog";
 import { type Lang, makeT, pick } from "./i18n";
@@ -84,7 +85,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
   const thisMonth = now.getMonth() + 1;
   const { start, end } = monthRange(thisYear, thisMonth);
   const taskHorizon = new Date(Date.UTC(thisYear, now.getMonth(), now.getDate() + TASK_ALERT_DAYS + 1));
-  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles, employeeRequests] = await Promise.all([
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles, employeeRequests, originals] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
@@ -159,6 +160,14 @@ export async function computeAlerts(company: Company, permissions: readonly stri
           select: { id: true, type: true, lastDay: true, employee: { select: { fullName: true, nameEn: true } } },
           orderBy: { createdAt: "asc" },
           take: 50,
+        })
+      : [],
+    can(user, "documents.view")
+      ? prisma.heldDocument.findMany({
+          where: { companyId: company.id, OR: [{ status: "OUT", dueBack: { lt: now } }, { status: "HELD", employee: { status: "TERMINATED" } }] },
+          select: { id: true, type: true, title: true, status: true, dueBack: true, employee: { select: { id: true, fullName: true, nameEn: true } } },
+          orderBy: { dueBack: "asc" },
+          take: 30,
         })
       : [],
   ]);
@@ -321,6 +330,8 @@ export async function computeAlerts(company: Company, permissions: readonly stri
       title:
         type === "LETTER"
           ? t("طلبات خطابات وشهادات بانتظار الاعتماد", "Letter requests awaiting approval")
+          : type === "DOCUMENTS"
+            ? t("طلبات استلام مستندات أصلية بانتظار الاعتماد", "Requests to collect originals awaiting approval")
           : type === "ADVANCE"
             ? t("طلبات سلف بانتظار الاعتماد", "Advance requests awaiting approval")
             : t("طلبات موظفين بانتظار الاعتماد", "Employee requests awaiting approval"),
@@ -372,6 +383,22 @@ export async function computeAlerts(company: Company, permissions: readonly stri
       message: `${asset.name} — ${asset.employee ? nameOf(asset.employee) : ""}`,
       href: `/assets/${asset.id}`,
       days: -20,
+    });
+  }
+
+  for (const doc of originals) {
+    const label = pick(heldDocLabel(doc), lang);
+    const late = doc.status === "OUT" && doc.dueBack ? daysUntil(doc.dueBack) : 0;
+    alerts.push({
+      id: `custody-${doc.id}`,
+      severity: "danger",
+      title: doc.status === "OUT" ? t("مستند أصلي لم يُعَد في موعده", "Original not returned on time") : t("مستند أصلي لموظف انتهت خدمته", "Original held for a former employee"),
+      message:
+        doc.status === "OUT"
+          ? `${label} — ${nameOf(doc.employee)} — ${t(`متأخر ${daysPhrase(late, "ar")}`, `${daysPhrase(late, "en")} overdue`)}`
+          : `${label} — ${nameOf(doc.employee)} — ${t("سلّمه له باستمارة تسليم", "hand it back with a handover form")}`,
+      href: `/documents/custody?employee=${doc.employee.id}`,
+      days: doc.status === "OUT" ? Math.min(late, 0) - 18 : -18,
     });
   }
 
@@ -452,7 +479,7 @@ function alertPermission(id: string): Permission {
   if (id.endsWith("-contract") || id.startsWith("birthday-")) return "employees.view";
   if (id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
   if (id.startsWith("leave-") || id.startsWith("att-") || id.startsWith("request-")) return "attendance.view";
-  if (id === "review-documents") return "documents.view";
+  if (id === "review-documents" || id.startsWith("custody-")) return "documents.view";
   if (id.startsWith("reminder-")) return "calendar.view";
   if (id.startsWith("task-")) return "tasks.view";
   if (id.startsWith("interview-")) return "recruitment.view";

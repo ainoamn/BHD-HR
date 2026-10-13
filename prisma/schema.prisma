@@ -50,6 +50,8 @@ model Company {
   signatoryTitle       String?
   signatureUrl         String?
   stampUrl             String?
+  /// Letter kinds an employee asks for from the portal that are issued at once, signed, without a person approving.
+  letterAutoKinds      Json?
   employees            Employee[]
   leaveRequests        LeaveRequest[]
   employeeRequests     EmployeeRequest[]
@@ -76,6 +78,8 @@ model Company {
   reviews              PerformanceReview[]
   assets               Asset[]
   expenseClaims        ExpenseClaim[]
+  heldDocuments        HeldDocument[]
+  custodyForms         CustodyForm[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 }
@@ -244,6 +248,8 @@ model Employee {
   reviews            PerformanceReview[]
   assets             Asset[]
   expenseClaims      ExpenseClaim[]
+  heldDocuments      HeldDocument[]
+  custodyForms       CustodyForm[]
   account            Membership?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -402,12 +408,12 @@ model LeaveRequest {
 /// Something an employee asks for from the portal (src/lib/requests.ts): an official letter, a resignation, a salary advance or anything else.
 /// Approving a letter request issues the signed letter (letterId); approving an advance creates the pay item (payItemId).
 model EmployeeRequest {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   companyId     String
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employeeId    String
-  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  /// LETTER, RESIGNATION, ADVANCE or OTHER.
+  employee      Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// LETTER, RESIGNATION, ADVANCE, DOCUMENTS or OTHER.
   type          String
   /// LETTER: the letter kind asked for (REQUEST_LETTER_KINDS).
   letterKind    String?
@@ -420,17 +426,21 @@ model EmployeeRequest {
   /// ADVANCE: amount and number of monthly instalments.
   amount        Float?
   installments  Int?
+  /// DOCUMENTS: the held originals (HeldDocument ids) the employee wants back, and when they will return them (null = for good).
+  documentIds   String[]     @default([])
+  dueBack       DateTime?
+  custodyForm   CustodyForm?
   /// PENDING, APPROVED, REJECTED or CANCELLED (by the employee).
-  status        String    @default("PENDING")
+  status        String       @default("PENDING")
   decidedById   String?
   decidedByName String?
   decidedAt     DateTime?
   decisionNote  String?
-  letterId      String?   @unique
-  letter        Letter?   @relation(fields: [letterId], references: [id], onDelete: SetNull)
+  letterId      String?      @unique
+  letter        Letter?      @relation(fields: [letterId], references: [id], onDelete: SetNull)
   payItemId     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@index([companyId, status])
   @@index([employeeId])
@@ -974,6 +984,76 @@ model AssetEvent {
   createdAt    DateTime @default(now())
 
   @@index([assetId])
+}
+
+/// An original document the company keeps for an employee: passport, cards, certificates… (src/lib/custody.ts).
+model HeldDocument {
+  id         String        @id @default(cuid())
+  companyId  String
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// HELD_DOC_TYPES in src/lib/custody.ts.
+  type       String
+  /// Free name, e.g. the degree; shown instead of the type label when set.
+  title      String?
+  documentNo String?
+  /// HELD (with the company) or OUT (handed to the employee).
+  status     String        @default("HELD")
+  /// While OUT: the date it should come back; null = handed over for good.
+  dueBack    DateTime?
+  notes      String?
+  items      CustodyItem[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId])
+}
+
+/// A handover form: the company receiving originals from an employee (IN) or handing them over (OUT).
+model CustodyForm {
+  id             String           @id @default(cuid())
+  companyId      String
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// DC-2026-0001: per company and year.
+  refNo          String
+  /// IN or OUT.
+  direction      String
+  purpose        String?
+  /// OUT: when the employee should bring the documents back; null = for good.
+  dueBack        DateTime?
+  /// Who physically handed the documents over and who received them.
+  handedByName   String
+  receivedByName String
+  createdById    String?
+  createdByName  String?
+  /// Key of the employee's copy; the employee confirms it from the portal.
+  token          String           @unique
+  acknowledgedAt DateTime?
+  requestId      String?          @unique
+  request        EmployeeRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  items          CustodyItem[]
+  createdAt      DateTime         @default(now())
+
+  @@unique([companyId, refNo])
+  @@index([employeeId])
+}
+
+/// One document on a handover form; the label and number are copied so the form reads the same later.
+model CustodyItem {
+  id         String       @id @default(cuid())
+  formId     String
+  form       CustodyForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  documentId String
+  document   HeldDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  label      String
+  documentNo String?
+
+  @@unique([formId, documentId])
+  @@index([documentId])
 }
 
 /// Money an employee spent for work and claims back (src/lib/expenses.ts).

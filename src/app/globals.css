@@ -1018,6 +1018,24 @@ textarea:focus-visible {
   border-top: 1px solid var(--doc-gold-soft);
 }
 .letter-doc__pagefoot > span:last-child { text-align: end; }
+/* Custody forms: the list of original documents moving between the company and the employee. */
+.letter-doc__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+.letter-doc__table th,
+.letter-doc__table td {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--doc-gold-soft);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.letter-doc__table th { background: rgba(201, 168, 106, 0.1); color: var(--doc-ink); font-weight: 700; }
+.letter-doc__table th .letter-doc__bi { align-items: flex-start; }
+.letter-doc__table td:first-child { width: 2.4rem; text-align: center; }
 
 @container (max-width: 40rem) {
   .letter-doc__title { padding-inline: 0; }
@@ -1087,6 +1105,8 @@ textarea:focus-visible {
   .letter-doc__pagefoot { padding-top: 4mm; font-size: 7pt; }
   .letter-doc__pagefoot::before { top: 2mm; }
   .letter-doc a { color: inherit; text-decoration: none; }
+  .letter-doc__table th,
+  .letter-doc__table td { padding: 1mm 2mm; }
 }
 
 /* BHD app icons + switcher (docs/BHD-APP-SWITCHER.md). */

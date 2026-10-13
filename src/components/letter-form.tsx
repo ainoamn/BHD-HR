@@ -109,8 +109,9 @@ export function LetterForm({
         <input type="hidden" name="kind" value={kind} />
         {(
           [
-            [t("خطابات وإنذارات", "Letters and warnings"), WRITTEN_KINDS],
-            [t("شهادات ومستندات جاهزة (تُكتب تلقائياً من ملف الموظف)", "Ready certificates and documents (written from the employee's file)"), autoKinds],
+            [t("إنذارات وجزاءات وتحقيق", "Warnings, penalties and hearings"), WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === "discipline")],
+            [t("قرارات وإشعارات الموارد البشرية", "HR decisions and notices"), WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === "hr")],
+            [t("شهادات وخطابات جاهزة (تُكتب تلقائياً من ملف الموظف)", "Ready certificates and letters (written from the employee's file)"), autoKinds],
           ] as const
         ).map(([heading, options]) => (
           <div key={heading} className="space-y-2">
@@ -182,16 +183,47 @@ export function LetterForm({
           <div className="grid gap-4 sm:grid-cols-2">
             {LETTER_KIND[kind].document ? (
               <Field
-                label={kind === "SALARY_TRANSFER" ? t("اسم البنك (إن لم يُحدد في ملف الموظف)", "Bank name (if not in the employee's file)") : t("الجهة المقدَّمة إليها", "Addressed to")}
-                hint={kind === "SALARY_TRANSFER" ? undefined : t("اتركه فارغاً لـ «إلى من يهمه الأمر».", "Leave empty for “To whom it may concern”.")}
+                key={kind}
+                label={
+                  kind === "SALARY_TRANSFER" || kind === "BANK_ACCOUNT"
+                    ? t("اسم البنك (إن لم يُحدد في ملف الموظف)", "Bank name (if not in the employee's file)")
+                    : kind === "EMBASSY"
+                      ? t("السفارة", "Embassy")
+                      : t("الجهة المقدَّمة إليها", "Addressed to")
+                }
+                hint={
+                  kind === "BANK_ACCOUNT"
+                    ? t("يُطبع في الخطاب عنوان الموظف من ملفه وعنوان المنشأة وسجلها التجاري.", "The employee's address from their file and the company's address and CR number are printed.")
+                    : kind === "SALARY_TRANSFER"
+                      ? undefined
+                      : kind === "EMBASSY"
+                        ? t("مثال: سفارة المملكة المتحدة في مسقط", "e.g. British Embassy, Muscat")
+                        : t("اتركه فارغاً لـ «إلى من يهمه الأمر».", "Leave empty for “To whom it may concern”.")
+                }
               >
                 <input className={`${fieldClass} w-full`} name="addressee" defaultValue={request?.addressee || ""} maxLength={160} />
               </Field>
             ) : null}
-            {kind === "NOC" ? (
-              <Field label={t("الغرض من عدم الممانعة *", "No objection to *")} hint={t("مثل: السفر خارج السلطنة، أو استخراج رخصة قيادة.", "e.g. travelling abroad, or getting a driving licence.")}>
+            {kind === "NOC" || kind === "EMBASSY" ? (
+              <Field
+                key={`${kind}-purpose`}
+                label={kind === "EMBASSY" ? t("وجهة السفر وتواريخه والغرض *", "Destination, dates and purpose *") : t("الغرض من عدم الممانعة *", "No objection to *")}
+                hint={
+                  kind === "EMBASSY"
+                    ? t("مثل: سياحة في المملكة المتحدة من 1 إلى 15 ديسمبر 2026.", "e.g. tourism in the UK from 1 to 15 December 2026.")
+                    : t("مثل: السفر خارج السلطنة، أو استخراج رخصة قيادة.", "e.g. travelling abroad, or getting a driving licence.")
+                }
+              >
                 <input className={`${fieldClass} w-full`} name="purpose" defaultValue={request?.details || ""} maxLength={400} required />
               </Field>
+            ) : null}
+            {kind === "CLEARANCE" ? (
+              <p className="rounded-xl bg-slate-50 px-3.5 py-3 text-xs leading-5 text-slate-600 ring-1 ring-inset ring-slate-200 sm:col-span-2">
+                {t(
+                  "لا تصدر الشهادة إذا بقيت لدى الموظف عهدة مسجّلة في «العُهد والأصول»؛ سجّل استلامها أولاً. لمن انتهت خدمته تُذكر فترة عمله حتى تاريخ انتهاء العقد.",
+                  "The certificate won't issue while the employee still holds an asset recorded in “Assets & custody”; record its return first. For former staff, the period of service up to the contract end is stated.",
+                )}
+              </p>
             ) : null}
             {kind === "EXPERIENCE_CERTIFICATE" ? (
               <Field label={t("تاريخ انتهاء العمل (اختياري)", "End of service (optional)")} hint={t("اتركه فارغاً إن كان الموظف لا يزال على رأس عمله.", "Leave empty if the employee still works here.")}>

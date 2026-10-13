@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound } from "lucide-react";
+import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
 import { WorkSitePicker } from "@/components/work-site-picker";
 import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
@@ -25,7 +25,8 @@ import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
 import { sendPendingLetterCopies } from "@/server/letter-actions";
-import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateMemberAccess, updateProfile, updateSignatureSettings } from "@/server/settings-actions";
+import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateLetterIssuing, updateMemberAccess, updateProfile, updateSignatureSettings } from "@/server/settings-actions";
+import { AUTO_ISSUE_KINDS, LETTER_KIND, readAutoKinds } from "@/lib/letters";
 
 function SectionHead({ icon: Icon, title, text, children }: { icon: LucideIcon; title: string; text?: string; children?: React.ReactNode }) {
   return (
@@ -138,6 +139,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     ...(isAdmin
       ? [
           { id: "signature", label: t("التوقيع والختم", "Signature & stamp"), icon: PenLine },
+          { id: "letter-issuing", label: t("إصدار الخطابات المطلوبة", "Requested letters"), icon: Zap },
           { id: "channels", label: t("إرسال الخطابات", "Letter delivery"), icon: Send },
           { id: "roles", label: t("الأدوار والحسابات", "Roles & accounts"), icon: UsersRound },
           { id: "members", label: t("المستخدمون والصلاحيات", "Users & permissions"), icon: ShieldCheck },
@@ -145,6 +147,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       : []),
   ];
   const Chevron = lang === "en" ? ChevronRight : ChevronLeft;
+  const autoKinds = readAutoKinds(user.company.letterAutoKinds);
 
   return (
     <div className="page-wide">
@@ -487,6 +490,49 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <SubmitButton className="w-full sm:w-auto">
                     <Save size={16} />
                     {t("حفظ التوقيع والختم", "Save signature and stamp")}
+                  </SubmitButton>
+                </div>
+              </Card>
+            </form>
+          ) : null}
+
+          {isAdmin ? (
+            <form action={updateLetterIssuing}>
+              <Card id="letter-issuing" className="grid scroll-mt-24 gap-4">
+                <SectionHead
+                  icon={Zap}
+                  title={t("إصدار الخطابات المطلوبة من البوابة", "Letters requested in the portal")}
+                  text={t(
+                    "اختر الخطابات التي تصدر إلكترونياً فور طلب الموظف دون تدخل بشري، موقّعة باسم المفوّض بالتوقيع ومن بيانات ملفه. غير المختارة تنتظر موافقة يدوية في «طلبات الموظفين». إن نقصت بيانات في الملف يُحوَّل الطلب للموافقة اليدوية تلقائياً.",
+                    "Choose the letters issued electronically the moment an employee asks, with no one involved, signed in the authorised signatory's name from the employee's file. The rest wait for manual approval in “Employee requests”. If the file lacks data, the request falls back to manual approval.",
+                  )}
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {AUTO_ISSUE_KINDS.map((kind) => (
+                    <label
+                      key={kind}
+                      className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface p-3 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 has-[:checked]:bg-emerald-50/60 has-[:checked]:ring-emerald-300"
+                    >
+                      <input type="checkbox" name="autoKinds" value={kind} defaultChecked={autoKinds.includes(kind)} className="mt-1 size-4 accent-teal-700" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-slate-900">{pick(LETTER_KIND[kind].label, lang)}</span>
+                        <span className="block text-xs text-slate-500">
+                          {LETTER_KIND[kind].salary ? t("يُظهر الراتب", "Shows pay") : t("لا يُظهر الراتب", "No pay shown")}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs leading-5 text-slate-500">
+                  {t(
+                    "«خطاب آخر» بموضوع يكتبه الموظف، وقبول الاستقالة، والسلف، واستلام المستندات الأصلية تبقى دائماً بموافقة يدوية.",
+                    "“Another letter” with the employee's own subject, resignations, advances and collecting originals always need manual approval.",
+                  )}
+                </p>
+                <div className="flex justify-end">
+                  <SubmitButton className="w-full sm:w-auto">
+                    <Save size={16} />
+                    {t("حفظ طريقة الإصدار", "Save issuing")}
                   </SubmitButton>
                 </div>
               </Card>

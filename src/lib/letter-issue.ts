@@ -44,7 +44,8 @@ export async function issueLetter(input: {
   addresseeEn?: string | null;
   signatoryName?: string | null;
   signatoryTitle?: string | null;
-  user: { id: string; name: string };
+  /** id null = issued by the system on its own (an automatic request letter). */
+  user: { id: string | null; name: string };
   channels: Channel[];
   requestId?: string | null;
 }) {

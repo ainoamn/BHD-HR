@@ -2,12 +2,13 @@ import type { Bi } from "./i18n";
 import { LETTER_KIND, type LetterKind } from "./letters";
 import type { Permission } from "./permissions";
 
-export const REQUEST_TYPES = ["LETTER", "RESIGNATION", "ADVANCE", "OTHER"] as const;
+export const REQUEST_TYPES = ["LETTER", "DOCUMENTS", "RESIGNATION", "ADVANCE", "OTHER"] as const;
 export type RequestType = (typeof REQUEST_TYPES)[number];
 
 /** `perm` decides the request; a salary-revealing letter also needs salaries.view (canDecideRequest). */
 export const REQUEST_TYPE: Record<RequestType, { label: Bi; perm: Permission }> = {
   LETTER: { label: { ar: "طلب خطاب", en: "Letter request" }, perm: "letters.create" },
+  DOCUMENTS: { label: { ar: "طلب استلام مستندات أصلية", en: "Original documents request" }, perm: "documents.edit" },
   RESIGNATION: { label: { ar: "استقالة", en: "Resignation" }, perm: "employees.edit" },
   ADVANCE: { label: { ar: "طلب سلفة", en: "Advance request" }, perm: "salaries.create" },
   OTHER: { label: { ar: "طلب آخر", en: "Other request" }, perm: "employees.edit" },
@@ -16,6 +17,7 @@ export const REQUEST_TYPE: Record<RequestType, { label: Bi; perm: Permission }> 
 export const PERMISSION_TEXT: Record<string, Bi> = {
   "letters.create": { ar: "إصدار الخطابات", en: "issue letters" },
   "employees.edit": { ar: "تعديل الموظفين", en: "edit employees" },
+  "documents.edit": { ar: "تعديل المستندات", en: "edit documents" },
   "salaries.create": { ar: "إضافة بنود الرواتب", en: "add pay items" },
   "salaries.view": { ar: "عرض الرواتب", en: "view salaries" },
 };
@@ -29,6 +31,8 @@ export const REQUEST_STATUS: Record<string, { label: Bi; tone: string }> = {
 
 /** Labour Law notice for monthly-paid staff; the default last day of a resignation. */
 export const RESIGNATION_NOTICE_DAYS = 30;
+/** Longest an employee may keep originals taken from the company's safekeeping. */
+export const MAX_DOCUMENT_DAYS = 90;
 /** Open (pending) requests one employee may have at a time. */
 export const MAX_OPEN_REQUESTS = 8;
 export const MAX_ADVANCE_INSTALLMENTS = 24;

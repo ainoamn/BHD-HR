@@ -6,7 +6,7 @@ import { can, getSessionUser, requireAdmin, requirePermission } from "@/lib/auth
 import { CHANNELS, sendPendingCopies, type Channel } from "@/lib/delivery";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import { generateLetter } from "@/lib/letter-docs";
+import { generateLetter, issuerOf } from "@/lib/letter-docs";
 import { copyTarget, issueLetter } from "@/lib/letter-issue";
 import { isLetterKind, LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
@@ -48,18 +48,23 @@ export async function createLetters(formData: FormData) {
   const purpose = clip(str(formData, "purpose"), 400) || "";
   const endDate = parseDateInput(str(formData, "endDate"));
   const channels = wantedChannels(formData);
+  const openAssets =
+    kind === "CLEARANCE"
+      ? await prisma.asset.groupBy({ by: ["employeeId"], where: { companyId: user.companyId, employeeId: { in: employees.map((employee) => employee.id) }, status: "ASSIGNED" }, _count: true })
+      : [];
 
   const drafts = employees.map((employee) => {
     if (!meta.auto) return { employee, text: { subject, subjectEn: clip(str(formData, "subjectEn"), 200), body, bodyEn: clip(str(formData, "bodyEn"), 8000), addressee: null, addresseeEn: null } };
     const result = generateLetter(kind, {
       employee,
-      issuer: { name: employee.employer?.name || user.company.name, nameEn: employee.employer ? employee.employer.nameEn : user.company.nameEn },
+      issuer: issuerOf(employee.employer, user.company),
       addressee,
       purpose,
-      endDate,
+      endDate: endDate || (kind === "CLEARANCE" && employee.status === "TERMINATED" ? employee.contractEnd : null),
       gross: packageGross(employee),
       currency: user.company.currency,
       lastDay: employee.contractEnd,
+      openAssets: openAssets.find((item) => item.employeeId === employee.id)?._count || 0,
     });
     if ("error" in result) go(back, { error: `${employee.fullName}: ${result.error[lang]}` });
     return { employee, text: (result as Extract<typeof result, { letter: unknown }>).letter };

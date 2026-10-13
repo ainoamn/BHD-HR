@@ -4,12 +4,13 @@ import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
 import { pick } from "@/lib/i18n";
+import { heldDocLabel } from "@/lib/custody";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { PERMISSION_TEXT, REQUEST_TYPE, canDecideRequest, requestPermissions, requestTitle, type RequestType } from "@/lib/requests";
 import { formatDate, formatDateTime, money, toDateInput } from "@/lib/utils";
 import { decideEmployeeRequest } from "@/server/employee-request-actions";
 
-const TYPE_TONE: Record<string, string> = { LETTER: "teal", RESIGNATION: "red", ADVANCE: "gold", OTHER: "slate" };
+const TYPE_TONE: Record<string, string> = { LETTER: "teal", DOCUMENTS: "sky", RESIGNATION: "red", ADVANCE: "gold", OTHER: "slate" };
 
 export type PendingEmployeeRequest = {
   id: string;
@@ -22,7 +23,19 @@ export type PendingEmployeeRequest = {
   amount: number | null;
   installments: number | null;
   createdAt: Date;
-  employee: { id: string; fullName: string; nameEn: string | null; employeeNumber: string; joiningDate: Date | null; bankAccount: string | null };
+  documentIds?: string[];
+  dueBack?: Date | null;
+  employee: {
+    id: string;
+    fullName: string;
+    nameEn: string | null;
+    employeeNumber: string;
+    joiningDate: Date | null;
+    bankAccount: string | null;
+    address?: string | null;
+    passportNumber?: string | null;
+    heldDocuments?: { id: string; type: string; title: string | null; documentNo: string | null; status: string }[];
+  };
 };
 
 function nextMonthInput() {
@@ -52,11 +65,21 @@ export function EmployeeRequestCard({
   const written = type === "LETTER" && request.letterKind === "GENERAL";
   const decide = canDecideRequest(user, request);
   const name = lang === "en" && request.employee.nameEn ? request.employee.nameEn : request.employee.fullName;
-  const missingBank = request.letterKind === "SALARY_TRANSFER" && !request.employee.bankAccount;
+  const missing =
+    request.letterKind === "SALARY_TRANSFER" && !request.employee.bankAccount
+      ? t("لا يوجد رقم حساب بنكي في ملف الموظف؛ أضفه أولاً ثم اعتمد.", "The employee's file has no bank account; add it first, then approve.")
+      : request.letterKind === "BANK_ACCOUNT" && !request.employee.address
+        ? t("لا يوجد عنوان سكن في ملف الموظف، وخطاب فتح الحساب يتطلبه؛ أضفه أولاً ثم اعتمد.", "The employee's file has no home address, which the account-opening letter needs; add it first, then approve.")
+        : request.letterKind === "EMBASSY" && !request.employee.passportNumber
+          ? t("لا يوجد رقم جواز في ملف الموظف، وخطاب السفارة يتطلبه؛ أضفه أولاً ثم اعتمد.", "The employee's file has no passport number, which the embassy letter needs; add it first, then approve.")
+          : null;
+  const requested = type === "DOCUMENTS" ? (request.employee.heldDocuments || []).filter((doc) => request.documentIds?.includes(doc.id)) : [];
   const label = (text: string) => <span>{text}</span>;
   const approveLabel =
     type === "LETTER"
       ? t("اعتماد وإصدار الخطاب موقّعاً", "Approve and issue signed letter")
+      : type === "DOCUMENTS"
+        ? t("اعتماد وإصدار استمارة التسليم", "Approve and issue handover form")
       : type === "RESIGNATION"
         ? t("قبول الاستقالة", "Accept resignation")
         : type === "ADVANCE"
@@ -87,6 +110,26 @@ export function EmployeeRequestCard({
                 {request.employee.joiningDate ? ` · ${t("التحق", "Joined")} ${formatDate(request.employee.joiningDate)}` : ""}
               </p>
             ) : null}
+            {requested.length ? (
+              <ul className="my-1 space-y-1">
+                {requested.map((doc) => (
+                  <li key={doc.id} className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-semibold text-slate-800">{pick(heldDocLabel(doc), lang)}</span>
+                    {doc.documentNo ? (
+                      <span className="text-xs text-slate-500" dir="ltr">
+                        {doc.documentNo}
+                      </span>
+                    ) : null}
+                    {doc.status !== "HELD" ? <ToneBadge tone="amber">{t("ليس محفوظاً الآن", "Not held now")}</ToneBadge> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {request.dueBack ? (
+              <p>
+                {t("يعيدها بتاريخ:", "Returns them on:")} <strong>{formatDate(request.dueBack)}</strong>
+              </p>
+            ) : null}
             {request.amount ? (
               <p>
                 {t("المبلغ:", "Amount:")} <strong className="tabular">{money(request.amount, currency)}</strong> · {request.installments || 1} {t("قسط", "instalment(s)")}
@@ -114,7 +157,11 @@ export function EmployeeRequestCard({
           <input type="hidden" name="returnTo" value="/approvals#requests" />
           {type === "LETTER" && !written && letterMeta?.document ? (
             <label className="block min-w-0 space-y-1 text-xs text-slate-500">
-              {label(request.letterKind === "SALARY_TRANSFER" ? t("اسم البنك (إن لم يُحدد في الملف)", "Bank (if not in the file)") : t("موجّه إلى (فارغ = إلى من يهمه الأمر)", "Addressed to (empty = to whom it may concern)"))}
+              {label(
+                request.letterKind === "SALARY_TRANSFER" || request.letterKind === "BANK_ACCOUNT"
+                  ? t("اسم البنك (إن لم يُحدد في الملف)", "Bank (if not in the file)")
+                  : t("موجّه إلى (فارغ = إلى من يهمه الأمر)", "Addressed to (empty = to whom it may concern)"),
+              )}
               <input className={`${fieldClass} w-full`} name="addressee" defaultValue={request.addressee || ""} maxLength={160} />
             </label>
           ) : null}
@@ -122,6 +169,12 @@ export function EmployeeRequestCard({
             <label className="block min-w-0 space-y-1 text-xs text-slate-500">
               {label(t("آخر يوم عمل معتمد", "Approved last working day"))}
               <input className={`${fieldClass} w-full`} type="date" name="lastDay" defaultValue={toDateInput(request.lastDay)} required />
+            </label>
+          ) : null}
+          {type === "DOCUMENTS" ? (
+            <label className="block min-w-0 space-y-1 text-xs text-slate-500">
+              {label(t("موعد الإعادة المعتمد", "Approved return date"))}
+              <input className={`${fieldClass} w-full`} type="date" name="dueBack" defaultValue={toDateInput(request.dueBack || null)} required />
             </label>
           ) : null}
           {type === "ADVANCE" ? (
@@ -144,9 +197,9 @@ export function EmployeeRequestCard({
             {label(t("ملاحظة للموظف (اختياري)", "Note to the employee (optional)"))}
             <input className={`${fieldClass} w-full`} name="decisionNote" maxLength={500} />
           </label>
-          {missingBank ? (
+          {missing ? (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-inset ring-amber-200 sm:col-span-2">
-              {t("لا يوجد رقم حساب بنكي في ملف الموظف؛ أضفه أولاً ثم اعتمد.", "The employee's file has no bank account; add it first, then approve.")}{" "}
+              {missing}{" "}
               <Link href={`/employees/${request.employee.id}/edit`} className="font-bold underline underline-offset-2">
                 {t("تعديل الملف", "Edit file")}
               </Link>

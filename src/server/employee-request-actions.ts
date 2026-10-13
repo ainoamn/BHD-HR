@@ -2,18 +2,16 @@
 
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
-import { CHANNELS, sendPendingCopies } from "@/lib/delivery";
+import { createCustodyForm } from "@/lib/custody";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import { generateLetter } from "@/lib/letter-docs";
-import { issueLetter } from "@/lib/letter-issue";
-import { LETTER_KIND, REQUEST_LETTER_KINDS, type LetterKind } from "@/lib/letters";
+import { PURPOSE_KINDS, REQUEST_LETTER_KINDS } from "@/lib/letters";
 import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { portalEmployee } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
+import { AUTO_ACTOR_NAME, issueRequestedLetter, issuesOnItsOwn } from "@/lib/request-letters";
 import { requestOrigin } from "@/lib/request-origin";
-import { MAX_ADVANCE_INSTALLMENTS, MAX_OPEN_REQUESTS, canDecideRequest, isRequestType, requestTitle } from "@/lib/requests";
-import { packageGross } from "@/lib/salary";
+import { MAX_ADVANCE_INSTALLMENTS, MAX_DOCUMENT_DAYS, MAX_OPEN_REQUESTS, canDecideRequest, isRequestType, requestTitle } from "@/lib/requests";
 import { clip, formatDate, intValue, money, num, parseDateInput, req, round3, safeReturn, str, todayInputValue } from "@/lib/utils";
 
 const TX = { maxWait: 10_000, timeout: 30_000 };
@@ -51,6 +49,8 @@ export async function submitEmployeeRequest(formData: FormData) {
     lastDay?: Date;
     amount?: number;
     installments?: number;
+    documentIds?: string[];
+    dueBack?: Date;
   } = { type, details };
 
   if (type === "LETTER") {
@@ -59,7 +59,9 @@ export async function submitEmployeeRequest(formData: FormData) {
     if (letterKind !== "GENERAL" && open.some((item) => item.type === "LETTER" && item.letterKind === letterKind)) {
       fail("لديك طلب مماثل بانتظار الاعتماد", "You already have the same request awaiting approval");
     }
-    if (letterKind === "NOC" && (details?.length || 0) < 3) fail("اكتب الغرض من شهادة عدم الممانعة", "Write what the no-objection certificate is for");
+    if ((PURPOSE_KINDS as readonly string[]).includes(letterKind) && (details?.length || 0) < 3) {
+      fail(letterKind === "EMBASSY" ? "اكتب وجهة السفر وتواريخه والغرض منه" : "اكتب الغرض من شهادة عدم الممانعة", letterKind === "EMBASSY" ? "Write the travel destination, dates and purpose" : "Write what the no-objection certificate is for");
+    }
     const subject = clip(str(formData, "subject"), 120);
     if (letterKind === "GENERAL" && (!subject || subject.length < 2)) fail("اكتب موضوع الخطاب المطلوب", "Write the subject of the letter you need");
     data.letterKind = letterKind;
@@ -72,6 +74,23 @@ export async function submitEmployeeRequest(formData: FormData) {
     const existing = await prisma.employeeRequest.count({ where: { employeeId: employee.id, type: "RESIGNATION", status: { in: ["PENDING", "APPROVED"] } } });
     if (existing) fail("لديك استقالة مقدّمة مسبقاً", "You have already submitted a resignation");
     data.lastDay = lastDay!;
+  } else if (type === "DOCUMENTS") {
+    const wanted = [...new Set(formData.getAll("documentIds").map(String))].slice(0, 30);
+    const held = wanted.length
+      ? await prisma.heldDocument.findMany({ where: { id: { in: wanted }, employeeId: employee.id, status: "HELD" }, select: { id: true } })
+      : [];
+    if (!held.length) fail("اختر المستندات التي تريد استلامها", "Choose the documents you want to collect");
+    const pending = await prisma.employeeRequest.findMany({ where: { employeeId: employee.id, type: "DOCUMENTS", status: "PENDING" }, select: { documentIds: true } });
+    const asked = new Set(pending.flatMap((item) => item.documentIds));
+    if (held.some((doc) => asked.has(doc.id))) fail("لديك طلب بانتظار الاعتماد يشمل بعض هذه المستندات", "A pending request of yours already includes some of these documents");
+    if ((details?.length || 0) < 3) fail("اكتب الغرض من استلام المستندات", "Write why you need the documents");
+    const dueBack = parseDateInput(str(formData, "dueBack"));
+    const latest = new Date(today().getTime() + MAX_DOCUMENT_DAYS * 86_400_000);
+    if (!dueBack || dueBack < today() || dueBack > latest) {
+      fail(`اختر تاريخ إعادة المستندات (خلال ${MAX_DOCUMENT_DAYS} يوماً)`, `Choose when you will return the documents (within ${MAX_DOCUMENT_DAYS} days)`);
+    }
+    data.documentIds = held.map((doc) => doc.id);
+    data.dueBack = dueBack!;
   } else if (type === "ADVANCE") {
     const amount = round3(num(formData, "amount"));
     const installments = intValue(formData, "installments") || 1;
@@ -94,6 +113,28 @@ export async function submitEmployeeRequest(formData: FormData) {
     action: "EMPLOYEE_REQUEST",
     message: `قدّم ${employee.fullName} من البوابة: ${requestTitle(request).ar}`,
   });
+
+  if (request.type === "LETTER" && issuesOnItsOwn(employee.company, request.letterKind)) {
+    const issued = await issueRequestedLetter({
+      request: { ...request, employee },
+      company: employee.company,
+      actor: { id: null, name: AUTO_ACTOR_NAME },
+      origin: await requestOrigin(),
+    });
+    refreshAll();
+    if ("letter" in issued) {
+      go(back, { message: t(`صدر الخطاب ${issued.letter.refNo} إلكترونياً وموقّعاً، وتجده في «خطاباتي».`, `Letter ${issued.letter.refNo} was issued and e-signed at once; find it under “My letters”.`) });
+    }
+    if ("error" in issued) {
+      go(back, {
+        message: t(
+          `أُرسل الطلب إلى الإدارة لإكماله يدوياً (${issued.error.ar}).`,
+          `Request sent to management to complete by hand (${issued.error.en}).`,
+        ),
+      });
+    }
+  }
+
   refreshAll();
   go(back, {
     message:
@@ -163,7 +204,6 @@ export async function decideEmployeeRequest(formData: FormData) {
 
   if (item.type === "LETTER" && item.letterKind === "GENERAL") go(`/letters/new?requestId=${item.id}`);
 
-  const issuer = { name: employee.employer?.name || user.company.name, nameEn: employee.employer ? employee.employer.nameEn : user.company.nameEn };
   const claim = async () => {
     const updated = await prisma.employeeRequest.updateMany({ where: { id: item.id, status: "PENDING" }, data: { status: "APPROVED", ...decided } });
     if (!updated.count) fail("سبق البتّ في هذا الطلب", "This request was already decided");
@@ -172,47 +212,50 @@ export async function decideEmployeeRequest(formData: FormData) {
   let message = t("تم اعتماد الطلب", "Request approved");
 
   if (item.type === "LETTER" || item.type === "RESIGNATION") {
-    const kind: LetterKind = item.type === "RESIGNATION" ? "RESIGNATION_ACCEPTANCE" : (item.letterKind as LetterKind);
-    if (!LETTER_KIND[kind]?.auto) fail("نوع الخطاب غير معروف", "Unknown letter type");
-    const lastDay = item.type === "RESIGNATION" ? parseDateInput(str(formData, "lastDay")) || item.lastDay : null;
-    if (item.type === "RESIGNATION" && !lastDay) fail("حدد آخر يوم عمل", "Set the last working day");
-    const generated = generateLetter(kind, {
-      employee,
-      issuer,
-      addressee: clip(str(formData, "addressee"), 160) ?? item.addressee ?? "",
-      purpose: item.details || "",
-      endDate: employee.status === "TERMINATED" ? employee.contractEnd : null,
-      gross: packageGross(employee),
-      currency: user.company.currency,
-      lastDay,
-      submittedAt: item.createdAt,
+    const issued = await issueRequestedLetter({
+      request: item,
+      company: user.company,
+      actor: { id: user.id, name: user.name },
+      origin: await requestOrigin(),
+      addressee: clip(str(formData, "addressee"), 160),
+      lastDay: item.type === "RESIGNATION" ? parseDateInput(str(formData, "lastDay")) : null,
+      decisionNote: note,
     });
-    if ("error" in generated) go(back, { error: generated.error[lang] });
-    const text = (generated as Extract<typeof generated, { letter: unknown }>).letter;
-    await claim();
-    let letter: { id: string; refNo: string };
-    try {
-      if (lastDay) await prisma.employee.update({ where: { id: employee.id }, data: { contractEnd: lastDay } });
-      letter = await issueLetter({
-        companyId: user.companyId,
-        employee,
-        kind,
-        issuedAt: today(),
-        ...text,
-        user,
-        channels: [...CHANNELS],
-        requestId: item.id,
-      });
-    } catch (error) {
-      await release();
-      if (lastDay) await prisma.employee.update({ where: { id: employee.id }, data: { contractEnd: employee.contractEnd } });
-      throw error;
-    }
-    await sendPendingCopies(user.companyId, await requestOrigin(), [letter.id]);
+    if ("error" in issued) go(back, { error: issued.error[lang] });
+    const { letter, lastDay } = issued as Extract<typeof issued, { letter: unknown }>;
     message =
       item.type === "RESIGNATION"
         ? t(`قُبلت الاستقالة وصدر خطاب القبول ${letter.refNo}. آخر يوم عمل: ${formatDate(lastDay)}`, `Resignation accepted; acceptance letter ${letter.refNo} issued. Last day: ${formatDate(lastDay)}`)
         : t(`اعتُمد الطلب وصدر الخطاب ${letter.refNo} موقّعاً إلكترونياً`, `Approved; letter ${letter.refNo} issued and e-signed`);
+  } else if (item.type === "DOCUMENTS") {
+    const dueBack = parseDateInput(str(formData, "dueBack")) || item.dueBack;
+    if (!dueBack || dueBack < today()) fail("حدد تاريخ إعادة المستندات", "Set the date the documents are due back");
+    await claim();
+    let form: Awaited<ReturnType<typeof createCustodyForm>>;
+    try {
+      form = await createCustodyForm({
+        companyId: user.companyId,
+        employee,
+        direction: "OUT",
+        documentIds: item.documentIds,
+        purpose: item.details,
+        dueBack,
+        staffName: user.name,
+        user: { id: user.id, name: user.name },
+        requestId: item.id,
+      });
+    } catch (error) {
+      await release();
+      throw error;
+    }
+    if (!form) {
+      await release();
+      fail("المستندات المطلوبة لم تعد محفوظة لدى المنشأة", "The requested documents are no longer held by the company");
+    }
+    message = t(
+      `اعتُمد الطلب وصدرت استمارة التسليم ${form!.refNo} (${form!.count} مستند). يُقرّ الموظف بالاستلام من بوابته.`,
+      `Approved; handover form ${form!.refNo} issued (${form!.count} document(s)). The employee acknowledges receipt in their portal.`,
+    );
   } else if (item.type === "ADVANCE") {
     const amount = round3(num(formData, "amount")) || item.amount || 0;
     const installments = intValue(formData, "installments") || item.installments || 1;

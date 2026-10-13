@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ChevronDown, FilePlus2, Files, Paperclip } from "lucide-react";
+import { ChevronDown, FilePlus2, Files, FolderLock, Paperclip } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
-import { PageHeader, ToneBadge, fieldClass, linkAction } from "@/components/ui";
+import { PageHeader, ToneBadge, fieldClass, linkAction, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
 import { collectDocuments } from "@/lib/documents";
@@ -59,7 +59,12 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         icon={Files}
         title={t("المستندات", "Documents")}
         description={t("البطاقة والجواز والإقامة وبقية الوثائق، مع حالة الانتهاء.", "ID card, passport, residence and other documents, with expiry status.")}
-      />
+      >
+        <Link href="/documents/custody" className={secondaryBtn}>
+          <FolderLock size={16} />
+          {t("المستندات الأصلية في العهدة", "Originals in custody")}
+        </Link>
+      </PageHeader>
       <Flash error={sp.error} message={sp.message} />
       {pendingReview ? (
         <Link

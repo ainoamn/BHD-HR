@@ -3,38 +3,75 @@ import { formatDate } from "./utils";
 
 export const LETTER_KINDS = [
   "NOTICE",
+  "ABSENCE_INQUIRY",
   "WARNING_1",
   "WARNING_2",
   "FINAL_WARNING",
+  "INVESTIGATION",
+  "DEDUCTION_NOTICE",
   "APPRECIATION",
+  "PROMOTION",
+  "SALARY_INCREASE",
+  "PROBATION_CONFIRMATION",
+  "TRANSFER",
+  "CONTRACT_RENEWAL",
+  "NON_RENEWAL",
+  "TERMINATION",
+  "LEAVE_APPROVAL",
+  "RETURN_TO_WORK",
   "GENERAL",
   "SALARY_CERTIFICATE",
   "EMPLOYMENT_CERTIFICATE",
   "EXPERIENCE_CERTIFICATE",
   "SALARY_TRANSFER",
+  "BANK_ACCOUNT",
+  "EMBASSY",
   "NOC",
+  "CLEARANCE",
   "RESIGNATION_ACCEPTANCE",
 ] as const;
 export type LetterKind = (typeof LETTER_KINDS)[number];
+
+/** Where a kind sits in the letter form: discipline, HR decisions and notices, or ready documents. */
+export type LetterGroup = "discipline" | "hr" | "ready";
 
 /**
  * `auto`: the text is written from the employee's file (src/lib/letter-docs.ts), not typed.
  * `document`: addressed to a third party (to whom it may concern), so there is no employee acknowledgement block.
  * `salary`: reveals pay, so issuing it also needs salaries.view.
+ * `warning`: printed in red with “Private & Confidential”; `confidential` adds only the mark.
  */
-export const LETTER_KIND: Record<LetterKind, { label: Bi; tone: string; warning: boolean; auto?: boolean; document?: boolean; salary?: boolean }> = {
-  NOTICE: { label: { ar: "لفت نظر", en: "Notice" }, tone: "amber", warning: false },
-  WARNING_1: { label: { ar: "إنذار أول", en: "First warning" }, tone: "orange", warning: true },
-  WARNING_2: { label: { ar: "إنذار ثانٍ", en: "Second warning" }, tone: "red", warning: true },
-  FINAL_WARNING: { label: { ar: "إنذار نهائي", en: "Final warning" }, tone: "red", warning: true },
-  APPRECIATION: { label: { ar: "شكر وتقدير", en: "Appreciation" }, tone: "green", warning: false },
-  GENERAL: { label: { ar: "خطاب", en: "Letter" }, tone: "slate", warning: false },
-  SALARY_CERTIFICATE: { label: { ar: "شهادة راتب", en: "Salary certificate" }, tone: "teal", warning: false, auto: true, document: true, salary: true },
-  EMPLOYMENT_CERTIFICATE: { label: { ar: "شهادة بيانات موظف", en: "Employment certificate" }, tone: "teal", warning: false, auto: true, document: true },
-  EXPERIENCE_CERTIFICATE: { label: { ar: "شهادة خبرة", en: "Experience certificate" }, tone: "teal", warning: false, auto: true, document: true },
-  SALARY_TRANSFER: { label: { ar: "رسالة تحويل راتب", en: "Salary transfer letter" }, tone: "teal", warning: false, auto: true, document: true, salary: true },
-  NOC: { label: { ar: "شهادة عدم ممانعة", en: "No-objection certificate" }, tone: "teal", warning: false, auto: true, document: true },
-  RESIGNATION_ACCEPTANCE: { label: { ar: "قبول استقالة", en: "Resignation acceptance" }, tone: "slate", warning: false, auto: true },
+export const LETTER_KIND: Record<
+  LetterKind,
+  { label: Bi; tone: string; group: LetterGroup; warning: boolean; confidential?: boolean; auto?: boolean; document?: boolean; salary?: boolean }
+> = {
+  NOTICE: { label: { ar: "لفت نظر", en: "Notice" }, tone: "amber", group: "discipline", warning: false },
+  ABSENCE_INQUIRY: { label: { ar: "استفسار عن غياب", en: "Absence inquiry" }, tone: "amber", group: "discipline", warning: false, confidential: true },
+  WARNING_1: { label: { ar: "إنذار أول", en: "First warning" }, tone: "orange", group: "discipline", warning: true },
+  WARNING_2: { label: { ar: "إنذار ثانٍ", en: "Second warning" }, tone: "red", group: "discipline", warning: true },
+  FINAL_WARNING: { label: { ar: "إنذار نهائي", en: "Final warning" }, tone: "red", group: "discipline", warning: true },
+  INVESTIGATION: { label: { ar: "استدعاء للتحقيق", en: "Disciplinary hearing" }, tone: "red", group: "discipline", warning: true },
+  DEDUCTION_NOTICE: { label: { ar: "إشعار جزاء بالخصم", en: "Deduction penalty notice" }, tone: "red", group: "discipline", warning: true },
+  APPRECIATION: { label: { ar: "شكر وتقدير", en: "Appreciation" }, tone: "green", group: "hr", warning: false },
+  PROMOTION: { label: { ar: "ترقية", en: "Promotion" }, tone: "green", group: "hr", warning: false, confidential: true },
+  SALARY_INCREASE: { label: { ar: "زيادة راتب", en: "Salary increase" }, tone: "green", group: "hr", warning: false, confidential: true },
+  PROBATION_CONFIRMATION: { label: { ar: "تثبيت بعد فترة التجربة", en: "Confirmation after probation" }, tone: "green", group: "hr", warning: false },
+  TRANSFER: { label: { ar: "نقل أو تكليف", en: "Transfer or assignment" }, tone: "sky", group: "hr", warning: false },
+  CONTRACT_RENEWAL: { label: { ar: "تجديد عقد العمل", en: "Contract renewal" }, tone: "teal", group: "hr", warning: false },
+  NON_RENEWAL: { label: { ar: "عدم تجديد العقد", en: "Contract non-renewal" }, tone: "slate", group: "hr", warning: false, confidential: true },
+  TERMINATION: { label: { ar: "إنهاء خدمة", en: "Termination of employment" }, tone: "red", group: "hr", warning: false, confidential: true },
+  LEAVE_APPROVAL: { label: { ar: "الموافقة على إجازة", en: "Leave approval" }, tone: "sky", group: "hr", warning: false },
+  RETURN_TO_WORK: { label: { ar: "إشعار مباشرة عمل", en: "Return-to-work notice" }, tone: "sky", group: "hr", warning: false },
+  GENERAL: { label: { ar: "خطاب", en: "Letter" }, tone: "slate", group: "hr", warning: false },
+  SALARY_CERTIFICATE: { label: { ar: "شهادة راتب", en: "Salary certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true, salary: true },
+  EMPLOYMENT_CERTIFICATE: { label: { ar: "شهادة بيانات موظف", en: "Employment certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true },
+  EXPERIENCE_CERTIFICATE: { label: { ar: "شهادة خبرة", en: "Experience certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true },
+  SALARY_TRANSFER: { label: { ar: "رسالة تحويل راتب", en: "Salary transfer letter" }, tone: "teal", group: "ready", warning: false, auto: true, document: true, salary: true },
+  BANK_ACCOUNT: { label: { ar: "خطاب فتح حساب بنكي", en: "Bank account opening letter" }, tone: "teal", group: "ready", warning: false, auto: true, document: true, salary: true },
+  EMBASSY: { label: { ar: "خطاب إلى سفارة (تأشيرة)", en: "Embassy letter (visa)" }, tone: "teal", group: "ready", warning: false, auto: true, document: true, salary: true },
+  NOC: { label: { ar: "شهادة عدم ممانعة", en: "No-objection certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true },
+  CLEARANCE: { label: { ar: "شهادة إخلاء طرف", en: "Clearance certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true },
+  RESIGNATION_ACCEPTANCE: { label: { ar: "قبول استقالة", en: "Resignation acceptance" }, tone: "slate", group: "ready", warning: false, auto: true },
 };
 
 export function isLetterKind(value: string): value is LetterKind {
@@ -44,8 +81,27 @@ export function isLetterKind(value: string): value is LetterKind {
 /** Kinds written by hand in the letter form; the rest are generated from the employee's file. */
 export const WRITTEN_KINDS = LETTER_KINDS.filter((kind) => !LETTER_KIND[kind].auto);
 /** Kinds an employee can ask for from the portal, plus GENERAL for anything else. */
-export const REQUEST_LETTER_KINDS = ["SALARY_CERTIFICATE", "EMPLOYMENT_CERTIFICATE", "EXPERIENCE_CERTIFICATE", "SALARY_TRANSFER", "NOC", "GENERAL"] as const satisfies readonly LetterKind[];
+export const REQUEST_LETTER_KINDS = [
+  "SALARY_CERTIFICATE",
+  "EMPLOYMENT_CERTIFICATE",
+  "EXPERIENCE_CERTIFICATE",
+  "SALARY_TRANSFER",
+  "BANK_ACCOUNT",
+  "EMBASSY",
+  "NOC",
+  "CLEARANCE",
+  "GENERAL",
+] as const satisfies readonly LetterKind[];
 export type RequestLetterKind = (typeof REQUEST_LETTER_KINDS)[number];
+/** Requested kinds the company may let the system issue at once (Company.letterAutoKinds); GENERAL is always written by a person. */
+export const AUTO_ISSUE_KINDS = REQUEST_LETTER_KINDS.filter((kind) => kind !== "GENERAL");
+/** Requested kinds whose “details” field carries what the letter is for. */
+export const PURPOSE_KINDS: readonly LetterKind[] = ["NOC", "EMBASSY"];
+
+export function readAutoKinds(value: unknown): LetterKind[] {
+  if (!Array.isArray(value)) return [];
+  return AUTO_ISSUE_KINDS.filter((kind) => value.includes(kind));
+}
 
 export const WARNING_KINDS: LetterKind[] = ["WARNING_1", "WARNING_2", "FINAL_WARNING"];
 
@@ -87,11 +143,88 @@ export const LETTER_TEMPLATES: Record<LetterKind, { subject: string; subjectEn: 
     bodyEn:
       "Despite the previous warnings issued to you, the following violation has recurred:\n{reason}\n\nWe therefore issue you this final warning. Please note that any further violation after this warning may lead to the termination of your employment under the Labour Law and the penalties policy.",
   },
+  ABSENCE_INQUIRY: {
+    subject: "استفسار عن غياب",
+    subjectEn: "Absence Inquiry",
+    body: "تبيّن تغيّبكم عن العمل دون إذن مسبق أو عذر مقبول، وذلك:\n{reason}\n\nلذا نرجو تقديم مبرراتكم كتابياً خلال ثلاثة أيام عمل من تاريخ استلام هذا الخطاب، مع إرفاق ما يثبتها. وفي حال عدم الرد خلال المدة المحددة ستُتخذ الإجراءات المنصوص عليها في لائحة الجزاءات وقانون العمل.",
+    bodyEn:
+      "Our records show that you were absent from work without prior permission or an acceptable excuse, as follows:\n{reason}\n\nPlease explain your absence in writing within three working days of receiving this letter, with any supporting evidence. If no reply is received within this period, the measures set out in the penalties policy and the Labour Law will be taken.",
+  },
+  INVESTIGATION: {
+    subject: "استدعاء للتحقيق",
+    subjectEn: "Notice of Disciplinary Hearing",
+    body: "تقرر إحالتكم إلى التحقيق الإداري بشأن ما نُسب إليكم، وذلك على النحو التالي:\n{reason}\n\nلذا نرجو حضوركم في الموعد والمكان المحددين لسماع أقوالكم وتقديم ما لديكم من دفاع ومستندات. ويُعدّ تخلّفكم عن الحضور دون عذر مقبول تنازلاً عن حقكم في إبداء دفاعكم.",
+    bodyEn:
+      "It has been decided to refer you to an administrative investigation regarding the following:\n{reason}\n\nPlease attend at the stated time and place to give your statement and present any defence and documents. Failure to attend without an acceptable excuse will be treated as waiving your right to present a defence.",
+  },
+  DEDUCTION_NOTICE: {
+    subject: "إشعار جزاء بالخصم من الراتب",
+    subjectEn: "Notice of Salary Deduction Penalty",
+    body: "بالإشارة إلى المخالفة المنسوبة إليكم والمتمثلة في:\n{reason}\n\nوبعد الاطلاع على ملابساتها، تقرر توقيع جزاء الخصم من راتبكم وفق لائحة الجزاءات المعتمدة وأحكام قانون العمل. ونأمل منكم الالتزام بأنظمة العمل وعدم تكرار المخالفة.",
+    bodyEn:
+      "With reference to the violation attributed to you, namely:\n{reason}\n\nHaving reviewed its circumstances, a salary deduction penalty has been imposed in line with the approved penalties policy and the Labour Law. We expect you to comply with the work rules and not to repeat the violation.",
+  },
   APPRECIATION: {
     subject: "شكر وتقدير",
     subjectEn: "Letter of Appreciation",
     body: "يسرّ الإدارة أن تتقدم إليكم بخالص الشكر والتقدير على:\n{reason}\n\nمتمنين لكم دوام التوفيق والنجاح، ومواصلة العطاء والتميّز.",
     bodyEn: "The management is pleased to extend its sincere thanks and appreciation for:\n{reason}\n\nWe wish you continued success and look forward to your ongoing dedication and excellence.",
+  },
+  PROMOTION: {
+    subject: "ترقية",
+    subjectEn: "Promotion",
+    body: "يسرّ الإدارة أن تبلغكم بقرار ترقيتكم، وذلك على النحو التالي:\n{reason}\n\nوتأتي هذه الترقية تقديراً لجهودكم وكفاءتكم، متمنين لكم مزيداً من التوفيق والنجاح في مهامكم الجديدة.",
+    bodyEn: "The management is pleased to inform you of your promotion, as follows:\n{reason}\n\nThis promotion recognises your efforts and competence. We wish you every success in your new role.",
+  },
+  SALARY_INCREASE: {
+    subject: "زيادة الراتب",
+    subjectEn: "Salary Increase",
+    body: "يسرّ الإدارة إبلاغكم بالموافقة على زيادة راتبكم، وذلك على النحو التالي:\n{reason}\n\nوتأتي هذه الزيادة تقديراً لأدائكم، مع بقاء سائر شروط عقد العمل دون تغيير.",
+    bodyEn: "The management is pleased to inform you that your salary has been increased, as follows:\n{reason}\n\nThis increase recognises your performance. All other terms of your employment contract remain unchanged.",
+  },
+  PROBATION_CONFIRMATION: {
+    subject: "تثبيت بعد فترة التجربة",
+    subjectEn: "Confirmation of Employment",
+    body: "يسرّنا إبلاغكم بأنكم أتممتم فترة التجربة بنجاح، وقد تقرر تثبيتكم في وظيفتكم.\n{reason}\n\nمتمنين لكم دوام التوفيق والنجاح.",
+    bodyEn: "We are pleased to inform you that you have successfully completed your probation period and your employment has been confirmed.\n{reason}\n\nWe wish you continued success.",
+  },
+  TRANSFER: {
+    subject: "نقل / تكليف",
+    subjectEn: "Transfer / Assignment",
+    body: "نفيدكم بأنه تقرر نقلكم أو تكليفكم على النحو التالي:\n{reason}\n\nونرجو مباشرة مهامكم الجديدة اعتباراً من التاريخ المحدد، مع بقاء سائر شروط عقد العمل دون تغيير ما لم يُذكر خلاف ذلك.",
+    bodyEn: "Please be informed that you have been transferred or assigned as follows:\n{reason}\n\nPlease take up your new duties from the stated date. All other terms of your employment contract remain unchanged unless stated otherwise.",
+  },
+  CONTRACT_RENEWAL: {
+    subject: "تجديد عقد العمل",
+    subjectEn: "Renewal of Employment Contract",
+    body: "يسرّنا إبلاغكم بموافقة الإدارة على تجديد عقد عملكم، وذلك على النحو التالي:\n{reason}\n\nوتبقى سائر شروط العقد وأحكامه سارية ما لم يُتفق على خلاف ذلك كتابياً.",
+    bodyEn: "We are pleased to inform you that the management has approved the renewal of your employment contract, as follows:\n{reason}\n\nAll other terms and conditions of the contract remain in force unless otherwise agreed in writing.",
+  },
+  NON_RENEWAL: {
+    subject: "إشعار بعدم تجديد عقد العمل",
+    subjectEn: "Notice of Contract Non-Renewal",
+    body: "نحيطكم علماً بأن الإدارة قررت عدم تجديد عقد عملكم عند انتهاء مدته، وذلك على النحو التالي:\n{reason}\n\nونرجو منكم قبل آخر يوم عمل تسليم ما بعهدتكم من أصول ومستندات واستكمال إجراءات إخلاء الطرف، على أن تُصرف مستحقاتكم وفق أحكام قانون العمل. شاكرين لكم ما قدمتموه خلال فترة عملكم.",
+    bodyEn:
+      "Please be informed that the management has decided not to renew your employment contract when it expires, as follows:\n{reason}\n\nBefore your last working day, please hand over any company assets and documents in your custody and complete the clearance procedure. Your dues will be paid in accordance with the Labour Law. We thank you for your contribution.",
+  },
+  TERMINATION: {
+    subject: "إنهاء خدمة",
+    subjectEn: "Termination of Employment",
+    body: "نحيطكم علماً بأن الإدارة قررت إنهاء خدمتكم، وذلك للأسباب والتفاصيل التالية:\n{reason}\n\nونرجو منكم تسليم ما بعهدتكم من أصول ومستندات واستكمال إجراءات إخلاء الطرف، على أن تُصرف مستحقاتكم وفق أحكام قانون العمل.",
+    bodyEn:
+      "Please be informed that the management has decided to terminate your employment, for the following reasons and details:\n{reason}\n\nPlease hand over any company assets and documents in your custody and complete the clearance procedure. Your dues will be paid in accordance with the Labour Law.",
+  },
+  LEAVE_APPROVAL: {
+    subject: "الموافقة على إجازة",
+    subjectEn: "Leave Approval",
+    body: "نفيدكم بموافقة الإدارة على منحكم إجازة، وذلك على النحو التالي:\n{reason}\n\nونرجو مباشرة العمل في اليوم التالي لانتهاء الإجازة، وإبلاغ الإدارة مسبقاً بأي تغيير.",
+    bodyEn: "Please be informed that the management has approved your leave, as follows:\n{reason}\n\nPlease resume work on the day after your leave ends, and inform the management in advance of any change.",
+  },
+  RETURN_TO_WORK: {
+    subject: "إشعار مباشرة عمل",
+    subjectEn: "Return to Work",
+    body: "نفيدكم بأنه سُجّلت مباشرتكم العمل بعد انتهاء إجازتكم، وذلك على النحو التالي:\n{reason}\n\nمتمنين لكم التوفيق.",
+    bodyEn: "This is to confirm that your return to work after your leave has been recorded, as follows:\n{reason}\n\nWe wish you every success.",
   },
   GENERAL: {
     subject: "",
@@ -103,7 +236,10 @@ export const LETTER_TEMPLATES: Record<LetterKind, { subject: string; subjectEn: 
   EMPLOYMENT_CERTIFICATE: { subject: "شهادة بيانات موظف", subjectEn: "Employment Certificate", body: "", bodyEn: "" },
   EXPERIENCE_CERTIFICATE: { subject: "شهادة خبرة", subjectEn: "Experience Certificate", body: "", bodyEn: "" },
   SALARY_TRANSFER: { subject: "رسالة تحويل راتب", subjectEn: "Salary Transfer Letter", body: "", bodyEn: "" },
+  BANK_ACCOUNT: { subject: "طلب فتح حساب بنكي", subjectEn: "Bank Account Opening", body: "", bodyEn: "" },
+  EMBASSY: { subject: "طلب تأشيرة", subjectEn: "Visa Application Support", body: "", bodyEn: "" },
   NOC: { subject: "شهادة عدم ممانعة", subjectEn: "No-Objection Certificate", body: "", bodyEn: "" },
+  CLEARANCE: { subject: "شهادة إخلاء طرف", subjectEn: "Clearance Certificate", body: "", bodyEn: "" },
   RESIGNATION_ACCEPTANCE: { subject: "قبول استقالة", subjectEn: "Acceptance of Resignation", body: "", bodyEn: "" },
 };
 

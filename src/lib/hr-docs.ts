@@ -23,6 +23,8 @@ export type DocEmployee = Pick<
   | "fullName"
   | "nameEn"
   | "employeeNumber"
+  | "address"
+  | "phone"
   | "gender"
   | "nationality"
   | "idNumber"

@@ -8,6 +8,7 @@ import type { DocHeader } from "./salary-docs";
 
 /** The serif of BHD R contracts (contract-doc-parts.tsx), so HR letters read as the same family of documents. */
 const letterSerif = Amiri({ subsets: ["arabic", "latin"], weight: ["400", "700"], display: "swap", variable: "--font-letter" });
+export const letterFontClass = letterSerif.variable;
 
 export type LetterSheetData = {
   kind: string;
@@ -26,7 +27,7 @@ export type LetterSheetData = {
   employee: { fullName: string; nameEn: string | null; employeeNumber: string; jobTitle: string | null; jobTitleEn: string | null; gender?: string | null };
 };
 
-function Bi({ ar, en }: { ar: React.ReactNode; en: React.ReactNode }) {
+export function Bi({ ar, en }: { ar: React.ReactNode; en: React.ReactNode }) {
   return (
     <span className="letter-doc__bi">
       <span lang="ar">{ar}</span>
@@ -37,7 +38,7 @@ function Bi({ ar, en }: { ar: React.ReactNode; en: React.ReactNode }) {
   );
 }
 
-function Para({ ar, en, className = "" }: { ar: React.ReactNode; en?: React.ReactNode; className?: string }) {
+export function Para({ ar, en, className = "" }: { ar: React.ReactNode; en?: React.ReactNode; className?: string }) {
   return (
     <div className={`letter-doc__para ${en ? "" : "letter-doc__para--single"} ${className}`}>
       <p dir="rtl" lang="ar">
@@ -111,7 +112,7 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
       </header>
 
       <div className="letter-doc__title">
-        {warning ? (
+        {warning || meta.confidential ? (
           <p className="letter-doc__confidential">
             سري وشخصي · <span dir="ltr">Private &amp; Confidential</span>
           </p>

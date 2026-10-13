@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, CircleHelp, Clock3, Contact, FileUp, FileUser, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { CalendarCheck2, CircleHelp, Clock3, Contact, FileUp, FileUser, Files, FolderLock, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
 import { Tr, TranslateToggle } from "@/components/ai-translate";
 import { cvCompleteness, cvFor, hasCvContent, readCv } from "@/lib/cv";
 import { PortalRequests } from "@/components/portal-requests";
-import { LETTER_KIND, type LetterKind } from "@/lib/letters";
+import { CUSTODY_DIRECTION, HELD_STATUS_LABEL, HELD_STATUS_TONE, heldDocLabel } from "@/lib/custody";
+import { LETTER_KIND, readAutoKinds, type LetterKind } from "@/lib/letters";
+import { submitEmployeeRequest } from "@/server/employee-request-actions";
 import { getSessionUser, isStaffRole } from "@/lib/auth";
 import { isTeamRole } from "@/lib/permissions";
 import { logout } from "@/server/auth-actions";
@@ -30,7 +32,7 @@ import { SCORE_LABEL, criterionName, overallBand, overallTone, parseCriteria, pa
 import { LEAVE_REQUEST_LABEL, LEAVE_REQUEST_TONE, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
-import { THEME_COOKIE, daysLabel, formatDate, money, normalizeTheme, todayInputValue } from "@/lib/utils";
+import { THEME_COOKIE, daysLabel, formatDate, money, normalizeTheme, toDateInput, todayInputValue } from "@/lib/utils";
 import { cancelExpense, cancelLeaveRequest, requestLeave, submitExpense, submitPortalDocument } from "@/server/portal-actions";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +67,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const signedIn = session && session.employeeId === employee.id ? session : null;
   const headerPill = "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20";
   const today = muscatDay();
-  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests] = await Promise.all([
+  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests, heldDocuments, custodyForms] = await Promise.all([
     getLeaveTypes(company.id),
     prisma.attendance.findMany({ where: { employeeId: employee.id }, select: { type: true, balanceKey: true } }),
     prisma.leaveCredit.findMany({ where: { employeeId: employee.id }, select: { balanceKey: true, days: true } }),
@@ -94,11 +96,22 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     prisma.expenseClaim.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" }, take: 15 }),
     prisma.employeeRequest.findMany({
       where: { employeeId: employee.id },
-      include: { letter: { select: { token: true, refNo: true, cancelledAt: true } } },
+      include: { letter: { select: { token: true, refNo: true, cancelledAt: true } }, custodyForm: { select: { id: true, refNo: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    prisma.heldDocument.findMany({ where: { employeeId: employee.id }, orderBy: [{ status: "asc" }, { createdAt: "asc" }] }),
+    prisma.custodyForm.findMany({
+      where: { employeeId: employee.id },
+      select: { id: true, refNo: true, direction: true, createdAt: true, acknowledgedAt: true, _count: { select: { items: true } } },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
   ]);
+  const pendingDocIds = new Set(employeeRequests.filter((request) => request.type === "DOCUMENTS" && request.status === "PENDING").flatMap((request) => request.documentIds));
+  const requestableDocs = heldDocuments.filter((doc) => doc.status === "HELD" && !pendingDocIds.has(doc.id));
+  const unacknowledged = custodyForms.filter((form) => form.direction === "OUT" && !form.acknowledgedAt).length;
+  const now = new Date();
   const balances = computeLeaveBalances(employee, attendance, credits, leaveTypes).filter((item) => item.applies || item.remaining !== 0);
   const choices = portalLeaveChoices(leaveTypes, employee.jobTitleId, lang);
   const header = headerFor({ employerName: employee.employer?.name, employerNameEn: employee.employer?.nameEn, employer: employee.employer }, company);
@@ -127,6 +140,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     { id: "leave", label: t("الإجازات", "Leave") },
     { id: "payslips", label: t("الرواتب", "Payslips") },
     { id: "documents", label: t("المستندات", "Documents") },
+    heldDocuments.length || custodyForms.length ? { id: "custody", label: t("أصولي لدى المنشأة", "My originals") } : null,
     { id: "expenses", label: t("المصروفات", "Expenses") },
     { id: "requests", label: t("الطلبات", "Requests") },
     letters.length ? { id: "letters", label: t("الخطابات", "Letters") } : null,
@@ -434,6 +448,118 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           </details>
         </Card>
 
+        {heldDocuments.length || custodyForms.length ? (
+          <Card id="custody" className="scroll-mt-16">
+            {sectionTitle(
+              FolderLock,
+              t("مستنداتي الأصلية لدى المنشأة", "My originals held by the company"),
+              t(
+                "جوازك وبطاقاتك وشهاداتك الأصلية المحفوظة لدى المنشأة. اطلب استلام ما تحتاجه، وأقرّ إلكترونياً بكل استمارة استلام أو تسليم.",
+                "Your original passport, cards and certificates kept by the company. Ask to collect what you need, and acknowledge each receipt or handover form online.",
+              ),
+            )}
+            {unacknowledged ? (
+              <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900 ring-1 ring-inset ring-amber-200">
+                {t(`لديك ${unacknowledged} استمارة تسليم بانتظار إقرارك بالاستلام`, `${unacknowledged} handover form(s) await your acknowledgement`)}
+              </p>
+            ) : null}
+            <ul className="divide-y divide-slate-100">
+              {heldDocuments.map((doc) => {
+                const late = doc.status === "OUT" && doc.dueBack && doc.dueBack < now;
+                return (
+                  <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{pick(heldDocLabel(doc), lang)}</p>
+                      <p className="text-xs text-slate-500">
+                        <span dir="ltr">{doc.documentNo || "—"}</span>
+                        {doc.status === "OUT" && doc.dueBack ? ` · ${t("أعِده قبل", "Return by")} ${formatDate(doc.dueBack)}` : ""}
+                        {pendingDocIds.has(doc.id) ? ` · ${t("طلبت استلامه", "You asked for it")}` : ""}
+                      </p>
+                    </div>
+                    <ToneBadge tone={late ? "red" : HELD_STATUS_TONE[doc.status] || "slate"}>
+                      {late ? t("تأخرت إعادته", "Overdue") : doc.status === "OUT" ? t("معي", "With me") : pick(HELD_STATUS_LABEL.HELD, lang)}
+                    </ToneBadge>
+                  </li>
+                );
+              })}
+            </ul>
+            {requestableDocs.length ? (
+              <details className="group mt-4 rounded-2xl border border-slate-200 p-3 sm:p-4">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-teal-800">
+                  <FileUp size={16} />
+                  {t("طلب استلام مستندات أصلية", "Ask to collect originals")}
+                </summary>
+                <form action={submitEmployeeRequest} className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="token" value={token} />
+                  <input type="hidden" name="type" value="DOCUMENTS" />
+                  <fieldset className="space-y-2 sm:col-span-2">
+                    <legend className="mb-1.5 text-sm font-medium text-slate-700">{t("المستندات", "Documents")}</legend>
+                    {requestableDocs.map((doc) => (
+                      <label key={doc.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface p-3 ring-1 ring-inset ring-slate-200 has-[:checked]:bg-teal-50/60 has-[:checked]:ring-teal-300">
+                        <input type="checkbox" name="documentIds" value={doc.id} className="mt-1 size-4 accent-teal-700" />
+                        <span className="min-w-0 text-sm">
+                          <span className="block font-semibold text-slate-900">{pick(heldDocLabel(doc), lang)}</span>
+                          {doc.documentNo ? (
+                            <span className="block text-xs text-slate-500" dir="ltr">
+                              {doc.documentNo}
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">{t("الغرض", "Purpose")}</span>
+                    <input className={`${fieldClass} w-full`} name="details" required minLength={3} maxLength={500} placeholder={t("مثال: سفر، تجديد رخصة، معاملة بنكية", "e.g. travel, licence renewal, bank errand")} />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">{t("سأعيدها بتاريخ", "I will return them on")}</span>
+                    <input className={`${fieldClass} w-full`} type="date" name="dueBack" required min={todayInputValue()} defaultValue={toDateInput(new Date(Date.now() + 7 * 86_400_000))} />
+                  </label>
+                  <p className="text-xs leading-5 text-slate-500 sm:col-span-2">
+                    {t(
+                      "بعد موافقة الإدارة تصدر استمارة تسليم باسمك، تُقرّ فيها إلكترونياً باستلام المستندات وتتعهد بإعادتها في الموعد.",
+                      "Once management approves, a handover form is issued in your name; you acknowledge receipt online and undertake to return them on time.",
+                    )}
+                  </p>
+                  <div className="sm:col-span-2">
+                    <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
+                      {t("إرسال الطلب", "Send request")}
+                    </SubmitButton>
+                  </div>
+                </form>
+              </details>
+            ) : null}
+            {custodyForms.length ? (
+              <div className="mt-4">
+                <h3 className="mb-2 text-sm font-bold text-slate-800">{t("استمارات الاستلام والتسليم", "Receipt and handover forms")}</h3>
+                <ul className="divide-y divide-slate-100">
+                  {custodyForms.map((form) => (
+                    <li key={form.id}>
+                      <Link href={`${base}/custody/${form.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm transition hover:text-teal-800">
+                        <span className="min-w-0">
+                          <span className="block font-medium">{pick(CUSTODY_DIRECTION[form.direction]?.title, lang, form.direction)}</span>
+                          <span className="text-xs text-slate-500">
+                            <span className="tabular" dir="ltr">
+                              {form.refNo}
+                            </span>{" "}
+                            · {formatDate(form.createdAt)} · {t(`${form._count.items} مستند`, `${form._count.items} document(s)`)}
+                          </span>
+                        </span>
+                        {form.acknowledgedAt ? (
+                          <ToneBadge tone="green">{t("أقررت بها", "Acknowledged")}</ToneBadge>
+                        ) : (
+                          <ToneBadge tone="amber">{t("بانتظار إقرارك", "Please acknowledge")}</ToneBadge>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Card>
+        ) : null}
+
         <Card id="expenses" className="scroll-mt-16">
           {sectionTitle(Wallet, t("تعويض المصروفات", "Expense claims"), t("صرفت من مالك لأجل العمل؟ أرسل الإيصال، وبعد الموافقة يُصرف لك مع الراتب أو مباشرة.", "Spent your own money on work? Send the receipt; once approved it is paid with your salary or directly."))}
           <details className="group rounded-2xl border border-slate-200 p-3 sm:p-4" open={claims.length === 0}>
@@ -526,7 +652,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             t("الطلبات والخطابات", "Requests and letters"),
             t("اطلب شهادة راتب أو تعريف أو تحويل راتب أو أي خطاب، أو سلفة، أو قدّم استقالتك. تعتمدها الإدارة إلكترونياً وتظهر النتيجة هنا.", "Ask for a salary, employment or salary-transfer letter or any other letter, an advance, or submit your resignation. Management approves electronically and the result shows here."),
           )}
-          <PortalRequests token={token} requests={employeeRequests} currency={company.currency} lang={lang} t={t} />
+          <PortalRequests token={token} requests={employeeRequests} currency={company.currency} lang={lang} t={t} autoKinds={readAutoKinds(company.letterAutoKinds)} />
         </Card>
 
         {letters.length ? (

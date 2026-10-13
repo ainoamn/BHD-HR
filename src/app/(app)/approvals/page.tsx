@@ -68,7 +68,21 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     allow.requests
       ? prisma.employeeRequest.findMany({
           where: { companyId: user.companyId, status: "PENDING" },
-          include: { employee: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true, joiningDate: true, bankAccount: true } } },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                fullName: true,
+                nameEn: true,
+                employeeNumber: true,
+                joiningDate: true,
+                bankAccount: true,
+                address: true,
+                passportNumber: true,
+                heldDocuments: { select: { id: true, type: true, title: true, documentNo: true, status: true } },
+              },
+            },
+          },
           orderBy: { createdAt: "asc" },
           take: 100,
         })
@@ -76,7 +90,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     allow.requests
       ? prisma.employeeRequest.findMany({
           where: { companyId: user.companyId, status: { in: ["APPROVED", "REJECTED"] } },
-          include: { employee: { select: { id: true, fullName: true, nameEn: true } }, letter: { select: { id: true, refNo: true } } },
+          include: { employee: { select: { id: true, fullName: true, nameEn: true } }, letter: { select: { id: true, refNo: true } }, custodyForm: { select: { id: true, refNo: true } } },
           orderBy: { decidedAt: "desc" },
           take: 15,
         })
@@ -100,9 +114,16 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
 
       {allow.requests ? (
         <Card className="mb-5" id="requests">
-          <SectionTitle hint={t(`${openRequests.length} بانتظار القرار`, `${openRequests.length} awaiting a decision`)}>{t("الخطابات والاستقالات والطلبات الأخرى", "Letters, resignations and other requests")}</SectionTitle>
+          <SectionTitle hint={t(`${openRequests.length} بانتظار القرار`, `${openRequests.length} awaiting a decision`)}>{t("الخطابات والمستندات الأصلية والاستقالات والطلبات الأخرى", "Letters, originals, resignations and other requests")}</SectionTitle>
           {openRequests.length === 0 ? (
-            <EmptyState icon={ScrollText} title={t("لا طلبات معلّقة", "No pending requests")} text={t("طلبات الخطابات والشهادات والسلف والاستقالات من بوابة الموظف تظهر هنا.", "Letter, certificate, advance and resignation requests from the employee portal appear here.")} />
+            <EmptyState
+              icon={ScrollText}
+              title={t("لا طلبات معلّقة", "No pending requests")}
+              text={t(
+                "طلبات الخطابات والشهادات واستلام المستندات الأصلية والسلف والاستقالات من بوابة الموظف تظهر هنا.",
+                "Letter, certificate, original-document, advance and resignation requests from the employee portal appear here.",
+              )}
+            />
           ) : null}
           <ul className="space-y-3">
             {openRequests.map((request) => (
@@ -125,6 +146,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                       {request.letter ? (
                         <Link href={`/letters/${request.letter.id}`} className="tabular ms-2 font-semibold text-teal-800 hover:underline" dir="ltr">
                           {request.letter.refNo}
+                        </Link>
+                      ) : null}
+                      {request.custodyForm ? (
+                        <Link href={`/documents/custody/${request.custodyForm.id}`} className="tabular ms-2 font-semibold text-teal-800 hover:underline" dir="ltr">
+                          {request.custodyForm.refNo}
                         </Link>
                       ) : null}
                     </span>

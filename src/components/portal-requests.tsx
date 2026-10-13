@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BadgeCheck, DoorOpen, FilePlus2, HandCoins, MessageSquarePlus, ScrollText } from "lucide-react";
+import { BadgeCheck, DoorOpen, FilePlus2, FolderLock, HandCoins, MessageSquarePlus, ScrollText, Zap } from "lucide-react";
 import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass } from "@/components/ui";
@@ -25,14 +25,22 @@ export type PortalRequest = {
   decidedAt: Date | null;
   createdAt: Date;
   letter: { token: string; refNo: string; cancelledAt: Date | null } | null;
+  dueBack?: Date | null;
+  custodyForm?: { id: string; refNo: string } | null;
 };
 
 const LETTER_HINT: Partial<Record<string, Bi>> = {
   SALARY_CERTIFICATE: { ar: "تُظهر راتبك الإجمالي وتفاصيله، للبنوك والسفارات والجهات الحكومية.", en: "Shows your gross pay and breakdown, for banks, embassies and government offices." },
   EMPLOYMENT_CERTIFICATE: { ar: "تعريف ببياناتك ووظيفتك وتاريخ التحاقك، دون ذكر الراتب.", en: "Confirms your details, job and joining date, without pay." },
   EXPERIENCE_CERTIFICATE: { ar: "تثبت مدة عملك ووظيفتك.", en: "Confirms how long you have worked here and your job." },
-  SALARY_TRANSFER: { ar: "لفتح حساب أو طلب تمويل؛ تتعهد فيها المنشأة بتحويل راتبك إلى بنكك المسجّل في ملفك.", en: "For opening an account or a loan; the company commits to paying your salary into the bank on your file." },
+  SALARY_TRANSFER: { ar: "لطلب تمويل أو بطاقة؛ تتعهد فيها المنشأة بتحويل راتبك إلى بنكك المسجّل في ملفك.", en: "For a loan or card; the company commits to paying your salary into the bank on your file." },
+  BANK_ACCOUNT: {
+    ar: "لفتح حساب جديد لراتبك؛ اكتب اسم البنك في «موجّه إلى». يتضمن عنوانك وعنوان المنشأة.",
+    en: "To open a new salary account; write the bank in “Addressed to”. Includes your address and the company's.",
+  },
+  EMBASSY: { ar: "لطلب تأشيرة؛ اكتب في «موجّه إلى» اسم السفارة، وفي التفاصيل وجهة السفر وتواريخه.", en: "For a visa; write the embassy in “Addressed to” and the destination and dates in the details." },
   NOC: { ar: "اكتب في التفاصيل الغرض، مثل السفر أو استخراج رخصة.", en: "Write the purpose in the details, e.g. travel or a licence." },
+  CLEARANCE: { ar: "تثبت أنك سلّمت كل عهد المنشأة؛ تصدر فقط إذا لم يبقَ بعهدتك شيء.", en: "Confirms you returned all company assets; issued only when you hold none." },
   GENERAL: { ar: "أي خطاب آخر؛ اكتب موضوعه وتفاصيله.", en: "Any other letter; write its subject and details." },
 };
 
@@ -42,12 +50,15 @@ export function PortalRequests({
   currency,
   lang,
   t,
+  autoKinds = [],
 }: {
   token: string;
   requests: PortalRequest[];
   currency: string;
   lang: "ar" | "en";
   t: (ar: string, en: string) => string;
+  /** Letter kinds the company issues at once, without waiting for approval. */
+  autoKinds?: readonly string[];
 }) {
   const resignation = requests.find((request) => request.type === "RESIGNATION" && (request.status === "PENDING" || request.status === "APPROVED"));
   const defaultLastDay = new Date(Date.now() + RESIGNATION_NOTICE_DAYS * 86400000);
@@ -80,7 +91,15 @@ export function PortalRequests({
                 >
                   <input type="radio" name="letterKind" value={kind} defaultChecked={index === 0} className="mt-1 accent-teal-700" />
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-900">{kind === "GENERAL" ? t("خطاب آخر", "Another letter") : pick(LETTER_KIND[kind].label, lang)}</span>
+                    <span className="block text-sm font-semibold text-slate-900">
+                      {kind === "GENERAL" ? t("خطاب آخر", "Another letter") : pick(LETTER_KIND[kind].label, lang)}
+                      {autoKinds.includes(kind) ? (
+                        <span className="ms-1.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 align-middle text-[0.7rem] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                          <Zap size={11} />
+                          {t("يصدر فوراً", "Instant")}
+                        </span>
+                      ) : null}
+                    </span>
                     {LETTER_HINT[kind] ? <span className="mt-0.5 block text-xs leading-5 text-slate-500">{pick(LETTER_HINT[kind]!, lang)}</span> : null}
                   </span>
                 </label>
@@ -101,10 +120,15 @@ export function PortalRequests({
           </label>
           <p className="flex items-start gap-2 text-xs leading-5 text-slate-500 sm:col-span-2">
             <BadgeCheck size={14} className="mt-0.5 shrink-0 text-emerald-600" />
-            {t(
-              "بعد اعتماد الإدارة يصدر الخطاب موقّعاً إلكترونياً مع رمز QR، ويظهر هنا لتحميله. أي جهة تمسح الرمز تتأكد أنه أصلي.",
-              "Once management approves, the letter is issued e-signed with a QR code and appears here to download. Anyone who scans the code can confirm it is authentic.",
-            )}
+            {autoKinds.length
+              ? t(
+                  "الخطابات المعلّمة «يصدر فوراً» تصدر موقّعة إلكترونياً لحظة الطلب من بيانات ملفك؛ والبقية بعد اعتماد الإدارة. كل خطاب يحمل رمز QR تتحقق به أي جهة من أنه أصلي.",
+                  "Letters marked “Instant” are issued e-signed the moment you ask, from your file; the rest after management approves. Every letter carries a QR code anyone can scan to confirm it is authentic.",
+                )
+              : t(
+                  "بعد اعتماد الإدارة يصدر الخطاب موقّعاً إلكترونياً مع رمز QR، ويظهر هنا لتحميله. أي جهة تمسح الرمز تتأكد أنه أصلي.",
+                  "Once management approves, the letter is issued e-signed with a QR code and appears here to download. Anyone who scans the code can confirm it is authentic.",
+                )}
           </p>
           <div className="sm:col-span-2">
             <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
@@ -211,6 +235,7 @@ export function PortalRequests({
                         {request.lastDay ? ` · ${t("آخر يوم عمل", "Last day")} ${formatDate(request.lastDay)}` : ""}
                         {request.amount ? ` · ${money(request.amount, currency)} × ${request.installments || 1}` : ""}
                         {request.addressee ? ` · ${t("إلى", "To")} ${request.addressee}` : ""}
+                        {request.dueBack ? ` · ${t("الإعادة", "Return by")} ${formatDate(request.dueBack)}` : ""}
                       </p>
                     </div>
                     <ToneBadge tone={status.tone}>{pick(status.label, lang)}</ToneBadge>
@@ -229,6 +254,12 @@ export function PortalRequests({
                     <Link href={`/letter/${request.letter.token}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-teal-800 underline-offset-4 hover:underline">
                       <ScrollText size={15} />
                       {t(`فتح الخطاب ${request.letter.refNo} وتحميله`, `Open and download letter ${request.letter.refNo}`)}
+                    </Link>
+                  ) : null}
+                  {request.custodyForm ? (
+                    <Link href={`/portal/${token}/custody/${request.custodyForm.id}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-teal-800 underline-offset-4 hover:underline">
+                      <FolderLock size={15} />
+                      {t(`استمارة التسليم ${request.custodyForm.refNo} — أقرّ بالاستلام`, `Handover form ${request.custodyForm.refNo} — acknowledge receipt`)}
                     </Link>
                   ) : null}
                   {request.status === "PENDING" ? (

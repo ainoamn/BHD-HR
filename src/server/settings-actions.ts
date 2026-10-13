@@ -10,6 +10,7 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import { normalizePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { sealImageInUse } from "@/lib/letter-issue";
+import { AUTO_ISSUE_KINDS, LETTER_KIND } from "@/lib/letters";
 import { removeLogoIfUnused, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
 import { clip, intValue, req, str } from "@/lib/utils";
@@ -107,6 +108,23 @@ export async function updateSignatureSettings(formData: FormData) {
   await writeAudit({ userId: user.id, action: "SETTINGS", message: t("حدّث التوقيع الإلكتروني والختم", "Updated the e-signature and stamp") });
   refreshAll();
   go(back, { message: t("تم حفظ التوقيع والختم", "Signature and stamp saved") });
+}
+
+/** Which requested letter kinds are issued at once from the portal, with no one approving them. */
+export async function updateLetterIssuing(formData: FormData) {
+  const user = await requireAdmin();
+  const { t } = await getI18n();
+  const kinds = AUTO_ISSUE_KINDS.filter((kind) => formData.getAll("autoKinds").map(String).includes(kind));
+  await prisma.company.update({ where: { id: user.companyId }, data: { letterAutoKinds: kinds } });
+  await writeAudit({
+    userId: user.id,
+    action: "SETTINGS",
+    message: kinds.length
+      ? `جعل الإصدار الإلكتروني التلقائي لـ: ${kinds.map((kind) => LETTER_KIND[kind].label.ar).join("، ")}`
+      : "جعل كل الخطابات المطلوبة من البوابة بموافقة يدوية",
+  });
+  refreshAll();
+  go("/settings#letter-issuing", { message: t("تم حفظ طريقة إصدار الخطابات المطلوبة", "Requested-letter issuing saved") });
 }
 
 export async function updateProfile(formData: FormData) {
