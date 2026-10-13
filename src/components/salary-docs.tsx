@@ -10,6 +10,7 @@ export type DocHeader = {
   logoUrl: string | null;
   idNumber: string | null;
   phone: string | null;
+  email: string | null;
   address: string | null;
 };
 
@@ -57,6 +58,7 @@ export function headerFor(
       logoUrl: employer?.logoUrl || null,
       idNumber: employer?.idNumber || null,
       phone: formatPhone(employer?.phone),
+      email: employer?.email || null,
       address: employer?.address || null,
     };
   }
@@ -66,6 +68,7 @@ export function headerFor(
     logoUrl: company.logoUrl,
     idNumber: company.crNumber,
     phone: formatPhone(company.phone),
+    email: company.email,
     address: company.address,
   };
 }

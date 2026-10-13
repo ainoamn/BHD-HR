@@ -513,6 +513,37 @@ textarea:focus-visible {
 }
 .official-logo-light { background: #fffdf8; }
 
+/* Official documents (`.paper`, e.g. letters) stay white paper with ink text at night too. */
+@media screen {
+  :root[data-theme="dark"] .paper {
+    color-scheme: light;
+    color: #092d24;
+    --color-surface: #ffffff;
+    --color-slate-50: #f6f8f7;
+    --color-slate-100: #eef2f0;
+    --color-slate-200: #d7e2dc;
+    --color-slate-300: #c3d0c9;
+    --color-slate-400: #77897f;
+    --color-slate-500: #66756f;
+    --color-slate-600: #4e5e57;
+    --color-slate-700: #364841;
+    --color-slate-800: #1c3129;
+    --color-slate-900: #092d24;
+    --color-slate-950: #061f19;
+    --color-teal-50: #e6f1ec;
+    --color-teal-100: #cfe5dc;
+    --color-teal-200: #a9d2c2;
+    --color-teal-300: #7bb9a3;
+    --color-teal-600: #0b6b51;
+    --color-teal-700: #075c45;
+    --color-teal-800: #0a493b;
+  }
+  :root[data-theme="dark"] .paper .text-teal-700 { color: #075c45; }
+  :root[data-theme="dark"] .paper .text-teal-800 { color: #0a493b; }
+  :root[data-theme="dark"] .paper .text-teal-900 { color: #092d24; }
+  :root[data-theme="dark"] .paper .text-red-800 { color: var(--color-red-800); }
+}
+
 /* BHD app icons + switcher (docs/BHD-APP-SWITCHER.md). */
 .bhd-app-icon {
   display: grid;
