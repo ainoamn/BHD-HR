@@ -19,6 +19,13 @@ export const LETTER_KINDS = [
   "TERMINATION",
   "LEAVE_APPROVAL",
   "RETURN_TO_WORK",
+  "BONUS",
+  "TRAINING",
+  "CONGRATULATIONS",
+  "WELCOME",
+  "CONDOLENCE",
+  "CIRCULAR",
+  "REMINDER",
   "GENERAL",
   "SALARY_CERTIFICATE",
   "EMPLOYMENT_CERTIFICATE",
@@ -32,8 +39,16 @@ export const LETTER_KINDS = [
 ] as const;
 export type LetterKind = (typeof LETTER_KINDS)[number];
 
-/** Where a kind sits in the letter form: discipline, HR decisions and notices, or ready documents. */
-export type LetterGroup = "discipline" | "hr" | "ready";
+/** Where a kind sits in the letter form: discipline, recognition, career and pay, notices and circulars, or ready documents. */
+export type LetterGroup = "discipline" | "recognition" | "career" | "hr" | "ready";
+
+/** Groups of written kinds in the order the letter form shows them. */
+export const WRITTEN_GROUPS: { key: Exclude<LetterGroup, "ready">; label: Bi }[] = [
+  { key: "discipline", label: { ar: "إنذارات وجزاءات وتحقيق", en: "Warnings, penalties and hearings" } },
+  { key: "recognition", label: { ar: "الشكر والتقدير والتهاني", en: "Appreciation, congratulations and welcome" } },
+  { key: "career", label: { ar: "الترقيات والرواتب والعقود", en: "Promotions, pay and contracts" } },
+  { key: "hr", label: { ar: "الإجازات والتعاميم والإشعارات", en: "Leave, circulars and notices" } },
+];
 
 /**
  * `auto`: the text is written from the employee's file (src/lib/letter-docs.ts), not typed.
@@ -52,16 +67,23 @@ export const LETTER_KIND: Record<
   FINAL_WARNING: { label: { ar: "إنذار نهائي", en: "Final warning" }, tone: "red", group: "discipline", warning: true },
   INVESTIGATION: { label: { ar: "استدعاء للتحقيق", en: "Disciplinary hearing" }, tone: "red", group: "discipline", warning: true },
   DEDUCTION_NOTICE: { label: { ar: "إشعار جزاء بالخصم", en: "Deduction penalty notice" }, tone: "red", group: "discipline", warning: true },
-  APPRECIATION: { label: { ar: "شكر وتقدير", en: "Appreciation" }, tone: "green", group: "hr", warning: false },
-  PROMOTION: { label: { ar: "ترقية", en: "Promotion" }, tone: "green", group: "hr", warning: false, confidential: true },
-  SALARY_INCREASE: { label: { ar: "زيادة راتب", en: "Salary increase" }, tone: "green", group: "hr", warning: false, confidential: true },
-  PROBATION_CONFIRMATION: { label: { ar: "تثبيت بعد فترة التجربة", en: "Confirmation after probation" }, tone: "green", group: "hr", warning: false },
-  TRANSFER: { label: { ar: "نقل أو تكليف", en: "Transfer or assignment" }, tone: "sky", group: "hr", warning: false },
-  CONTRACT_RENEWAL: { label: { ar: "تجديد عقد العمل", en: "Contract renewal" }, tone: "teal", group: "hr", warning: false },
-  NON_RENEWAL: { label: { ar: "عدم تجديد العقد", en: "Contract non-renewal" }, tone: "slate", group: "hr", warning: false, confidential: true },
-  TERMINATION: { label: { ar: "إنهاء خدمة", en: "Termination of employment" }, tone: "red", group: "hr", warning: false, confidential: true },
+  APPRECIATION: { label: { ar: "شكر وتقدير", en: "Appreciation" }, tone: "green", group: "recognition", warning: false },
+  CONGRATULATIONS: { label: { ar: "تهنئة", en: "Congratulations" }, tone: "green", group: "recognition", warning: false },
+  WELCOME: { label: { ar: "ترحيب بموظف جديد", en: "Welcome" }, tone: "teal", group: "recognition", warning: false },
+  CONDOLENCE: { label: { ar: "تعزية ومواساة", en: "Condolences" }, tone: "slate", group: "recognition", warning: false },
+  PROMOTION: { label: { ar: "ترقية", en: "Promotion" }, tone: "green", group: "career", warning: false, confidential: true },
+  SALARY_INCREASE: { label: { ar: "زيادة راتب", en: "Salary increase" }, tone: "green", group: "career", warning: false, confidential: true },
+  BONUS: { label: { ar: "مكافأة وحافز", en: "Bonus" }, tone: "green", group: "career", warning: false, confidential: true },
+  PROBATION_CONFIRMATION: { label: { ar: "تثبيت بعد فترة التجربة", en: "Confirmation after probation" }, tone: "green", group: "career", warning: false },
+  TRANSFER: { label: { ar: "نقل أو تكليف", en: "Transfer or assignment" }, tone: "sky", group: "career", warning: false },
+  TRAINING: { label: { ar: "ترشيح لدورة تدريبية", en: "Training nomination" }, tone: "sky", group: "career", warning: false },
+  CONTRACT_RENEWAL: { label: { ar: "تجديد عقد العمل", en: "Contract renewal" }, tone: "teal", group: "career", warning: false },
+  NON_RENEWAL: { label: { ar: "عدم تجديد العقد", en: "Contract non-renewal" }, tone: "slate", group: "career", warning: false, confidential: true },
+  TERMINATION: { label: { ar: "إنهاء خدمة", en: "Termination of employment" }, tone: "red", group: "career", warning: false, confidential: true },
   LEAVE_APPROVAL: { label: { ar: "الموافقة على إجازة", en: "Leave approval" }, tone: "sky", group: "hr", warning: false },
   RETURN_TO_WORK: { label: { ar: "إشعار مباشرة عمل", en: "Return-to-work notice" }, tone: "sky", group: "hr", warning: false },
+  CIRCULAR: { label: { ar: "تعميم إداري", en: "Circular" }, tone: "slate", group: "hr", warning: false },
+  REMINDER: { label: { ar: "تذكير", en: "Reminder" }, tone: "sky", group: "hr", warning: false },
   GENERAL: { label: { ar: "خطاب", en: "Letter" }, tone: "slate", group: "hr", warning: false },
   SALARY_CERTIFICATE: { label: { ar: "شهادة راتب", en: "Salary certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true, salary: true },
   EMPLOYMENT_CERTIFICATE: { label: { ar: "شهادة بيانات موظف", en: "Employment certificate" }, tone: "teal", group: "ready", warning: false, auto: true, document: true },
@@ -225,6 +247,51 @@ export const LETTER_TEMPLATES: Record<LetterKind, { subject: string; subjectEn: 
     subjectEn: "Return to Work",
     body: "نفيدكم بأنه سُجّلت مباشرتكم العمل بعد انتهاء إجازتكم، وذلك على النحو التالي:\n{reason}\n\nمتمنين لكم التوفيق.",
     bodyEn: "This is to confirm that your return to work after your leave has been recorded, as follows:\n{reason}\n\nWe wish you every success.",
+  },
+  BONUS: {
+    subject: "مكافأة تقديرية",
+    subjectEn: "Bonus Award",
+    body: "يسرّ الإدارة إبلاغكم بمنحكم مكافأة مالية، وذلك على النحو التالي:\n{reason}\n\nوتأتي هذه المكافأة تقديراً لجهودكم المتميزة وإسهامكم في تحقيق أهداف المنشأة، وتُصرف مع راتبكم وفق الإجراءات المتبعة. متمنين لكم مزيداً من التوفيق.",
+    bodyEn:
+      "The management is pleased to inform you that you have been awarded a bonus, as follows:\n{reason}\n\nThis bonus recognises your outstanding efforts and contribution to the company's goals, and will be paid with your salary in the usual way. We wish you continued success.",
+  },
+  TRAINING: {
+    subject: "ترشيح لدورة تدريبية",
+    subjectEn: "Training Nomination",
+    body: "يسرّنا إبلاغكم بترشيحكم لحضور البرنامج التدريبي التالي:\n{reason}\n\nونأمل أن يسهم هذا البرنامج في تطوير مهاراتكم المهنية، ونرجو الالتزام بالحضور في المواعيد المحددة وتقديم ملخص بما استفدتموه بعد انتهائه.",
+    bodyEn:
+      "We are pleased to inform you that you have been nominated to attend the following training programme:\n{reason}\n\nWe trust this programme will develop your professional skills. Please attend at the stated times and share a short summary of what you learned when it ends.",
+  },
+  CONGRATULATIONS: {
+    subject: "تهنئة",
+    subjectEn: "Congratulations",
+    body: "يطيب للإدارة أن تتقدم إليكم بأحرّ التهاني وأطيب الأمنيات بمناسبة:\n{reason}\n\nمتمنين لكم دوام الأفراح والمسرات، وأن يكلل الله مسيرتكم بالنجاح.",
+    bodyEn: "The management is delighted to extend its warmest congratulations and best wishes on the occasion of:\n{reason}\n\nWe wish you lasting joy and continued success.",
+  },
+  WELCOME: {
+    subject: "ترحيب بالانضمام",
+    subjectEn: "Welcome Aboard",
+    body: "يسرّ الإدارة أن ترحب بانضمامكم إلى فريق العمل، متمنين لكم بداية موفقة ومسيرة مهنية حافلة بالنجاح.\n{reason}\n\nونحن على ثقة بأنكم ستكونون إضافة قيّمة للفريق، فلا تترددوا في التواصل مع مديركم المباشر أو قسم الموارد البشرية لأي استفسار.",
+    bodyEn:
+      "The management is pleased to welcome you to the team and wishes you a successful start and a rewarding career with us.\n{reason}\n\nWe are confident you will be a valuable addition to the team. Please do not hesitate to contact your line manager or Human Resources with any questions.",
+  },
+  CONDOLENCE: {
+    subject: "تعزية ومواساة",
+    subjectEn: "Condolences",
+    body: "تلقّت الإدارة ببالغ الحزن والأسى نبأ:\n{reason}\n\nونتقدم إليكم وإلى ذويكم بخالص التعازي وصادق المواساة، سائلين الله أن يتغمد الفقيد بواسع رحمته، وأن يلهمكم الصبر والسلوان. إنا لله وإنا إليه راجعون.",
+    bodyEn: "The management received with deep sorrow the news of:\n{reason}\n\nWe extend our sincere condolences to you and your family, and pray that you find patience and comfort at this difficult time.",
+  },
+  CIRCULAR: {
+    subject: "تعميم إداري",
+    subjectEn: "Circular",
+    body: "تودّ الإدارة إحاطة جميع الموظفين علماً بما يلي:\n{reason}\n\nونرجو من الجميع الالتزام بما ورد في هذا التعميم والعمل بموجبه اعتباراً من تاريخه.",
+    bodyEn: "The management would like to inform all employees of the following:\n{reason}\n\nEveryone is requested to comply with this circular and act on it from its date.",
+  },
+  REMINDER: {
+    subject: "تذكير",
+    subjectEn: "Reminder",
+    body: "نودّ تذكيركم بما يلي:\n{reason}\n\nنرجو التكرم باتخاذ اللازم في أقرب وقت، شاكرين لكم تعاونكم.",
+    bodyEn: "We would like to remind you of the following:\n{reason}\n\nPlease take the necessary action at your earliest convenience. Thank you for your cooperation.",
   },
   GENERAL: {
     subject: "",

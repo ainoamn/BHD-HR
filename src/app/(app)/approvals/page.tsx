@@ -68,6 +68,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     allow.requests
       ? prisma.employeeRequest.findMany({
           where: { companyId: user.companyId, status: "PENDING" },
+          omit: { signature: true, signedTextEn: true },
           include: {
             employee: {
               select: {
@@ -90,6 +91,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     allow.requests
       ? prisma.employeeRequest.findMany({
           where: { companyId: user.companyId, status: { in: ["APPROVED", "REJECTED"] } },
+          omit: { signature: true, signedText: true, signedTextEn: true },
           include: { employee: { select: { id: true, fullName: true, nameEn: true } }, letter: { select: { id: true, refNo: true } }, custodyForm: { select: { id: true, refNo: true } } },
           orderBy: { decidedAt: "desc" },
           take: 15,
@@ -151,6 +153,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                       {request.custodyForm ? (
                         <Link href={`/documents/custody/${request.custodyForm.id}`} className="tabular ms-2 font-semibold text-teal-800 hover:underline" dir="ltr">
                           {request.custodyForm.refNo}
+                        </Link>
+                      ) : null}
+                      {request.type === "RESIGNATION" ? (
+                        <Link href={`/approvals/resignation/${request.id}`} className="tabular ms-2 font-semibold text-teal-800 hover:underline" dir={request.refNo ? "ltr" : undefined}>
+                          {request.refNo || t("الاستقالة", "Resignation")}
                         </Link>
                       ) : null}
                     </span>

@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { createCustodyForm } from "@/lib/custody";
@@ -11,6 +12,8 @@ import { portalEmployee } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { AUTO_ACTOR_NAME, issueRequestedLetter, issuesOnItsOwn } from "@/lib/request-letters";
 import { requestOrigin } from "@/lib/request-origin";
+import { RESIGNATION_TEXT_MAX, RESIGNATION_TEXT_MIN } from "@/lib/resignation";
+import { createSignedResignation, readSignature } from "@/lib/resignation-seal";
 import { MAX_ADVANCE_INSTALLMENTS, MAX_DOCUMENT_DAYS, MAX_OPEN_REQUESTS, canDecideRequest, isRequestType, requestTitle } from "@/lib/requests";
 import { clip, formatDate, intValue, money, num, parseDateInput, req, round3, safeReturn, str, todayInputValue } from "@/lib/utils";
 
@@ -72,9 +75,38 @@ export async function submitEmployeeRequest(formData: FormData) {
     if (req(formData, "confirm") !== "1") fail("أكّد رغبتك في تقديم الاستقالة", "Confirm that you want to resign");
     const lastDay = parseDateInput(str(formData, "lastDay"));
     if (!lastDay || lastDay < today()) fail("اختر آخر يوم عمل (اليوم أو بعده)", "Choose your last working day (today or later)");
+    const text = (str(formData, "signedText") || "").trim();
+    if (text.length < RESIGNATION_TEXT_MIN || text.length > RESIGNATION_TEXT_MAX) fail("اكتب نص الاستقالة", "Write the resignation text");
+    const signedName = clip(str(formData, "signedName"), 120);
+    if (!signedName || signedName.length < 3) fail("اكتب اسمك الكامل للتوقيع", "Type your full name to sign");
+    const signature = readSignature(str(formData, "signature"));
+    if (!signature) fail("وقّع بإصبعك أو بالفأرة في مربع التوقيع", "Draw your signature in the signature box");
     const existing = await prisma.employeeRequest.count({ where: { employeeId: employee.id, type: "RESIGNATION", status: { in: ["PENDING", "APPROVED"] } } });
     if (existing) fail("لديك استقالة مقدّمة مسبقاً", "You have already submitted a resignation");
-    data.lastDay = lastDay!;
+    const head = await headers();
+    const resignation = await createSignedResignation({
+      companyId: employee.companyId,
+      employeeId: employee.id,
+      lastDay: lastDay!,
+      text,
+      textEn: clip(str(formData, "signedTextEn"), RESIGNATION_TEXT_MAX),
+      signedName: signedName!,
+      signature: signature!,
+      signedIp: clip(head.get("x-forwarded-for")?.split(",")[0]?.trim() || head.get("x-real-ip") || "", 64),
+    });
+    await writeAudit({
+      companyId: employee.companyId,
+      employeeId: employee.id,
+      action: "EMPLOYEE_REQUEST",
+      message: `قدّم ${employee.fullName} استقالته موقّعة إلكترونياً من البوابة (${resignation.refNo}) / ${employee.nameEn || employee.fullName} submitted an e-signed resignation (${resignation.refNo})`,
+    });
+    refreshAll();
+    go(back, {
+      message: t(
+        `قُدّمت استقالتك الموقّعة ${resignation.refNo} إلى الإدارة. يظهر هنا قرار الاعتماد وخطاب القبول، وتستطيع فتح نسختك وطباعتها من «طلباتي».`,
+        `Your signed resignation ${resignation.refNo} was sent to management. The decision and acceptance letter will appear here; open or print your copy under “My requests”.`,
+      ),
+    });
   } else if (type === "DOCUMENTS") {
     const wanted = [...new Set(formData.getAll("documentIds").map(String))].slice(0, 30);
     const held = wanted.length
@@ -137,12 +169,7 @@ export async function submitEmployeeRequest(formData: FormData) {
   }
 
   refreshAll();
-  go(back, {
-    message:
-      type === "RESIGNATION"
-        ? t("قُدّمت الاستقالة إلى الإدارة. سيظهر هنا قرار الاعتماد وخطاب القبول.", "Your resignation was sent to management. The decision and acceptance letter will appear here.")
-        : t("أُرسل الطلب إلى الإدارة، وسيظهر هنا قرار الاعتماد.", "Request sent to management. The decision will appear here."),
-  });
+  go(back, { message: t("أُرسل الطلب إلى الإدارة، وسيظهر هنا قرار الاعتماد.", "Request sent to management. The decision will appear here.") });
 }
 
 export async function cancelEmployeeRequest(formData: FormData) {

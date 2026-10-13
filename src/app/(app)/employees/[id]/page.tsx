@@ -150,11 +150,12 @@ export default async function EmployeePage({
       : [],
     prisma.employeeRequest.findMany({
       where: { employeeId: employee.id, companyId: user.companyId, OR: [{ status: "PENDING" }, { type: "RESIGNATION", status: "APPROVED" }] },
-      select: { id: true, type: true, status: true, lastDay: true, letterId: true },
+      select: { id: true, type: true, status: true, lastDay: true, approvedLastDay: true, letterId: true },
       orderBy: { createdAt: "desc" },
     }),
   ]);
-  const acceptedResignation = employee.status === "TERMINATED" ? null : openRequests.find((request) => request.type === "RESIGNATION" && request.status === "APPROVED");
+  const accepted = employee.status === "TERMINATED" ? null : openRequests.find((request) => request.type === "RESIGNATION" && request.status === "APPROVED");
+  const acceptedResignation = accepted ? { ...accepted, lastDay: accepted.approvedLastDay || accepted.lastDay } : null;
   const pendingRequests = openRequests.filter((request) => request.status === "PENDING").length;
   const activeWarnings = letters.filter((letter) => !letter.cancelledAt && WARNING_KINDS.includes(letter.kind as LetterKind) && letter.issuedAt >= warningSince).length;
   const openTasks = employeeTasks.filter((task) => !isClosedStatus(task.status)).length;
@@ -415,6 +416,9 @@ export default async function EmployeePage({
                 {t("تسوية نهاية الخدمة", "Final settlement")}
               </Link>
             ) : null}
+            <Link href={`/approvals/resignation/${acceptedResignation.id}`} className="underline underline-offset-4">
+              {t("الاستقالة الموقّعة", "Signed resignation")}
+            </Link>
             {acceptedResignation.letterId && allow.letters ? (
               <Link href={`/letters/${acceptedResignation.letterId}`} className="underline underline-offset-4">
                 {t("خطاب القبول", "Acceptance letter")}

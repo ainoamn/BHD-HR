@@ -262,6 +262,51 @@ export async function draftLetter(input: { kind: string; reason: string; employe
   }
 }
 
+export type SavedLetterTemplate = { id: string; kind: string; title: string; subject: string; subjectEn: string; body: string; bodyEn: string; createdByName: string | null };
+
+const MAX_COMPANY_TEMPLATES = 200;
+
+/** /letters/new: keep the text in the form as one of the company's own templates for that kind. */
+export async function saveLetterTemplate(input: { kind: string; title: string; subject: string; subjectEn: string; body: string; bodyEn: string }): Promise<{ template?: SavedLetterTemplate; error?: string }> {
+  const { t } = await getI18n();
+  const user = await getSessionUser();
+  if (!user || !can(user, "letters.create")) return { error: t("ليست لديك صلاحية إصدار الخطابات", "You cannot issue letters") };
+  if (!isLetterKind(input.kind) || LETTER_KIND[input.kind].auto) return { error: t("النماذج للخطابات التي تُكتب يدوياً فقط", "Templates are for written letters only") };
+  const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
+  const title = text(input.title, 80);
+  const subject = text(input.subject, 200);
+  const body = text(input.body, 8000);
+  if (title.length < 2) return { error: t("اكتب اسماً للنموذج", "Name the template") };
+  if (subject.length < 2 || body.length < 5) return { error: t("اكتب موضوع الخطاب ونصه أولاً", "Write the letter subject and text first") };
+  const count = await prisma.letterTemplate.count({ where: { companyId: user.companyId } });
+  if (count >= MAX_COMPANY_TEMPLATES) return { error: t(`بلغت منشأتك ${MAX_COMPANY_TEMPLATES} نموذجاً؛ احذف ما لا تحتاجه أولاً`, `Your company has ${MAX_COMPANY_TEMPLATES} templates; delete some first`) };
+  const saved = await prisma.letterTemplate.create({
+    data: {
+      companyId: user.companyId,
+      kind: input.kind,
+      title,
+      subject,
+      subjectEn: text(input.subjectEn, 200) || null,
+      body,
+      bodyEn: text(input.bodyEn, 8000) || null,
+      createdById: user.id,
+      createdByName: user.name,
+    },
+  });
+  await writeAudit({ userId: user.id, action: "LETTER_TEMPLATE", message: t(`حفظ نموذج خطاب «${title}» (${LETTER_KIND[input.kind].label.ar})`, `Saved letter template “${title}” (${LETTER_KIND[input.kind].label.en})`) });
+  return { template: { id: saved.id, kind: saved.kind, title: saved.title, subject: saved.subject, subjectEn: saved.subjectEn || "", body: saved.body, bodyEn: saved.bodyEn || "", createdByName: saved.createdByName } };
+}
+
+export async function deleteLetterTemplate(id: string): Promise<{ ok?: boolean; error?: string }> {
+  const { t } = await getI18n();
+  const user = await getSessionUser();
+  if (!user || !can(user, "letters.create")) return { error: t("ليست لديك صلاحية إصدار الخطابات", "You cannot issue letters") };
+  const removed = await prisma.letterTemplate.deleteMany({ where: { id: String(id || ""), companyId: user.companyId } });
+  if (!removed.count) return { error: t("النموذج غير موجود", "Template not found") };
+  await writeAudit({ userId: user.id, action: "LETTER_TEMPLATE_DELETE", message: t("حذف نموذج خطاب من نماذج المنشأة", "Deleted a company letter template") });
+  return { ok: true };
+}
+
 /** Public: the employee confirms receipt from the link in the copy. */
 export async function acknowledgeLetter(formData: FormData) {
   const token = req(formData, "token");

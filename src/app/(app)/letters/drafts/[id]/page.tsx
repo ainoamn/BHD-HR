@@ -11,6 +11,7 @@ import { can, requirePermission } from "@/lib/auth";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { composeLetters, DRAFT_STATUS, muscatToday, OPEN_DRAFT, readDraftContent } from "@/lib/letter-drafts";
+import { blanksIn } from "@/lib/letter-library";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatDateTime, parseDateInput, toDateInput } from "@/lib/utils";
@@ -35,8 +36,9 @@ export default async function LetterDraftPage({
   const open = OPEN_DRAFT.includes(draft.status);
   const allowEdit = open && can(user, "letters.create");
   const composed = open
-    ? await composeLetters({ companyId: user.companyId, company: user.company, kind: draft.kind, employeeIds: draft.employeeIds, content, canSalary: can(user, "salaries.view") })
+    ? await composeLetters({ companyId: user.companyId, company: user.company, kind: draft.kind, employeeIds: draft.employeeIds, content, canSalary: can(user, "salaries.view"), allowBlanks: true })
     : null;
+  const blanks = open && !meta.auto ? blanksIn(content.subject, content.subjectEn, content.body, content.bodyEn) : [];
   const items = composed && !("error" in composed) ? composed.items : [];
   const shown = items.find((item) => item.employee.id === sp.e) || items[0];
   const [names, letters] = await Promise.all([
@@ -64,6 +66,21 @@ export default async function LetterDraftPage({
                 {t("لا يمكن إصدار هذا الخطاب بعد:", "This letter can't be issued yet:")} {composed.error[lang]}
               </span>
             </p>
+          ) : null}
+          {blanks.length ? (
+            <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 ring-1 ring-inset ring-amber-200">
+              <p className="flex items-start gap-2 font-semibold">
+                <CircleAlert size={18} className="mt-0.5 shrink-0" />
+                {t("لا يصدر الخطاب قبل إكمال الفراغات التي تركها النموذج:", "The letter won't issue until the blanks the template left are filled in:")}
+              </p>
+              <p className="mt-1.5 flex flex-wrap gap-1.5">
+                {blanks.map((blank) => (
+                  <span key={blank} className="rounded-md bg-surface px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ring-amber-200">
+                    {blank}
+                  </span>
+                ))}
+              </p>
+            </div>
           ) : null}
           {shown ? (
             <>

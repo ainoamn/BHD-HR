@@ -100,6 +100,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     prisma.expenseClaim.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" }, take: 15 }),
     prisma.employeeRequest.findMany({
       where: { employeeId: employee.id },
+      omit: { signature: true, signedText: true, signedTextEn: true },
       include: { letter: { select: { token: true, refNo: true, cancelledAt: true } }, custodyForm: { select: { id: true, refNo: true } } },
       orderBy: { createdAt: "desc" },
       take: 20,
@@ -787,7 +788,24 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             t("الطلبات والخطابات", "Requests and letters"),
             t("اطلب شهادة راتب أو تعريف أو تحويل راتب أو أي خطاب، أو سلفة، أو قدّم استقالتك. تعتمدها الإدارة إلكترونياً وتظهر النتيجة هنا.", "Ask for a salary, employment or salary-transfer letter or any other letter, an advance, or submit your resignation. Management approves electronically and the result shows here."),
           )}
-          <PortalRequests token={token} requests={employeeRequests} currency={company.currency} lang={lang} t={t} autoKinds={autoKinds} />
+          <PortalRequests
+            token={token}
+            requests={employeeRequests}
+            currency={company.currency}
+            lang={lang}
+            t={t}
+            autoKinds={autoKinds}
+            resignationContext={{
+              name: employee.fullName,
+              nameEn: employee.nameEn || employee.fullName,
+              employeeNumber: employee.employeeNumber,
+              female: employee.gender === "FEMALE",
+              job: termText(employee.jobTitle, employee.jobTitleEn, "ar") || "",
+              jobEn: termText(employee.jobTitle, employee.jobTitleEn, "en") || "",
+              company: employee.employer?.name || company.name,
+              companyEn: employee.employer?.nameEn || employee.employer?.name || company.nameEn || company.name,
+            }}
+          />
         </Card>
 
         {letters.length ? (

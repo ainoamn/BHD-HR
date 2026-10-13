@@ -72,6 +72,7 @@ model Company {
   employeeNotes        EmployeeNote[]
   letters              Letter[]
   letterDrafts         LetterDraft[]
+  letterTemplates      LetterTemplate[]
   briefs               DailyBrief[]
   jobOpenings          JobOpening[]
   candidates           Candidate[]
@@ -409,40 +410,54 @@ model LeaveRequest {
 /// Something an employee asks for from the portal (src/lib/requests.ts): an official letter, a resignation, a salary advance or anything else.
 /// Approving a letter request issues the signed letter (letterId); approving an advance creates the pay item (payItemId).
 model EmployeeRequest {
-  id            String       @id @default(cuid())
-  companyId     String
-  company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employeeId    String
-  employee      Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  companyId       String
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   /// LETTER, RESIGNATION, ADVANCE, DOCUMENTS or OTHER.
-  type          String
+  type            String
   /// LETTER: the letter kind asked for (REQUEST_LETTER_KINDS).
-  letterKind    String?
-  subject       String?
-  details       String?
+  letterKind      String?
+  subject         String?
+  details         String?
   /// LETTER: who the letter is addressed to.
-  addressee     String?
+  addressee       String?
   /// RESIGNATION: the last working day the employee proposes.
-  lastDay       DateTime?
+  lastDay         DateTime?
   /// ADVANCE: amount and number of monthly instalments.
-  amount        Float?
-  installments  Int?
+  amount          Float?
+  installments    Int?
   /// DOCUMENTS: the held originals (HeldDocument ids) the employee wants back, and when they will return them (null = for good).
-  documentIds   String[]     @default([])
-  dueBack       DateTime?
-  custodyForm   CustodyForm?
+  documentIds     String[]     @default([])
+  dueBack         DateTime?
+  custodyForm     CustodyForm?
   /// PENDING, APPROVED, REJECTED or CANCELLED (by the employee).
-  status        String       @default("PENDING")
-  decidedById   String?
-  decidedByName String?
-  decidedAt     DateTime?
-  decisionNote  String?
-  letterId      String?      @unique
-  letter        Letter?      @relation(fields: [letterId], references: [id], onDelete: SetNull)
-  payItemId     String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  status          String       @default("PENDING")
+  decidedById     String?
+  decidedByName   String?
+  decidedAt       DateTime?
+  decisionNote    String?
+  letterId        String?      @unique
+  letter          Letter?      @relation(fields: [letterId], references: [id], onDelete: SetNull)
+  payItemId       String?
+  /// RESIGNATION (src/lib/resignation.ts): RS-2026-0001 per company and year; the text the employee signed (Arabic,
+  /// and English when not edited); the full name they typed and the signature they drew (PNG data URL); when and from
+  /// which address they signed; and a SHA-256 of all of it, so any later change shows on the document.
+  refNo           String?
+  signedText      String?
+  signedTextEn    String?
+  signedName      String?
+  signature       String?
+  signedAt        DateTime?
+  signedIp        String?
+  fingerprint     String?
+  /// RESIGNATION: the last working day management approved (lastDay keeps the one the employee proposed).
+  approvedLastDay DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
+  @@unique([companyId, refNo])
   @@index([companyId, status])
   @@index([employeeId])
 }
@@ -833,6 +848,26 @@ model LetterDraft {
 
   @@index([companyId, status])
   @@index([status, scheduledFor])
+}
+
+/// A company's own wording for a written letter kind, saved from /letters/new; listed before the ready library
+/// (src/lib/letter-library.ts). May keep `{reason}` and `[[…]]` blanks like the library.
+model LetterTemplate {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind          String
+  title         String
+  subject       String
+  subjectEn     String?
+  body          String
+  bodyEn        String?
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId, kind])
 }
 
 /// One copy of a letter to send by EMAIL or WHATSAPP. Stays PENDING until that channel is configured (src/lib/delivery.ts).

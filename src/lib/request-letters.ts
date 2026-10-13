@@ -50,7 +50,7 @@ export async function issueRequestedLetter(input: {
   });
   if ("error" in generated) return generated;
 
-  const decided = { decidedById: actor.id, decidedByName: actor.name, decidedAt: new Date(), decisionNote: input.decisionNote || null };
+  const decided = { decidedById: actor.id, decidedByName: actor.name, decidedAt: new Date(), decisionNote: input.decisionNote || null, approvedLastDay: lastDay };
   const claimed = await prisma.employeeRequest.updateMany({ where: { id: request.id, status: "PENDING" }, data: { status: "APPROVED", ...decided } });
   if (!claimed.count) return { error: { ar: "سبق البتّ في هذا الطلب", en: "This request was already decided" } };
   const auto = actor.id === null;
@@ -70,7 +70,7 @@ export async function issueRequestedLetter(input: {
       requestId: request.id,
     });
   } catch (error) {
-    await prisma.employeeRequest.update({ where: { id: request.id }, data: { status: "PENDING", decidedById: null, decidedByName: null, decidedAt: null, decisionNote: null } });
+    await prisma.employeeRequest.update({ where: { id: request.id }, data: { status: "PENDING", decidedById: null, decidedByName: null, decidedAt: null, decisionNote: null, approvedLastDay: null } });
     if (lastDay) await prisma.employee.update({ where: { id: employee.id }, data: { contractEnd: employee.contractEnd } });
     throw error;
   }

@@ -3,6 +3,7 @@ import { CHANNELS, sendPendingCopies, type Channel } from "./delivery";
 import { muscatDay } from "./clock";
 import { generateLetter, issuerOf, type GeneratedLetter } from "./letter-docs";
 import { issueLetter } from "./letter-issue";
+import { blanksIn } from "./letter-library";
 import { isLetterKind, LETTER_KIND, type LetterKind } from "./letters";
 import { permissionsFor } from "./permissions";
 import { prisma } from "./prisma";
@@ -86,7 +87,16 @@ type IssuerCompany = Pick<Company, "name" | "nameEn" | "address" | "phone" | "cr
  * The text of each employee's letter, exactly as it would be issued now: generated kinds from the employee's file,
  * written kinds from the form. Returns the first problem instead (missing text, data the letter needs, open assets…).
  */
-export async function composeLetters(input: { companyId: string; company: IssuerCompany; kind: string; employeeIds: string[]; content: DraftContent; canSalary: boolean }) {
+export async function composeLetters(input: {
+  companyId: string;
+  company: IssuerCompany;
+  kind: string;
+  employeeIds: string[];
+  content: DraftContent;
+  canSalary: boolean;
+  /** Preview only: keep `[[…]]` blanks a template left instead of refusing. */
+  allowBlanks?: boolean;
+}) {
   const fail = (ar: string, en: string): { error: Bilingual } => ({ error: { ar, en } });
   if (!isLetterKind(input.kind)) return fail("اختر نوع الخطاب", "Choose the letter type");
   const kind = input.kind as LetterKind;
@@ -97,6 +107,11 @@ export async function composeLetters(input: { companyId: string; company: Issuer
   if (!employees.length) return fail("الموظف غير موجود", "Employee not found");
   const { content } = input;
   if (!meta.auto && (content.subject.length < 2 || content.body.length < 5)) return fail("اكتب موضوع الخطاب ونصه", "Enter the letter subject and text");
+  const blanks = meta.auto || input.allowBlanks ? [] : blanksIn(content.subject, content.subjectEn, content.body, content.bodyEn);
+  if (blanks.length) {
+    const list = blanks.slice(0, 6).join("، ");
+    return fail(`أكمل الفراغات المعلّمة بين [[ ]] في النص أو احذفها: ${list}`, `Fill in or remove the blanks marked [[ ]] in the text: ${blanks.slice(0, 6).join(", ")}`);
+  }
   const openAssets =
     kind === "CLEARANCE"
       ? await prisma.asset.groupBy({ by: ["employeeId"], where: { companyId: input.companyId, employeeId: { in: employees.map((employee) => employee.id) }, status: "ASSIGNED" }, _count: true })

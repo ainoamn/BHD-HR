@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BadgeCheck, DoorOpen, FilePlus2, FolderLock, HandCoins, MessageSquarePlus, ScrollText, Zap } from "lucide-react";
+import { BadgeCheck, DoorOpen, FilePlus2, FileSignature, FolderLock, HandCoins, MessageSquarePlus, ScrollText, Zap } from "lucide-react";
 import { Tr } from "./ai-translate";
+import { ResignationForm } from "./resignation-form";
+import type { ResignationContext } from "@/lib/resignation";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass } from "@/components/ui";
 import { pick, type Bi } from "@/lib/i18n";
@@ -25,6 +27,8 @@ export type PortalRequest = {
   decidedAt: Date | null;
   createdAt: Date;
   letter: { token: string; refNo: string; cancelledAt: Date | null } | null;
+  refNo?: string | null;
+  approvedLastDay?: Date | null;
   dueBack?: Date | null;
   custodyForm?: { id: string; refNo: string } | null;
 };
@@ -51,6 +55,7 @@ export function PortalRequests({
   lang,
   t,
   autoKinds = [],
+  resignationContext,
 }: {
   token: string;
   requests: PortalRequest[];
@@ -59,6 +64,8 @@ export function PortalRequests({
   t: (ar: string, en: string) => string;
   /** Letter kinds the company issues at once, without waiting for approval. */
   autoKinds?: readonly string[];
+  /** Who resigns from whom, for the ready resignation wordings. */
+  resignationContext: Omit<ResignationContext, "lastDay">;
 }) {
   const resignation = requests.find((request) => request.type === "RESIGNATION" && (request.status === "PENDING" || request.status === "APPROVED"));
   const defaultLastDay = new Date(Date.now() + RESIGNATION_NOTICE_DAYS * 86400000);
@@ -192,31 +199,15 @@ export function PortalRequests({
         ? null
         : block(
             DoorOpen,
-            t("تقديم استقالة", "Submit a resignation"),
-            <form action={submitEmployeeRequest} className="mt-3 grid gap-3 sm:grid-cols-2">
-              <input type="hidden" name="token" value={token} />
-              <input type="hidden" name="type" value="RESIGNATION" />
-              <label className="block space-y-1.5">
-                {label(t("آخر يوم عمل مقترح", "Proposed last working day"))}
-                <input className={`${fieldClass} w-full`} type="date" name="lastDay" required defaultValue={toDateInput(defaultLastDay)} />
-              </label>
-              <p className="self-end text-xs leading-5 text-slate-500">
-                {t(`فترة الإشعار المعتادة ${RESIGNATION_NOTICE_DAYS} يوماً وفق قانون العمل، وتحددها الإدارة عند القبول.`, `The usual notice is ${RESIGNATION_NOTICE_DAYS} days under the Labour Law; management sets it when accepting.`)}
-              </p>
-              <label className="block space-y-1.5 sm:col-span-2">
-                {label(t("السبب (اختياري)", "Reason (optional)"))}
-                <textarea className={`${fieldClass} min-h-20 w-full`} name="details" maxLength={2000} />
-              </label>
-              <label className="flex items-start gap-2.5 rounded-xl bg-amber-50 px-3.5 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200 sm:col-span-2">
-                <input type="checkbox" name="confirm" value="1" required className="mt-1 accent-amber-700" />
-                {t("أقدّم استقالتي من العمل برغبتي، وأعلم أنها تُرفع إلى الإدارة للاعتماد.", "I am resigning of my own will, and I understand it goes to management for approval.")}
-              </label>
-              <div className="sm:col-span-2">
-                <SubmitButton variant="danger" className="w-full sm:w-auto" confirm={t("تقديم الاستقالة إلى الإدارة؟", "Send your resignation to management?")} pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
-                  {t("تقديم الاستقالة", "Submit resignation")}
-                </SubmitButton>
-              </div>
-            </form>,
+            t("تقديم استقالة موقّعة إلكترونياً", "Submit an e-signed resignation"),
+            <ResignationForm
+              token={token}
+              lang={lang}
+              context={resignationContext}
+              defaultLastDay={toDateInput(defaultLastDay)}
+              minDay={toDateInput(new Date())}
+              noticeDays={RESIGNATION_NOTICE_DAYS}
+            />,
           )}
 
       {requests.length ? (
@@ -232,7 +223,7 @@ export function PortalRequests({
                       <p className="break-words font-semibold text-slate-900">{pick(requestTitle(request), lang)}</p>
                       <p className="mt-0.5 text-xs text-slate-500">
                         {t("قُدّم", "Sent")} {formatDate(request.createdAt)}
-                        {request.lastDay ? ` · ${t("آخر يوم عمل", "Last day")} ${formatDate(request.lastDay)}` : ""}
+                        {request.approvedLastDay || request.lastDay ? ` · ${t("آخر يوم عمل", "Last day")} ${formatDate(request.approvedLastDay || request.lastDay)}` : ""}
                         {request.amount ? ` · ${money(request.amount, currency)} × ${request.installments || 1}` : ""}
                         {request.addressee ? ` · ${t("إلى", "To")} ${request.addressee}` : ""}
                         {request.dueBack ? ` · ${t("الإعادة", "Return by")} ${formatDate(request.dueBack)}` : ""}
@@ -254,6 +245,12 @@ export function PortalRequests({
                     <Link href={`/letter/${request.letter.token}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-teal-800 underline-offset-4 hover:underline">
                       <ScrollText size={15} />
                       {t(`فتح الخطاب ${request.letter.refNo} وتحميله`, `Open and download letter ${request.letter.refNo}`)}
+                    </Link>
+                  ) : null}
+                  {request.type === "RESIGNATION" ? (
+                    <Link href={`/portal/${token}/resignation/${request.id}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-teal-800 underline-offset-4 hover:underline">
+                      <FileSignature size={15} />
+                      {request.refNo ? t(`استقالتي الموقّعة ${request.refNo} — عرض وطباعة`, `My signed resignation ${request.refNo} — view and print`) : t("عرض الاستقالة وطباعتها", "View and print the resignation")}
                     </Link>
                   ) : null}
                   {request.custodyForm ? (

@@ -3,12 +3,14 @@
 import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
-import { fillTemplate, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
+import { blanksIn } from "@/lib/letter-library";
+import { LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
 import type { DraftContent } from "@/lib/letter-drafts";
 import { cn } from "@/lib/utils";
-import { draftLetter } from "@/server/letter-actions";
+import { draftLetter, type SavedLetterTemplate } from "@/server/letter-actions";
 import { EmployeeMultiSelect } from "./employee-multi-select";
 import { useLang } from "./lang-provider";
+import { LetterTemplates } from "./letter-templates";
 import { SubmitButton } from "./submit-button";
 import { Field, fieldClass, secondaryBtn } from "./ui";
 
@@ -27,6 +29,7 @@ export function LetterForm({
   request,
   savedDraft,
   tomorrow,
+  companyTemplates,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employees: LetterEmployee[];
@@ -43,6 +46,8 @@ export function LetterForm({
   savedDraft?: { id: string; content: DraftContent; scheduleDate: string } | null;
   /** Earliest day a letter can be scheduled for (YYYY-MM-DD). */
   tomorrow: string;
+  /** The company's own wordings (LetterTemplate), all kinds. */
+  companyTemplates: SavedLetterTemplate[];
 }) {
   const { lang, t } = useLang();
   const saved = savedDraft?.content;
@@ -58,6 +63,8 @@ export function LetterForm({
   const [scheduleDate, setScheduleDate] = useState(savedDraft?.scheduleDate || "");
   const [note, setNote] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [drafting, startDraft] = useTransition();
+  const [ownTemplates, setOwnTemplates] = useState(companyTemplates);
+  const blanks = auto ? [] : blanksIn(subject, subjectEn, body, bodyEn);
 
   const chosen = employees.filter((employee) => selected.includes(employee.value));
   const single = chosen.length === 1 ? chosen[0] : null;
@@ -70,15 +77,6 @@ export function LetterForm({
     setKind(next);
     if (!subject || subject === before.subject) setSubject(LETTER_TEMPLATES[next].subject);
     if (!subjectEn || subjectEn === before.subjectEn) setSubjectEn(LETTER_TEMPLATES[next].subjectEn);
-  };
-
-  const useTemplate = () => {
-    const template = LETTER_TEMPLATES[kind];
-    setSubject(template.subject || subject);
-    setSubjectEn(template.subjectEn || subjectEn);
-    setBody(fillTemplate(template.body, reason));
-    setBodyEn(fillTemplate(template.bodyEn, reason));
-    setNote({ tone: "ok", text: t("تمت تعبئة النص من القالب. راجعه وعدّله قبل الإصدار.", "Filled from the template. Review and edit before issuing.") });
   };
 
   const draft = () =>
@@ -119,8 +117,7 @@ export function LetterForm({
         <input type="hidden" name="kind" value={kind} />
         {(
           [
-            [t("إنذارات وجزاءات وتحقيق", "Warnings, penalties and hearings"), WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === "discipline")],
-            [t("قرارات وإشعارات الموارد البشرية", "HR decisions and notices"), WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === "hr")],
+            ...WRITTEN_GROUPS.map((group) => [pick(group.label, lang), WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === group.key)] as const),
             [t("شهادات وخطابات جاهزة (تُكتب تلقائياً من ملف الموظف)", "Ready certificates and letters (written from the employee's file)"), autoKinds],
           ] as const
         ).map(([heading, options]) => (
@@ -247,18 +244,31 @@ export function LetterForm({
         <h2 className="text-sm font-bold text-slate-800">{t("٢. المحتوى", "2. Content")}</h2>
         <Field
           label={t("السبب أو التفاصيل", "Reason or details")}
-          hint={t("اكتب باختصار ما حدث (مثل: تأخر عن الدوام 3 مرات في أكتوبر)، ثم اطلب الصياغة الذكية أو استخدم القالب.", "Briefly describe what happened (e.g. late three times in October), then ask the AI to draft it or use the template.")}
+          hint={t(
+            "اكتب باختصار ما حدث أو المناسبة (مثل: تأخر عن الدوام 3 مرات في أكتوبر)، ثم اختر نموذجاً جاهزاً فيُدرج فيه، أو اطلب الصياغة الذكية، أو اكتب النص بنفسك.",
+            "Briefly describe what happened or the occasion (e.g. late three times in October), then pick a ready template to place it in, ask the AI to draft it, or write the text yourself.",
+          )}
         >
           <textarea className={`${fieldClass} min-h-20 w-full`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1500} />
         </Field>
+        <LetterTemplates
+          kind={kind}
+          reason={reason}
+          current={{ subject, subjectEn, body, bodyEn }}
+          companyTemplates={ownTemplates}
+          onTemplatesChange={setOwnTemplates}
+          onApply={(text, message) => {
+            setSubject(text.subject);
+            setSubjectEn(text.subjectEn);
+            setBody(text.body);
+            setBodyEn(text.bodyEn);
+            setNote({ tone: "ok", text: message });
+          }}
+        />
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={draft} disabled={drafting} className={secondaryBtn}>
             {drafting ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} className="text-gold-600" />}
             {drafting ? t("جارٍ الصياغة...", "Drafting...") : t("صياغة بالذكاء الاصطناعي", "Draft with AI")}
-          </button>
-          <button type="button" onClick={useTemplate} className={secondaryBtn}>
-            <FileText size={16} />
-            {t("استخدام القالب الجاهز", "Use the template")}
           </button>
         </div>
         {note ? (
@@ -284,6 +294,20 @@ export function LetterForm({
             </Field>
           </div>
         </div>
+        {blanks.length ? (
+          <div className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-inset ring-amber-200" role="status">
+            <p className="font-semibold">
+              {t(`بقي ${blanks.length} فراغ معلّم بين [[ ]] — أكمله بالمعلومة الصحيحة أو احذفه، فلا يصدر الخطاب ولا يُجدول قبل ذلك (المعاينة والحفظ في المسودات متاحان):`, `${blanks.length} blank(s) marked [[ ]] left — replace each with the right detail or remove it; the letter can't be issued or scheduled until then (preview and drafts still work):`)}
+            </p>
+            <p className="mt-1.5 flex flex-wrap gap-1.5">
+              {blanks.map((blank) => (
+                <span key={blank} className="rounded-md bg-surface px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ring-amber-200">
+                  {blank}
+                </span>
+              ))}
+            </p>
+          </div>
+        ) : null}
         <p className="text-xs text-slate-500">{t("الترويسة واسم الموظف والتاريخ والرقم والتوقيع تُطبع تلقائياً، فلا تكتبها في النص.", "The letterhead, employee name, date, number and signature are printed automatically; don't type them in the text.")}</p>
       </section>
       )}
@@ -339,7 +363,7 @@ export function LetterForm({
 
       <div className="space-y-3 border-t border-slate-100 pt-4">
         <div className="flex flex-wrap gap-2">
-          <SubmitButton name="intent" value="issue" pendingLabel={t("جارٍ العمل...", "Working...")}>
+          <SubmitButton name="intent" value="issue" disabled={blanks.length > 0} pendingLabel={t("جارٍ العمل...", "Working...")}>
             <BadgeCheck size={16} />
             {request ? t("اعتماد الطلب وإصدار الخطاب", "Approve the request and issue") : t("إصدار الخطاب موقّعاً الآن", "Issue signed now")}
           </SubmitButton>
@@ -369,7 +393,7 @@ export function LetterForm({
                 <input className={`${fieldClass} w-full`} type="date" name="scheduleDate" min={tomorrow} value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} />
               </Field>
             </div>
-            <SubmitButton variant="secondary" name="intent" value="schedule" disabled={!scheduleDate} pendingLabel={t("جارٍ العمل...", "Working...")}>
+            <SubmitButton variant="secondary" name="intent" value="schedule" disabled={!scheduleDate || blanks.length > 0} pendingLabel={t("جارٍ العمل...", "Working...")}>
               <CalendarClock size={16} />
               {t("جدولة الإصدار", "Schedule")}
             </SubmitButton>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, PenLine, X } from "lucide-react";
+import { Check, FileSignature, PenLine, X } from "lucide-react";
 import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
@@ -25,6 +25,9 @@ export type PendingEmployeeRequest = {
   createdAt: Date;
   documentIds?: string[];
   dueBack?: Date | null;
+  refNo?: string | null;
+  signedText?: string | null;
+  signedAt?: Date | null;
   employee: {
     id: string;
     fullName: string;
@@ -52,12 +55,16 @@ export function EmployeeRequestCard({
   lang,
   t,
   currency,
+  returnTo = "/approvals#requests",
+  docLink = true,
 }: {
   request: PendingEmployeeRequest;
   user: { permissions: readonly string[] };
   lang: "ar" | "en";
   t: (ar: string, en: string) => string;
   currency: string;
+  returnTo?: string;
+  docLink?: boolean;
 }) {
   const type = request.type as RequestType;
   const meta = REQUEST_TYPE[type] || REQUEST_TYPE.OTHER;
@@ -140,6 +147,20 @@ export function EmployeeRequestCard({
                 <Tr text={request.details} />
               </p>
             ) : null}
+            {type === "RESIGNATION" && request.signedText && docLink ? <p className="line-clamp-4 whitespace-pre-line break-words text-slate-600">{request.signedText}</p> : null}
+            {type === "RESIGNATION" && docLink ? (
+              <p className="flex flex-wrap items-center gap-2 pt-1">
+                {request.signedAt ? (
+                  <ToneBadge tone="green">
+                    <FileSignature size={12} />
+                    {t(`موقّعة إلكترونياً ${request.refNo || ""}`, `E-signed ${request.refNo || ""}`)}
+                  </ToneBadge>
+                ) : null}
+                <Link href={`/approvals/resignation/${request.id}`} className="inline-flex items-center gap-1 font-bold text-teal-800 underline-offset-4 hover:underline">
+                  {t("عرض الاستقالة كاملة والبتّ فيها", "Open the full resignation and decide")}
+                </Link>
+              </p>
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-slate-400">
             {t("أُرسل", "Sent")} {formatDateTime(request.createdAt)}
@@ -154,7 +175,7 @@ export function EmployeeRequestCard({
       ) : (
         <form action={decideEmployeeRequest} className="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">
           <input type="hidden" name="id" value={request.id} />
-          <input type="hidden" name="returnTo" value="/approvals#requests" />
+          <input type="hidden" name="returnTo" value={returnTo} />
           {type === "LETTER" && !written && letterMeta?.document ? (
             <label className="block min-w-0 space-y-1 text-xs text-slate-500">
               {label(

@@ -32,7 +32,7 @@ export default async function NewLetterPage({
         include: { employee: { select: { fullName: true, nameEn: true } } },
       })
     : null;
-  const [employees, warnings] = await Promise.all([
+  const [employees, warnings, templates] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: user.companyId, status: { not: "TERMINATED" } },
       select: { id: true, fullName: true, nameEn: true, employeeNumber: true, email: true, phone: true },
@@ -42,6 +42,12 @@ export default async function NewLetterPage({
       by: ["employeeId"],
       where: { companyId: user.companyId, kind: { in: WARNING_KINDS }, cancelledAt: null, issuedAt: { gte: since } },
       _count: { _all: true },
+    }),
+    prisma.letterTemplate.findMany({
+      where: { companyId: user.companyId },
+      select: { id: true, kind: true, title: true, subject: true, subjectEn: true, body: true, bodyEn: true, createdByName: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
     }),
   ]);
   const warningCount = new Map(warnings.map((row) => [row.employeeId, row._count._all]));
@@ -62,8 +68,8 @@ export default async function NewLetterPage({
         icon={ScrollText}
         title={draft ? t("تعديل المسودة", "Edit draft") : request ? t("كتابة الخطاب المطلوب", "Write the requested letter") : t("خطاب أو إنذار جديد", "New letter or warning")}
         description={t(
-          "اختر الموظف ونوع الخطاب. الشهادات الجاهزة تُكتب تلقائياً من ملف الموظف، والخطابات الأخرى تصوغها بالذكاء الاصطناعي أو من القالب. كل خطاب يصدر موقّعاً إلكترونياً مع رمز تحقق.",
-          "Choose the employee and letter type. Ready certificates are written from the employee's file; other letters are drafted by AI or from a template. Every letter is issued e-signed with a verification code.",
+          "اختر الموظف ونوع الخطاب. الشهادات الجاهزة تُكتب تلقائياً من ملف الموظف، والخطابات الأخرى تختار لها نموذجاً جاهزاً بالأسلوب الذي تريده، أو تصوغها بالذكاء الاصطناعي، أو تكتبها بنفسك. كل خطاب يصدر موقّعاً إلكترونياً مع رمز تحقق.",
+          "Choose the employee and letter type. Ready certificates are written from the employee's file; for other letters pick a ready template in the style you want, ask the AI to draft it, or write it yourself. Every letter is issued e-signed with a verification code.",
         )}
       />
       <Flash error={sp.error} message={sp.message} />
@@ -110,6 +116,7 @@ export default async function NewLetterPage({
           request={request ? { id: request.id, subject: request.subject || "", details: request.details || "", addressee: request.addressee || "" } : null}
           savedDraft={draft ? { id: draft.id, content: readDraftContent(draft.content), scheduleDate: toDateInput(draft.scheduledFor) } : null}
           tomorrow={toDateInput(new Date(muscatToday().getTime() + 86400000))}
+          companyTemplates={templates.map((item) => ({ ...item, subjectEn: item.subjectEn || "", bodyEn: item.bodyEn || "" }))}
         />
       </Card>
     </div>
