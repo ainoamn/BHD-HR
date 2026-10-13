@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Paperclip } from "lucide-react";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
+import { SubmitButton } from "@/components/submit-button";
 import { Card, InfoItem, SectionTitle, ToneBadge, linkAction } from "@/components/ui";
 import { canTeam } from "@/lib/auth";
 import { DOC_LABEL, monthName, termText } from "@/lib/constants";
@@ -18,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTeam } from "@/lib/team";
 import { daysLabel, formatDate, money } from "@/lib/utils";
 import { markAttendance } from "@/server/attendance-actions";
+import { reopenLeaveRequest } from "@/server/request-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default async function TeamMemberPage({ params, searchParams }: { params:
     docs: canTeam(user, "team.documents.view"),
     salaries: canTeam(user, "team.salaries.view"),
     reviews: canTeam(user, "team.performance.view"),
+    approve: canTeam(user, "team.leave.approve"),
   };
   const employee = await prisma.employee.findFirst({
     where: { id, companyId: user.companyId },
@@ -163,7 +166,26 @@ export default async function TeamMemberPage({ params, searchParams }: { params:
                       <span className="text-slate-700">
                         {requestLabel(request.choice)} · {formatDate(request.fromDate)} — {formatDate(request.toDate)}
                       </span>
-                      <ToneBadge tone={LEAVE_REQUEST_TONE[request.status] || "slate"}>{pick(LEAVE_REQUEST_LABEL[request.status], lang, request.status)}</ToneBadge>
+                      <span className="flex flex-wrap items-center gap-3">
+                        <ToneBadge tone={LEAVE_REQUEST_TONE[request.status] || "slate"}>{pick(LEAVE_REQUEST_LABEL[request.status], lang, request.status)}</ToneBadge>
+                        {allow.approve && ["APPROVED", "REJECTED", "REVOKED"].includes(request.status) ? (
+                          <form action={reopenLeaveRequest}>
+                            <input type="hidden" name="id" value={request.id} />
+                            <input type="hidden" name="returnTo" value={`/team/${employee.id}`} />
+                            <SubmitButton
+                              variant="link"
+                              pendingLabel={t("جارٍ التراجع...", "Undoing...")}
+                              confirm={
+                                request.status === "APPROVED"
+                                  ? t("التراجع عن الموافقة؟ ستُحذف أيام هذه الإجازة من الحضور وتعود إلى الرصيد، ويعود الطلب بانتظار القرار.", "Undo the approval? Its days are removed from attendance and returned to the balance, and the request waits for a decision again.")
+                                  : t("إعادة هذا الطلب إلى الانتظار لاتخاذ قرار جديد؟", "Return this request to waiting for a new decision?")
+                              }
+                            >
+                              {t("التراجع عن القرار", "Undo decision")}
+                            </SubmitButton>
+                          </form>
+                        ) : null}
+                      </span>
                     </li>
                   ))}
                 </ul>

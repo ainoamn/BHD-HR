@@ -393,7 +393,7 @@ model LeaveRequest {
   toDate            DateTime
   days              Float
   reason            String?
-  /// PENDING, APPROVED, REJECTED or CANCELLED (by the employee).
+  /// PENDING, APPROVED, REJECTED, CANCELLED (by the employee) or REVOKED (HR deleted the approved period).
   status            String    @default("PENDING")
   decidedById       String?
   decidedByName     String?

@@ -409,10 +409,18 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
     tips: [
       b("ملاحظتك عند الموافقة أو الرفض تظهر للموظف في بوابته.", "Your note on approval or rejection is shown to the employee in their portal."),
+      b(
+        "أخطأت في قرار إجازة؟ افتح «آخر القرارات» واضغط «التراجع عن القرار»: تُحذف أيامها من الحضور وتعود للرصيد، ويرجع الطلب «بانتظار الموافقة» لتقرر من جديد.",
+        "Decided a leave request by mistake? Open “Recent decisions” and press “Undo decision”: its days leave attendance and return to the balance, and the request waits for a decision again.",
+      ),
+      b(
+        "حذف فترة إجازة موافق عليها من الحضور يجعل طلبها عند الموظف «ألغتها الإدارة»، وتعديلها ينقل تواريخها الجديدة إلى الطلب.",
+        "Deleting an approved leave period from attendance marks its request “Cancelled by HR” for the employee; editing it carries the new dates to the request.",
+      ),
       b("الخطابات التي فعّلت إصدارها الفوري من الإعدادات لا تصل هنا إلا إذا نقصت بياناتها.", "Letters you set to issue instantly in Settings only reach this page when their data is incomplete."),
     ],
     related: ["letters", "custody", "attendance", "portal-requests"],
-    keywords: "طلبات موافقة اعتماد إجازة سلفة استقالة مستندات أصلية approvals requests approve originals",
+    keywords: "طلبات موافقة اعتماد إجازة سلفة استقالة مستندات أصلية تراجع إلغاء قرار approvals requests approve originals undo",
   },
   {
     slug: "documents",
@@ -820,7 +828,10 @@ export const HELP_TOPICS: HelpTopic[] = [
     steps: [
       b("البوابة ← «الإجازات»: الرصيد المتبقي من كل نوع.", "Portal → “Leave”: the remaining balance of each type."),
       b("اختر النوع والفترة واكتب السبب ثم «إرسال الطلب».", "Choose the type and dates, write the reason, then “Send request”."),
-      b("يظهر الطلب «بانتظار الموافقة»، ثم «موافق عليها» أو «مرفوضة» مع ملاحظة الإدارة.", "The request shows “Pending”, then “Approved” or “Rejected” with HR's note."),
+      b(
+        "يظهر الطلب «بانتظار الموافقة»، ثم «موافق عليها» أو «مرفوضة» مع ملاحظة الإدارة. إن ألغت الإدارة إجازة موافقاً عليها يظهر «ألغتها الإدارة».",
+        "The request shows “Pending”, then “Approved” or “Rejected” with HR's note. If HR cancels an approved leave it shows “Cancelled by HR”.",
+      ),
       b("يمكن إلغاء الطلب ما دام معلّقاً.", "A request can be cancelled while it is still pending."),
     ],
     related: ["approvals", "portal"],

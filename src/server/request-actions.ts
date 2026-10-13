@@ -88,6 +88,41 @@ export async function decideLeaveRequest(formData: FormData) {
   go(back, { message: lang === "en" ? `Approved and recorded: ${dates.length} day(s)` : `تمت الموافقة وسُجّلت ${dates.length} يوم في الحضور` });
 }
 
+/** Undoes a decision made by mistake: an approval's recorded days are removed and the request waits for a decision again. */
+export async function reopenLeaveRequest(formData: FormData) {
+  const { user, scope } = await requireActor("attendance.create", "team.leave.approve", "/approvals");
+  const { t } = await getI18n();
+  const back = safeReturn(formData.get("returnTo"), scope ? "/team" : "/approvals");
+  const request = await prisma.leaveRequest.findFirst({
+    where: { id: req(formData, "id"), companyId: user.companyId, ...(scope ? { employeeId: { in: scope } } : {}) },
+    include: { employee: { select: { id: true, fullName: true } } },
+  });
+  if (!request) go(back, { error: t("الطلب غير موجود", "Request not found") });
+  if (!["APPROVED", "REJECTED", "REVOKED"].includes(request!.status)) go(back, { error: t("لا يوجد قرار للتراجع عنه في هذا الطلب", "This request has no decision to undo") });
+  const removed = await prisma.$transaction(async (tx) => {
+    const { count } = request!.attendanceGroupId
+      ? await tx.attendance.deleteMany({ where: { groupId: request!.attendanceGroupId, employeeId: request!.employeeId } })
+      : { count: 0 };
+    await tx.leaveRequest.update({
+      where: { id: request!.id },
+      data: { status: "PENDING", attendanceGroupId: null, decidedById: null, decidedByName: null, decidedAt: null, decisionNote: null },
+    });
+    return count;
+  });
+  await writeAudit({
+    userId: user.id,
+    employeeId: request!.employee.id,
+    action: "LEAVE_REQUEST_REOPEN",
+    message: `تراجع عن قرار طلب إجازة ${request!.employee.fullName} ${formatDate(request!.fromDate)} — ${formatDate(request!.toDate)}${removed ? ` وحذف ${removed} يوم من الحضور` : ""}`,
+  });
+  refreshAll();
+  go(back, {
+    message: removed
+      ? t(`تم التراجع عن القرار وحُذفت ${removed} يوم من الحضور. الطلب بانتظار قرارك من جديد.`, `Decision undone and ${removed} day(s) removed from attendance. The request is waiting again.`)
+      : t("تم التراجع عن القرار. الطلب بانتظار قرارك من جديد.", "Decision undone. The request is waiting again."),
+  });
+}
+
 /** A document the employee sent from the portal: accept it into the file, or delete it with its upload. */
 export async function reviewPortalDocument(formData: FormData) {
   const user = await requirePermission("documents.edit", "/approvals");

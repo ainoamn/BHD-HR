@@ -19,13 +19,15 @@ export async function portalEmployee(token: string) {
   return employee;
 }
 
-export const LEAVE_REQUEST_STATUSES = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const;
+/** REVOKED: approved, then HR deleted the recorded period from attendance. */
+export const LEAVE_REQUEST_STATUSES = ["PENDING", "APPROVED", "REJECTED", "CANCELLED", "REVOKED"] as const;
 
 export const LEAVE_REQUEST_LABEL: Record<string, { ar: string; en: string }> = {
   PENDING: { ar: "بانتظار الموافقة", en: "Awaiting approval" },
   APPROVED: { ar: "موافق عليها", en: "Approved" },
   REJECTED: { ar: "مرفوضة", en: "Rejected" },
   CANCELLED: { ar: "ألغاها الموظف", en: "Cancelled by employee" },
+  REVOKED: { ar: "ألغتها الإدارة", en: "Cancelled by HR" },
 };
 
 export const LEAVE_REQUEST_TONE: Record<string, "amber" | "green" | "red" | "slate"> = {
@@ -33,6 +35,7 @@ export const LEAVE_REQUEST_TONE: Record<string, "amber" | "green" | "red" | "sla
   APPROVED: "green",
   REJECTED: "red",
   CANCELLED: "slate",
+  REVOKED: "slate",
 };
 
 /** What an employee may ask for: the leave types that apply to the job, and unpaid leave. */

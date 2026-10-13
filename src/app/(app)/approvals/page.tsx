@@ -17,7 +17,7 @@ import { attendanceLabel, computeLeaveBalances, parseAttendanceChoice } from "@/
 import { LEAVE_REQUEST_LABEL, LEAVE_REQUEST_TONE } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { daysLabel, formatDate, formatDateTime } from "@/lib/utils";
-import { decideLeaveRequest, reviewPortalDocument } from "@/server/request-actions";
+import { decideLeaveRequest, reopenLeaveRequest, reviewPortalDocument } from "@/server/request-actions";
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
   const sp = await searchParams;
@@ -246,7 +246,25 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                         {request.decidedByName ? ` · ${request.decidedByName}` : ""}
                       </span>
                     </span>
-                    <ToneBadge tone={LEAVE_REQUEST_TONE[request.status] || "slate"}>{pick(LEAVE_REQUEST_LABEL[request.status], lang, request.status)}</ToneBadge>
+                    <span className="flex flex-wrap items-center gap-3">
+                      <ToneBadge tone={LEAVE_REQUEST_TONE[request.status] || "slate"}>{pick(LEAVE_REQUEST_LABEL[request.status], lang, request.status)}</ToneBadge>
+                      {allow.decide && request.status !== "CANCELLED" ? (
+                        <form action={reopenLeaveRequest}>
+                          <input type="hidden" name="id" value={request.id} />
+                          <SubmitButton
+                            variant="link"
+                            pendingLabel={t("جارٍ التراجع...", "Undoing...")}
+                            confirm={
+                              request.status === "APPROVED"
+                                ? t("التراجع عن الموافقة؟ ستُحذف أيام هذه الإجازة من الحضور وتعود إلى الرصيد، ويعود الطلب بانتظار قرارك.", "Undo the approval? Its days are removed from attendance and returned to the balance, and the request waits for your decision again.")
+                                : t("إعادة هذا الطلب إلى الانتظار لتتخذ قراراً جديداً؟", "Return this request to waiting so you can decide again?")
+                            }
+                          >
+                            {t("التراجع عن القرار", "Undo decision")}
+                          </SubmitButton>
+                        </form>
+                      ) : null}
+                    </span>
                   </li>
                 ))}
               </ul>

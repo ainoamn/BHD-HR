@@ -6,7 +6,7 @@ import { requireActor, requirePermission } from "@/lib/auth";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import { attendanceLabel, computeLeaveBalances, eachUtcDate, leaveApplies, leaveName, parseAttendanceChoice, rowBalanceKey } from "@/lib/leave";
+import { LEAVE_CHOICE, attendanceLabel, computeLeaveBalances, eachUtcDate, leaveApplies, leaveName, parseAttendanceChoice, rowBalanceKey } from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
 import { clip, daysLabel, formatDate, parseDateInput, req, safeReturn, str } from "@/lib/utils";
 
@@ -27,12 +27,14 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
   const returnTo = safeReturn(formData.get("returnTo"), scope ? "/team" : "/attendance");
   let replacedIds: string[] = [];
   let replacedKey: string | null = null;
+  let replacedGroupId: string | null = null;
   let employeeId = req(formData, "employeeId");
   if (replaceId) {
     const old = await prisma.attendance.findFirst({ where: { id: replaceId, employee: { companyId: user.companyId } } });
     if (!old) go(returnTo, { error: t("السجل غير موجود", "Record not found") });
     employeeId = old!.employeeId;
     replacedKey = rowBalanceKey(old!);
+    replacedGroupId = old!.groupId;
     replacedIds = old!.groupId
       ? (await prisma.attendance.findMany({ where: { groupId: old!.groupId, employeeId }, select: { id: true } })).map((row) => row.id)
       : [old!.id];
@@ -92,6 +94,13 @@ async function saveAttendance(formData: FormData, replaceId: string | null) {
       await tx.attendance.createMany({
         data: dates.map((date) => ({ employeeId, date, type, notes, deductsSalary, balanceKey, groupId })),
       });
+      if (replacedGroupId) {
+        const requestChoice = type === "UNPAID_LEAVE" ? "UNPAID_LEAVE" : balanceKey && type !== "HALF_DAY" ? `${LEAVE_CHOICE}${balanceKey}` : null;
+        await tx.leaveRequest.updateMany({
+          where: { attendanceGroupId: replacedGroupId, employeeId, status: "APPROVED" },
+          data: requestChoice ? { attendanceGroupId: groupId, choice: requestChoice, fromDate: from!, toDate: to!, days } : { status: "REVOKED" },
+        });
+      }
     });
   } catch (error) {
     if (error instanceof Error && error.message === "CONFLICT") {
@@ -140,7 +149,15 @@ export async function deleteAttendance(formData: FormData) {
   const rows = row!.groupId
     ? await prisma.attendance.findMany({ where: { groupId: row!.groupId, employeeId: row!.employeeId }, orderBy: { date: "asc" } })
     : [row!];
-  await prisma.attendance.deleteMany({ where: { id: { in: rows.map((item) => item.id) } } });
+  const revoked = await prisma.$transaction(async (tx) => {
+    await tx.attendance.deleteMany({ where: { id: { in: rows.map((item) => item.id) } } });
+    if (!row!.groupId) return 0;
+    const { count } = await tx.leaveRequest.updateMany({
+      where: { attendanceGroupId: row!.groupId, employeeId: row!.employeeId, status: "APPROVED" },
+      data: { status: "REVOKED" },
+    });
+    return count;
+  });
   const first = formatDate(rows[0].date);
   const last = formatDate(rows[rows.length - 1].date);
   const period = first === last ? first : t(`من ${first} إلى ${last}`, `${first} to ${last}`);
@@ -150,10 +167,14 @@ export async function deleteAttendance(formData: FormData) {
     employeeId: row!.employeeId,
     action: "ATTENDANCE_DELETE",
     message: t(
-      `حذف ${attendanceLabel(row!, leaveTypes, "ar")} للموظف ${row!.employee.fullName} ${period}`,
-      `Deleted ${attendanceLabel(row!, leaveTypes, "en")} for ${row!.employee.fullName} ${period}`,
+      `حذف ${attendanceLabel(row!, leaveTypes, "ar")} للموظف ${row!.employee.fullName} ${period}${revoked ? " وأُلغي طلب الإجازة المرتبط به" : ""}`,
+      `Deleted ${attendanceLabel(row!, leaveTypes, "en")} for ${row!.employee.fullName} ${period}${revoked ? " and cancelled the linked leave request" : ""}`,
     ),
   });
   refreshAll();
-  go(returnTo, { message: t("تم حذف الفترة وإعادة الأيام إلى الرصيد", "Period deleted and days returned to the balance") });
+  go(returnTo, {
+    message: revoked
+      ? t("تم حذف الفترة وإعادة الأيام إلى الرصيد، وظهر طلب الإجازة للموظف «ألغتها الإدارة»", "Period deleted, days returned to the balance, and the employee's leave request now shows “Cancelled by HR”")
+      : t("تم حذف الفترة وإعادة الأيام إلى الرصيد", "Period deleted and days returned to the balance"),
+  });
 }
