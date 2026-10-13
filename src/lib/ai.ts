@@ -263,6 +263,48 @@ export async function aiOwnerInsights(input: { lang: Lang; companyName: string; 
   return text.replace(/\*\*/g, "").trim().slice(0, 2500);
 }
 
+/**
+ * Rewrites a CV in polished, professional wording in the target language (translating when the source is in the other one).
+ * Facts — employers, titles, dates, degrees, grades, numbers — are kept exactly; nothing is invented.
+ */
+export async function aiPolishCv(input: { to: Lang; cv: unknown; jobTitle: string | null; company: string }) {
+  const { text } = await generateText({
+    model: VISION_MODEL,
+    temperature: 0.3,
+    providerOptions: { gateway: { models: VISION_FALLBACKS } },
+    system: [
+      "You are an expert CV writer for professionals in the Gulf (Sultanate of Oman). You receive a CV as JSON and return the same JSON structure, rewritten to read polished, confident and professional.",
+      input.to === "en"
+        ? "Write every text value in clear, professional British English. Translate any Arabic text. Transliterate Arabic names of companies and places as they are commonly written in English."
+        : "Write every text value in polished Modern Standard Arabic as used in professional Gulf CVs. Translate any English text; keep well-known brand and product names (e.g. Microsoft Excel, SAP) in Latin letters.",
+      "Never invent facts: keep employers, job titles' meaning, dates (from/to/current), degrees, institutions, grades, years and numbers exactly as given. Do not add experiences, skills, certificates or achievements that are not in the input. Keep the same number of entries in the same order.",
+      "headline: a short professional title (max 8 words). summary: 3–4 sentences in first person implied (no 'I'), highlighting experience, strengths and value. experience[].description: 2–5 lines, each starting with '- ' and a strong action verb, concrete. skills: concise skill names. achievements: concise lines.",
+      "Keep linkedin and website unchanged. Leave empty fields empty. Reply with the rewritten value of \"cv\" only, as a JSON object with the same keys (headline, summary, experience, ...), without the surrounding currentJobTitle/currentEmployer wrapper.",
+    ].join(" "),
+    prompt: JSON.stringify({ currentJobTitle: input.jobTitle || undefined, currentEmployer: input.company, cv: input.cv }),
+  });
+  const result = parseJson<Record<string, unknown>>(text, "{");
+  return result && typeof result.cv === "object" && result.cv ? (result.cv as Record<string, unknown>) : result;
+}
+
+/** A standard bilingual job description for a job title in an Omani company, for HR to review and edit. */
+export async function aiJobDescription(input: { titleAr: string; titleEn: string | null; department: string | null; company: string; reportsTo: string | null }) {
+  const { text } = await generateText({
+    model: VISION_MODEL,
+    temperature: 0.3,
+    providerOptions: { gateway: { models: VISION_FALLBACKS } },
+    system: [
+      "You are a senior HR consultant in the Sultanate of Oman writing a formal job description for a company's HR file, aligned with the Omani Labour Law and common Gulf HR practice.",
+      "Write each part in formal Modern Standard Arabic (…Ar) and a faithful professional English version (…En) with the same items in the same order.",
+      "purpose: 2–3 sentences on why the job exists. responsibilities: 8–12 concrete duties starting with a verb. qualifications: 3–6 items (education, years of experience, licences). skills: 5–8 skills and competencies. kpis: 4–6 measurable performance indicators.",
+      "Keep it realistic for the job's level; no salary, no company-specific facts you were not given, no markdown or numbering inside items.",
+      'Reply with JSON only: {"purposeAr":"","purposeEn":"","responsibilitiesAr":[],"responsibilitiesEn":[],"qualificationsAr":[],"qualificationsEn":[],"skillsAr":[],"skillsEn":[],"kpisAr":[],"kpisEn":[]}',
+    ].join(" "),
+    prompt: JSON.stringify({ jobTitle: input.titleAr, jobTitleEn: input.titleEn || undefined, department: input.department || undefined, company: input.company, reportsTo: input.reportsTo || undefined }),
+  });
+  return parseJson<Record<string, unknown>>(text, "{");
+}
+
 /** Translates many terms in one request; entries the model skips come back as null. */
 export async function aiTranslateMany(texts: string[], to: Lang) {
   if (!texts.length) return [];

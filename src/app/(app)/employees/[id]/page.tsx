@@ -11,7 +11,10 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   CalendarCheck2,
+  ClipboardList,
+  Contact,
   DoorOpen,
+  FileUser,
   ExternalLink,
   FileBadge,
   Inbox,
@@ -22,8 +25,10 @@ import {
   ReceiptText,
   RefreshCw,
   ScrollText,
+  Sparkles,
   Wallet,
 } from "lucide-react";
+import { cvCompleteness, cvFor, readCv } from "@/lib/cv";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { badgeUrl, ensureBadgeToken, qrSvg } from "@/lib/badge";
 import { AttendanceEditForm, DeleteButton, DocumentEditForm } from "@/components/row-forms";
@@ -229,6 +234,7 @@ export default async function EmployeePage({
   const portalLink = employee.portalToken ? portalUrl(origin, employee.portalToken) : null;
   const badgeLink = badgeUrl(origin, await ensureBadgeToken(employee));
   const badgeSvg = await qrSvg(badgeLink);
+  const cvProgress = cvCompleteness(cvFor(readCv(employee.cv), lang).content, Boolean(employee.photoUrl));
   const personName = (person: { fullName: string; nameEn: string | null }) => (lang === "en" && person.nameEn ? person.nameEn : person.fullName);
   const companyName = lang === "en" && user.company.nameEn ? user.company.nameEn : user.company.name;
 
@@ -312,6 +318,10 @@ export default async function EmployeePage({
                 {t("تعديل البيانات", "Edit")}
               </Link>
             ) : null}
+            <Link href={`${base}/profile`} className={secondaryBtn}>
+              <Printer size={16} />
+              {t("طباعة الملف", "Print profile")}
+            </Link>
             {allow.salaries ? (
               <Link href={`${base}?tab=salaries#statement`} className={secondaryBtn}>
                 <ReceiptText size={16} />
@@ -1090,6 +1100,50 @@ export default async function EmployeePage({
               )}
             </Card>
           ) : null}
+          <Card id="profile-prints" className="scroll-mt-24">
+            <SectionTitle>{t("الملف الشخصي والمطبوعات", "Profile and prints")}</SectionTitle>
+            <div className="mb-3 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-inset ring-slate-100">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-semibold text-slate-600">{t("اكتمال السيرة الذاتية", "CV completeness")}</span>
+                <span className="tabular font-bold text-teal-800">{cvProgress.score}%</span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-teal-600" style={{ width: `${cvProgress.score}%` }} />
+              </div>
+              <p className="mt-1.5 text-xs leading-5 text-slate-500">
+                {employee.cvUpdatedAt
+                  ? t(`آخر تحديث ${formatDate(employee.cvUpdatedAt)}. يعدّلها الموظف من بوابته أيضاً.`, `Updated ${formatDate(employee.cvUpdatedAt)}. The employee can edit it from the portal too.`)
+                  : t("لم تُعبأ بعد. يعبّئها الموظف من بوابته أو تعبّئها أنت.", "Not filled yet. The employee fills it from the portal, or you can.")}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { href: `${base}/profile`, Icon: Printer, label: t("الملف الكامل (سيرة ذاتية)", "Full profile (CV)") },
+                allow.edit ? { href: `${base}/cv`, Icon: FileUser, label: t("تعديل السيرة الذاتية", "Edit CV") } : null,
+                { href: `${base}/job-description`, Icon: ClipboardList, label: t("بطاقة الوصف الوظيفي", "Job description"), ai: true },
+                { href: `${base}/business-card`, Icon: Contact, label: t("بطاقة العمل", "Business card") },
+              ]
+                .filter((item): item is { href: string; Icon: typeof Printer; label: string; ai?: boolean } => Boolean(item))
+                .map(({ href, Icon, label, ai }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+                  >
+                    <Icon size={17} className="shrink-0 text-teal-700" />
+                    <span className="min-w-0">
+                      {label}
+                      {ai ? (
+                        <span className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                          <Sparkles size={11} />
+                          {t("بالذكاء الاصطناعي", "AI-assisted")}
+                        </span>
+                      ) : null}
+                    </span>
+                  </Link>
+                ))}
+            </div>
+          </Card>
           <Card id="badge" className="scroll-mt-24">
             <SectionTitle>{t("بطاقة الموظف", "Employee ID card")}</SectionTitle>
             <p className="mb-3 text-xs leading-5 text-slate-600">

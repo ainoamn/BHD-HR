@@ -194,6 +194,9 @@ model Employee {
   photoUrl           String?
   /// Key of the public badge page /id/<token> behind the employee's QR code; separate from the portal key.
   badgeToken         String?             @unique
+  /// The employee's CV per language, {ar?, en?} of src/lib/cv.ts CvContent; edited from the portal or by HR.
+  cv                 Json?
+  cvUpdatedAt        DateTime?
   /// Names copied from the chosen JobTitle / Department so lists and prints need no join.
   jobTitle           String?
   jobTitleEn         String?
@@ -248,13 +251,17 @@ model Employee {
 }
 
 model JobTitle {
-  id        String     @id @default(cuid())
-  companyId String
-  company   Company    @relation(fields: [companyId], references: [id])
-  nameAr    String
-  nameEn    String?
-  employees Employee[]
-  createdAt DateTime   @default(now())
+  id            String     @id @default(cuid())
+  companyId     String
+  company       Company    @relation(fields: [companyId], references: [id])
+  nameAr        String
+  nameEn        String?
+  /// Bilingual job description (src/lib/job-description.ts), drafted by AI and edited by HR; shared by everyone with this title.
+  description   Json?
+  descriptionAt DateTime?
+  descriptionBy String?
+  employees     Employee[]
+  createdAt     DateTime   @default(now())
 
   @@unique([companyId, nameAr])
 }

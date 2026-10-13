@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, Clock3, FileUp, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { CalendarCheck2, Clock3, Contact, FileUp, FileUser, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { cvCompleteness, cvFor, hasCvContent, readCv } from "@/lib/cv";
 import { PortalRequests } from "@/components/portal-requests";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { getSessionUser, isStaffRole } from "@/lib/auth";
@@ -13,7 +14,7 @@ import { LangToggle } from "@/components/lang-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { headerFor } from "@/components/salary-docs";
 import { SubmitButton } from "@/components/submit-button";
-import { Card, ToneBadge, fieldClass } from "@/components/ui";
+import { Card, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { muscatDay, muscatTime, workedLabel } from "@/lib/clock";
 import { DOC_LABEL, EXTRA_DOC_TYPES, monthName, termText } from "@/lib/constants";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, EXPENSE_PAY_LABEL, EXPENSE_STATUS_LABEL, EXPENSE_STATUS_TONE } from "@/lib/expenses";
@@ -107,6 +108,8 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     requestOrigin(),
   ]);
   const badgeSvg = await qrSvg(badgeUrl(origin, badgeToken));
+  const cvVersion = cvFor(readCv(employee.cv), lang);
+  const cvProgress = cvCompleteness(cvVersion.content, Boolean(employee.photoUrl));
   const issuer = lang === "en" && header.nameEn ? header.nameEn : header.name;
   const name = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
   const job = termText(employee.jobTitle, employee.jobTitleEn, lang);
@@ -127,6 +130,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     { id: "requests", label: t("الطلبات", "Requests") },
     letters.length ? { id: "letters", label: t("الخطابات", "Letters") } : null,
     reviews.length ? { id: "reviews", label: t("التقييم", "Reviews") } : null,
+    { id: "cv", label: t("سيرتي", "My CV") },
     { id: "badge", label: t("بطاقتي", "My ID card") },
   ].filter((item): item is { id: string; label: string } => Boolean(item));
   const sectionTitle = (Icon: typeof Clock3, title: string, hint?: string) => (
@@ -583,6 +587,46 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             </div>
           </Card>
         ) : null}
+
+        <Card id="cv" className="scroll-mt-16">
+          {sectionTitle(
+            FileUser,
+            t("سيرتي الذاتية وملفي", "My CV and profile"),
+            t("عبّئ سيرتك بأسلوبك ودع الذكاء الاصطناعي يصوغها باحتراف، ثم اطبع ملفك الكامل أو بطاقة عملك.", "Fill in your CV your way and let AI polish it, then print your full profile or business card."),
+          )}
+          <div className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-inset ring-slate-100">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-semibold text-slate-600">{t("اكتمال السيرة", "CV completeness")}</span>
+              <span className="tabular font-bold text-teal-800">{cvProgress.score}%</span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full rounded-full bg-teal-600" style={{ width: `${cvProgress.score}%` }} />
+            </div>
+            {cvProgress.missing.length ? (
+              <p className="mt-1.5 text-xs leading-5 text-slate-500">
+                {t("ينقصها: ", "Missing: ")}
+                {cvProgress.missing
+                  .slice(0, 3)
+                  .map((item) => pick(item, lang))
+                  .join(t("، ", ", "))}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <Link href={`${base}/cv`} className={primaryBtn}>
+              <PenLine size={16} />
+              {hasCvContent(cvVersion.content) ? t("تعديل سيرتي", "Edit my CV") : t("إنشاء سيرتي", "Create my CV")}
+            </Link>
+            <Link href={`${base}/profile`} className={secondaryBtn}>
+              <Printer size={16} />
+              {t("طباعة ملفي الكامل", "Print my profile")}
+            </Link>
+            <Link href={`${base}/business-card`} className={secondaryBtn}>
+              <Contact size={16} />
+              {t("بطاقة العمل", "Business card")}
+            </Link>
+          </div>
+        </Card>
 
         <Card id="badge" className="scroll-mt-16">
           {sectionTitle(
