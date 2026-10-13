@@ -3,6 +3,7 @@
 import { FileDown, FileSpreadsheet, LoaderCircle, Printer } from "lucide-react";
 import { useState } from "react";
 import { useLang } from "./lang-provider";
+import { printAfterPaint } from "./print-button";
 import { primaryBtn, secondaryBtn } from "./ui";
 
 /** Print uses the browser; PDF is rendered from the on-screen report so Arabic shaping matches exactly. */
@@ -52,7 +53,7 @@ export function ReportToolbar({ targetId, excelHref, fileName, canExport }: { ta
 
   return (
     <div className="no-print flex flex-wrap gap-2" data-pdf-ignore="true">
-      <button type="button" onClick={() => window.print()} className={`${secondaryBtn} flex-1 sm:flex-none`}>
+      <button type="button" onClick={printAfterPaint} className={`${secondaryBtn} flex-1 sm:flex-none`}>
         <Printer className="size-4" />
         {t("طباعة", "Print")}
       </button>
