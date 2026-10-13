@@ -442,7 +442,10 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("من يمسح رمز QR يرى «مستند أصلي معتمد» ويحمّل الأصل PDF.", "Anyone scanning the QR code sees “Authentic document” and can download the original PDF."),
     ],
     tips: [
-      b("ارفع صورة التوقيع والختم مرة واحدة من الإعدادات ← «التوقيع الإلكتروني والختم».", "Upload the signature and stamp images once in Settings → “E-signature and stamp”."),
+      b(
+        "الخطاب موقّع إلكترونياً فلا يحتاج ختماً. ارفع صورة التوقيع مرة واحدة من الإعدادات ← «التوقيع الإلكتروني والختم»؛ صورة الختم اختيارية وتظهر فقط إن رفعتها.",
+        "Letters are e-signed, so no stamp is needed. Upload the signature image once in Settings → “E-signature and stamp”; a stamp image is optional and only shows if you upload one.",
+      ),
       b(
         "الخطاب يُطبع على ترويسة الكفيل أو المنشأة: أضف الشعار والاسم بالإنجليزية والسجل التجاري والعنوان والهاتف والبريد في بياناتها لتكتمل الترويسة وتذييل الصفحة.",
         "Letters print on the sponsor's or company's letterhead: add the logo, English name, CR number, address, phone and email to its details to complete the letterhead and page footer.",

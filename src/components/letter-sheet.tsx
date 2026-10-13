@@ -64,7 +64,7 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
     <div className="flex h-28 items-center justify-center">
       <img src={seal.stamp} alt="" className="max-h-28 max-w-40 object-contain" />
     </div>
-  ) : (
+  ) : seal ? null : (
     <div className="mx-auto flex size-28 items-center justify-center rounded-full border border-dashed border-slate-300 text-center text-[11px] leading-4 text-slate-400">
       ختم المنشأة
       <br />
