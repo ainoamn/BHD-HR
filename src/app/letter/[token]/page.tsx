@@ -34,7 +34,6 @@ export default async function EmployeeLetterPage({ params }: { params: Promise<{
   return (
     <div className="min-h-dvh bg-slate-100 print:bg-white">
       <div className="mx-auto max-w-[210mm] px-2 py-4 sm:px-4 sm:py-8 print:px-0 print:py-0">
-        <style>{`@page { size: A4; margin: 12mm; }`}</style>
         <div className="no-print mb-4 flex flex-col gap-3 rounded-2xl bg-surface p-4 shadow-card ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
           {letter.cancelledAt ? (
             <p className="font-semibold text-red-700">{t("ألغت الإدارة هذا الخطاب.", "Management has cancelled this letter.")}</p>

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { writeAudit } from "./audit";
 import type { Channel } from "./delivery";
 import { LETTER_KIND, type LetterKind } from "./letters";
-import { letterFingerprint, newVerifyToken } from "./letter-seal";
+import { letterFingerprint, newVerifyToken, nextSignatureNo } from "./letter-seal";
 import { normalizePhone } from "./phone";
 import { prisma } from "./prisma";
 import { clip, isUniqueError } from "./utils";
@@ -73,12 +73,13 @@ export async function issueLetter(input: {
 
   for (let attempt = 0; ; attempt += 1) {
     try {
-      const refNo = await nextRefNo(input.companyId, input.issuedAt);
       const signedAt = new Date();
+      const [refNo, signatureNo] = await Promise.all([nextRefNo(input.companyId, input.issuedAt), nextSignatureNo(input.companyId, signedAt)]);
       const letter = await prisma.letter.create({
         data: {
           ...content,
           refNo,
+          signatureNo,
           signedAt,
           fingerprint: letterFingerprint({ ...content, refNo, signedAt }),
           signatureUrl: company?.signatureUrl || null,
@@ -98,7 +99,7 @@ export async function issueLetter(input: {
         userId: input.user.id,
         employeeId: input.employee.id,
         action: "LETTER_ISSUE",
-        message: `أصدر «${label.ar}» رقم ${letter.refNo} لـ ${input.employee.fullName} موقّعاً إلكترونياً / Issued e-signed “${label.en}” ${letter.refNo} to ${input.employee.fullName}`,
+        message: `أصدر «${label.ar}» رقم ${letter.refNo} لـ ${input.employee.fullName} موقّعاً إلكترونياً برقم ${signatureNo} / Issued e-signed “${label.en}” ${letter.refNo} to ${input.employee.fullName}, e-signature ${signatureNo}`,
       });
       return letter;
     } catch (error) {

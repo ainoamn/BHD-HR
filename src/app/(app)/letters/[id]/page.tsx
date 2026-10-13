@@ -124,6 +124,12 @@ export default async function LetterPage({ params, searchParams }: { params: Pro
             </SectionTitle>
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">{t("رقم التوقيع الإلكتروني", "E-signature No.")}</dt>
+                <dd className="tabular font-bold text-red-700" dir="ltr">
+                  {seal.serial || "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
                 <dt className="text-slate-500">{t("وقّعه", "Signed by")}</dt>
                 <dd className="text-end">{seal.signedByName || "—"}</dd>
               </div>

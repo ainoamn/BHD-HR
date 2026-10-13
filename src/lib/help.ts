@@ -450,9 +450,13 @@ export const HELP_TOPICS: HelpTopic[] = [
         "الخطاب يُطبع على ترويسة الكفيل أو المنشأة: أضف الشعار والاسم بالإنجليزية والسجل التجاري والعنوان والهاتف والبريد في بياناتها لتكتمل الترويسة وتذييل الصفحة.",
         "Letters print on the sponsor's or company's letterhead: add the logo, English name, CR number, address, phone and email to its details to complete the letterhead and page footer.",
       ),
+      b(
+        "لكل خطاب موقّع رقم توقيع إلكتروني متسلسل (مثل ES-2026-000001) يظهر في الختم أعلى الخطاب وفي صفحة التحقق، ولا يتكرر ولا يتغيّر.",
+        "Every signed letter has a sequential e-signature number (e.g. ES-2026-000001) shown in the seal at the top of the letter and on the verification page; it never repeats or changes.",
+      ),
     ],
     related: ["approvals", "settings"],
-    keywords: "خطاب إنذار لفت نظر شهادة توقيع ختم letter warning certificate signature",
+    keywords: "خطاب إنذار لفت نظر شهادة توقيع ختم رقم التوقيع الإلكتروني letter warning certificate signature serial",
   },
   {
     slug: "org",

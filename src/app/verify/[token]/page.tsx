@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BadgeCheck, CalendarDays, FileText, Fingerprint, Hash, PenLine, ShieldAlert, ShieldOff, UserRound } from "lucide-react";
+import { BadgeCheck, CalendarDays, FileText, Fingerprint, Hash, PenLine, ShieldAlert, ShieldOff, Stamp, UserRound } from "lucide-react";
 import { LetterSheet } from "@/components/letter-sheet";
 import { PrintButton } from "@/components/print-button";
 import { headerFor } from "@/components/salary-docs";
@@ -69,13 +69,13 @@ export default async function VerifyLetterPage({ params }: { params: Promise<{ t
     { icon: CalendarDays, label: t("تاريخ الإصدار", "Issued on"), value: formatDate(letter.issuedAt) },
     { icon: UserRound, label: t("الموظف", "Employee"), value: employeeName },
     { icon: PenLine, label: t("وقّعه إلكترونياً", "E-signed by"), value: `${seal.signedByName || letter.signatoryName || "—"} · ${formatDateTime(seal.signedAt)}` },
+    { icon: Stamp, label: t("رقم التوقيع الإلكتروني", "E-signature No."), value: seal.serial || "—", ltr: true },
     { icon: Fingerprint, label: t("رمز التحقق", "Verification code"), value: seal.code, ltr: true },
   ];
 
   return (
     <main className="min-h-dvh bg-slate-100 print:bg-white">
       <div className="mx-auto max-w-[210mm] px-2 py-4 sm:px-4 sm:py-8 print:px-0 print:py-0">
-        <style>{`@page { size: A4; margin: 12mm; }`}</style>
         <section className="no-print animate-fade-up mb-4 overflow-hidden rounded-3xl border border-slate-200/90 bg-surface shadow-card">
           <div className={`flex items-start gap-3 px-4 py-4 ring-1 ring-inset sm:px-5 ${status.tone}`}>
             <status.icon size={26} className="mt-0.5 shrink-0" />

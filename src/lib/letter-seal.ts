@@ -3,9 +3,19 @@ import type { Letter } from "@prisma/client";
 import { qrSvg } from "./badge";
 import { inlineLogo } from "./inline-logo";
 import { prisma } from "./prisma";
+import { isUniqueError } from "./utils";
 
-/** What the letter sheet prints under the signature: the QR code to the public check page and the signing details. */
-export type LetterSeal = { qr: string; url: string; signedByName: string | null; signedAt: Date; code: string; signature: string | null; stamp: string | null };
+/** What the letter sheet prints: the e-signature serial, the QR code to the public check page and the signing details. */
+export type LetterSeal = {
+  qr: string;
+  url: string;
+  serial: string | null;
+  signedByName: string | null;
+  signedAt: Date;
+  code: string;
+  signature: string | null;
+  stamp: string | null;
+};
 
 type SealedContent = Pick<
   Letter,
@@ -47,17 +57,43 @@ export function fingerprintCode(fingerprint: string | null | undefined) {
   return (fingerprint || "").slice(0, 16).toUpperCase().match(/.{4}/g)?.join("-") || "";
 }
 
-/** Letters issued before electronic signing get their seal the first time they are opened. */
-export async function ensureLetterSeal<T extends Letter>(letter: T): Promise<T> {
-  if (letter.verifyToken && letter.fingerprint && letter.signedAt) return letter;
-  const signedAt = letter.signedAt || letter.createdAt;
-  const signedByName = letter.signedByName || letter.createdByName || letter.signatoryName;
-  const fingerprint = letterFingerprint({ ...letter, signedAt, signedByName });
-  await prisma.letter.updateMany({
-    where: { id: letter.id, verifyToken: null },
-    data: { verifyToken: newVerifyToken(), signedAt, signedByName, fingerprint },
+/** Next e-signature serial ES-2026-000001 for the company, in the Muscat year of signing. */
+export async function nextSignatureNo(companyId: string, signedAt: Date) {
+  const prefix = `ES-${new Date(signedAt.getTime() + 4 * 3600_000).getUTCFullYear()}-`;
+  const last = await prisma.letter.findFirst({
+    where: { companyId, signatureNo: { startsWith: prefix } },
+    orderBy: { signatureNo: "desc" },
+    select: { signatureNo: true },
   });
-  const sealed = await prisma.letter.findUnique({ where: { id: letter.id }, select: { verifyToken: true, signedAt: true, signedByName: true, fingerprint: true } });
+  const next = last?.signatureNo ? Number(last.signatureNo.slice(prefix.length)) + 1 : 1;
+  return `${prefix}${String(Number.isFinite(next) ? next : 1).padStart(6, "0")}`;
+}
+
+/** Letters issued before electronic signing (or before serials) get them the first time they are opened. */
+export async function ensureLetterSeal<T extends Letter>(letter: T): Promise<T> {
+  if (letter.verifyToken && letter.fingerprint && letter.signedAt && letter.signatureNo) return letter;
+  if (!letter.verifyToken || !letter.fingerprint || !letter.signedAt) {
+    const signedAt = letter.signedAt || letter.createdAt;
+    const signedByName = letter.signedByName || letter.createdByName || letter.signatoryName;
+    const fingerprint = letterFingerprint({ ...letter, signedAt, signedByName });
+    await prisma.letter.updateMany({
+      where: { id: letter.id, verifyToken: null },
+      data: { verifyToken: newVerifyToken(), signedAt, signedByName, fingerprint },
+    });
+  }
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const signatureNo = await nextSignatureNo(letter.companyId, letter.signedAt || letter.createdAt);
+      await prisma.letter.updateMany({ where: { id: letter.id, signatureNo: null }, data: { signatureNo } });
+      break;
+    } catch (error) {
+      if (!isUniqueError(error)) throw error;
+    }
+  }
+  const sealed = await prisma.letter.findUnique({
+    where: { id: letter.id },
+    select: { verifyToken: true, signedAt: true, signedByName: true, fingerprint: true, signatureNo: true },
+  });
   return { ...letter, ...sealed } as T;
 }
 
@@ -75,6 +111,6 @@ export async function sealedLetter<T extends Letter>(input: T, origin: string, i
   ]);
   return {
     letter,
-    seal: { qr, url, signedByName: letter.signedByName, signedAt: letter.signedAt || letter.createdAt, code: fingerprintCode(letter.fingerprint), signature, stamp },
+    seal: { qr, url, serial: letter.signatureNo, signedByName: letter.signedByName, signedAt: letter.signedAt || letter.createdAt, code: fingerprintCode(letter.fingerprint), signature, stamp },
   };
 }

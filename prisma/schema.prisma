@@ -784,6 +784,8 @@ model Letter {
   signedAt       DateTime?
   signedByName   String?
   fingerprint    String?
+  /// E-signature serial ES-2026-000001: per company and year (Muscat time) of signing, never reused.
+  signatureNo    String?
   signatureUrl   String?
   stampUrl       String?
   request        EmployeeRequest?
@@ -792,6 +794,7 @@ model Letter {
   updatedAt      DateTime         @updatedAt
 
   @@unique([companyId, refNo])
+  @@unique([companyId, signatureNo])
   @@index([employeeId])
 }
 
