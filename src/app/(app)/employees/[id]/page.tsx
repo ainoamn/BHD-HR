@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Tr } from "@/components/ai-translate";
 import { AccountCard } from "@/components/account-card";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
@@ -657,7 +658,9 @@ export default async function EmployeePage({
               {employee.notes ? (
                 <Card>
                   <SectionTitle>{t("ملاحظات", "Notes")}</SectionTitle>
-                  <p className="whitespace-pre-line text-sm leading-6 text-slate-600">{employee.notes}</p>
+                  <p className="whitespace-pre-line text-sm leading-6 text-slate-600">
+                    <Tr text={employee.notes} />
+                  </p>
                 </Card>
               ) : null}
             </>
@@ -712,7 +715,11 @@ export default async function EmployeePage({
                               </>
                             ) : null}
                           </p>
-                          {document.notes ? <p className="mt-1 text-xs text-slate-500">{document.notes}</p> : null}
+                          {document.notes ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                              <Tr text={document.notes} />
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap items-start justify-between gap-3 sm:justify-end">
                           {document.submittedAt && !document.reviewedAt ? (

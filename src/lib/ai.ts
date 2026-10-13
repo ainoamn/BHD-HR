@@ -326,6 +326,83 @@ export async function aiHelpAnswer(input: { question: string; corpus: string; la
   return parseJson<{ answer?: unknown; topics?: unknown }>(text, "{");
 }
 
+/** Mostly Arabic letters? Decides which way free text is translated. */
+export function isArabicText(text: string) {
+  const arabic = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  return arabic >= latin;
+}
+
+const WORKPLACE = "short workplace texts (task steps, comments, notes, reasons, activity-log lines) written by staff of a company in the Sultanate of Oman";
+const KEEP = "Keep personal names, numbers, dates, codes, emails and links exactly as written, keep line breaks, and never add or drop information.";
+
+/** For reading what others wrote: each text into the other language (Arabic ⇄ English); entries the model skips come back as null. */
+export async function aiTranslateTexts(texts: string[]) {
+  if (!texts.length) return [];
+  const { text } = await generateText({
+    model: MODEL,
+    temperature: 0,
+    system: [
+      `You translate ${WORKPLACE}.`,
+      "For each string: if it is mainly Arabic, translate it into clear, natural English; otherwise translate it into clear Modern Standard Arabic as used in Gulf workplaces.",
+      KEEP,
+      "You receive a JSON array of strings; reply with a JSON array of the same length holding each translation in the same order, and nothing else.",
+    ].join(" "),
+    prompt: JSON.stringify(texts),
+  });
+  const parsed = parseJson<unknown[]>(text, "[");
+  return texts.map((_, index) => {
+    const value = parsed?.[index];
+    return typeof value === "string" && value.trim() ? value.trim().slice(0, 4000) : null;
+  });
+}
+
+export type WriteMode = "translate" | "improve" | "suggest";
+
+/**
+ * Help while typing in any free-text field: translate it to the other language, polish its wording, or offer
+ * up to three things to write. `label` and `context` describe the field and the page it is on.
+ */
+export async function aiWrite(input: { mode: WriteMode; text: string; label: string; context: string; uiLang: Lang; multiline: boolean; maxLength: number }) {
+  const lang: Lang = input.text.trim() ? (isArabicText(input.text) ? "ar" : "en") : input.uiLang;
+  const langName = (value: Lang) => (value === "ar" ? "Modern Standard Arabic as used in Gulf workplaces" : "clear, natural English");
+  const shape = input.multiline ? "It may be a few sentences; plain text, no markdown." : "It is a single line; keep it short, no full stop at the end.";
+  const field = JSON.stringify({ field: input.label || undefined, page: input.context || undefined, text: input.text || undefined });
+  if (input.mode === "suggest") {
+    const { text } = await generateText({
+      model: MODEL,
+      temperature: 0.5,
+      system: [
+        `You help staff of an HR team in Oman fill in a form field. Suggest 3 different, realistic things to write in it, in ${langName(lang)}, fitting the field and the page context.`,
+        input.text.trim() ? "The user has started typing: suggest better or completed versions of their text, keeping its meaning." : "",
+        shape,
+        `Each suggestion at most ${Math.min(input.maxLength, input.multiline ? 400 : 120)} characters. Never invent names, amounts or dates that are not in the context.`,
+        "Reply with a JSON array of 3 strings only.",
+      ].join(" "),
+      prompt: field,
+    });
+    const parsed = parseJson<unknown[]>(text, "[");
+    return {
+      suggestions: (parsed || [])
+        .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        .map((item) => item.trim().slice(0, input.maxLength))
+        .slice(0, 3),
+    };
+  }
+  const to: Lang = lang === "ar" ? "en" : "ar";
+  const { text } = await generateText({
+    model: MODEL,
+    temperature: input.mode === "translate" ? 0 : 0.2,
+    system:
+      input.mode === "translate"
+        ? `You translate ${WORKPLACE} into ${langName(to)}. ${KEEP} Reply with the translation only.`
+        : `You polish ${WORKPLACE}: fix spelling and grammar and make the wording clear and professional, in the same language (${langName(lang)}), keeping the meaning and roughly the length. ${KEEP} ${shape} Reply with the improved text only.`,
+    prompt: input.text,
+  });
+  const result = text.trim().replace(/^["'«“]+|["'»”]+$/g, "");
+  return { text: (input.multiline ? result : result.replace(/\s+/g, " ")).slice(0, input.maxLength) };
+}
+
 /** Translates many terms in one request; entries the model skips come back as null. */
 export async function aiTranslateMany(texts: string[], to: Lang) {
   if (!texts.length) return [];

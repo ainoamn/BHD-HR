@@ -237,6 +237,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("المهام المتأخرة تظهر في التنبيهات، وكل مهمة في التقويم يوم استحقاقها. المعلّقة لا تُحتسب متأخرة.", "Late tasks appear in alerts, and every task shows in the calendar on its due date. Tasks on hold are not counted as late."),
       b("إن لم يكن البريد الآلي مفعّلاً فانسخ رابط المدعو أو أرسله ببريدك أو واتساب من قائمة «المدعوّون بالبريد».", "If automatic email isn't set up, copy an invitee's link or send it by your own mail or WhatsApp from “Invited by email”."),
       b("الأرشفة تخفي المهمة دون حذفها؛ استخدمها للمهام القديمة بدل الحذف.", "Archiving hides a task without deleting it; use it for old tasks instead of deleting."),
+      b("زر «ترجمة فورية» أعلى الشاشة يُظهر ترجمة العنوان والوصف والخطوات والسجل والتعليقات وكل الملاحظات تحتها. وعند الكتابة في أي حقل اضغط «ذكاء» على زاويته للترجمة أو تحسين الصياغة أو اقتراحات، مع «تراجع».", "The “Translate” button at the top shows the translation of the title, description, steps, history, comments and all notes under them. While typing in any field, tap “AI” on its corner to translate, improve the wording or get suggestions, with Undo."),
     ],
     related: ["calendar", "employee-file"],
     keywords: "مهام لوحة مهمة تحويل دعوة بريد تأجيل تعليق إغلاق أرشفة أولوية عاجلة tasks board kanban transfer invite email postpone hold close archive priority urgent",

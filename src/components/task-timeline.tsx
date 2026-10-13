@@ -1,5 +1,6 @@
 import { Archive, ArrowLeftRight, CalendarClock, CircleDot, Flag, Mail, UserPlus, type LucideIcon } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import { Tr } from "./ai-translate";
 
 export type TimelineEntry = { id: string; kind: string; authorName: string; body: string; createdAt: Date; userId: string | null };
 
@@ -30,9 +31,13 @@ export function TaskTimeline({ entries, emptyText, action }: { entries: Timeline
               </span>
               <div className="min-w-0 flex-1 pt-1">
                 <p className="break-words text-sm leading-6 text-slate-700">
-                  <span className="font-semibold text-slate-900">{entry.authorName}</span> {headline}
+                  <span className="font-semibold text-slate-900">{entry.authorName}</span> <Tr text={headline} />
                 </p>
-                {details.length ? <p className="mt-0.5 whitespace-pre-line break-words rounded-xl bg-slate-50 px-3 py-1.5 text-sm leading-6 text-slate-600 ring-1 ring-inset ring-slate-100">{details.join("\n")}</p> : null}
+                {details.length ? (
+                  <p className="mt-0.5 whitespace-pre-line break-words rounded-xl bg-slate-50 px-3 py-1.5 text-sm leading-6 text-slate-600 ring-1 ring-inset ring-slate-100">
+                    <Tr text={details.join("\n")} />
+                  </p>
+                ) : null}
                 <time className="tabular text-xs text-slate-500">{formatDateTime(entry.createdAt)}</time>
               </div>
             </li>
@@ -49,7 +54,9 @@ export function TaskTimeline({ entries, emptyText, action }: { entries: Timeline
                   {action?.(entry)}
                 </div>
               </div>
-              <p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{entry.body}</p>
+              <p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-slate-700">
+                <Tr text={entry.body} />
+              </p>
             </div>
           </li>
         );

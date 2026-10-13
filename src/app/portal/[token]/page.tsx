@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { CalendarCheck2, CircleHelp, Clock3, Contact, FileUp, FileUser, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { Tr, TranslateToggle } from "@/components/ai-translate";
 import { cvCompleteness, cvFor, hasCvContent, readCv } from "@/lib/cv";
 import { PortalRequests } from "@/components/portal-requests";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
@@ -166,6 +167,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            <TranslateToggle tone="dark" compact />
             <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <Link href={`${base}/help`} className={headerPill} title={t("شرح استخدام صفحتي", "How to use my page")}>
@@ -312,8 +314,16 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                     </div>
                     <ToneBadge tone={LEAVE_REQUEST_TONE[request.status] || "slate"}>{pick(LEAVE_REQUEST_LABEL[request.status], lang, request.status)}</ToneBadge>
                   </div>
-                  {request.reason ? <p className="mt-1.5 break-words text-xs text-slate-500">{request.reason}</p> : null}
-                  {request.decisionNote ? <p className="mt-1.5 text-xs text-slate-600">{t("ملاحظة الإدارة:", "Note from HR:")} {request.decisionNote}</p> : null}
+                  {request.reason ? (
+                    <p className="mt-1.5 break-words text-xs text-slate-500">
+                      <Tr text={request.reason} />
+                    </p>
+                  ) : null}
+                  {request.decisionNote ? (
+                    <p className="mt-1.5 text-xs text-slate-600">
+                      {t("ملاحظة الإدارة:", "Note from HR:")} <Tr text={request.decisionNote} />
+                    </p>
+                  ) : null}
                   {request.status === "PENDING" ? (
                     <form action={cancelLeaveRequest} className="mt-2">
                       <input type="hidden" name="token" value={token} />
@@ -490,7 +500,11 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                       {pick(EXPENSE_PAY_LABEL[claim.payMethod], lang, claim.payMethod)} · {formatDate(claim.paidAt)}
                     </p>
                   ) : null}
-                  {claim.decisionNote ? <p className="mt-1.5 break-words text-xs text-slate-600">{t("ملاحظة الإدارة:", "Note from HR:")} {claim.decisionNote}</p> : null}
+                  {claim.decisionNote ? (
+                    <p className="mt-1.5 break-words text-xs text-slate-600">
+                      {t("ملاحظة الإدارة:", "Note from HR:")} <Tr text={claim.decisionNote} />
+                    </p>
+                  ) : null}
                   {claim.status === "PENDING" ? (
                     <form action={cancelExpense} className="mt-2">
                       <input type="hidden" name="token" value={token} />

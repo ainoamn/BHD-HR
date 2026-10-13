@@ -162,6 +162,7 @@ export function AssistantChat({ suggestions }: { suggestions: string[] }) {
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
+            data-ai="off"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {

@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
+import { TranslateToggle } from "@/components/ai-translate";
+import { AiWriteAssist } from "@/components/ai-write";
 import { AppFrame } from "@/components/app-frame";
 import { BhdAppSwitcher } from "@/components/bhd/BhdAppSwitcher";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -78,6 +80,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               />
             </div>
           ) : null}
+          <TranslateToggle compact />
           <ThemeToggle initial={theme} />
           <LangToggle />
           <BhdAppSwitcher user={{ name: user.name, email: user.email, picture: user.picture }} onSignOut={logout} locale={lang} />
@@ -96,6 +99,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       ) : null}
       {children}
+      <AiWriteAssist />
     </AppFrame>
   );
 }

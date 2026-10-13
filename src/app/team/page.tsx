@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarCheck2, CalendarX2, Check, ChevronLeft, ChevronRight, FileWarning, Inbox, Receipt, Users, X } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { ExpenseClaimCard } from "@/components/expense-claim";
 import { Flash } from "@/components/flash";
@@ -131,7 +132,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                       <p className="mt-0.5 text-sm text-slate-600">
                         <ToneBadge tone="teal">{requestLabel(request.choice)}</ToneBadge> {formatDate(request.fromDate)} — {formatDate(request.toDate)} · {daysLabel(request.days)} {t("يوم", "day(s)")}
                       </p>
-                      {request.reason ? <p className="mt-1 text-sm text-slate-600">{request.reason}</p> : null}
+                      {request.reason ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          <Tr text={request.reason} />
+                        </p>
+                      ) : null}
                       <p className="mt-1 text-xs text-slate-400">
                         {t("أُرسل", "Sent")} {formatDateTime(request.createdAt)}
                       </p>

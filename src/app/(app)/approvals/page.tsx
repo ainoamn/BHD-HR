@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarCheck2, Check, FileCheck2, Inbox, Receipt, ScrollText, X } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { EmployeeRequestCard } from "@/components/employee-request-card";
 import { ExpenseClaimCard } from "@/components/expense-claim";
 import { REQUEST_STATUS, decidableTypes, requestTitle } from "@/lib/requests";
@@ -158,7 +159,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                         <ToneBadge tone="teal">{labelOf(request.choice)}</ToneBadge>{" "}
                         {formatDate(request.fromDate)} — {formatDate(request.toDate)} · {daysLabel(request.days)} {t("يوم", "day(s)")}
                       </p>
-                      {request.reason ? <p className="mt-1 text-sm text-slate-600">{request.reason}</p> : null}
+                      {request.reason ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          <Tr text={request.reason} />
+                        </p>
+                      ) : null}
                       <p className="mt-1 text-xs text-slate-400">{t("أُرسل", "Sent")} {formatDateTime(request.createdAt)}</p>
                     </div>
                     {balance ? (
@@ -231,7 +236,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                   <p className="mt-0.5 text-slate-600">
                     {pick(DOC_LABEL[document.type], lang, document.type)} · <span dir="ltr">{document.documentNo || "—"}</span> · {t("ينتهي", "expires")} {formatDate(document.expiryDate)}
                   </p>
-                  {document.notes ? <p className="mt-0.5 text-xs text-slate-500">{document.notes}</p> : null}
+                  {document.notes ? (
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      <Tr text={document.notes} />
+                    </p>
+                  ) : null}
                   {document.fileUrl ? (
                     <a href={document.fileUrl} target="_blank" className="mt-1 inline-block text-xs font-semibold text-teal-800 underline">
                       {t("فتح الملف", "Open file")}

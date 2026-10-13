@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check, Paperclip, X } from "lucide-react";
+import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass, linkAction } from "@/components/ui";
 import { EXPENSE_CATEGORY_LABEL, EXPENSE_PAY_LABEL, EXPENSE_PAY_METHODS, EXPENSE_STATUS_LABEL, EXPENSE_STATUS_TONE } from "@/lib/expenses";
@@ -62,7 +63,11 @@ export function ExpenseClaimCard({
             <span className="tabular font-bold text-slate-900">{money(claim.amount, currency)}</span> · {pick(EXPENSE_CATEGORY_LABEL[claim.category], lang, claim.category)} · {formatDate(claim.spentAt)}
             {claim.source === "PORTAL" ? ` · ${t("من البوابة", "from the portal")}` : ""}
           </p>
-          {claim.notes ? <p className="mt-1 break-words text-xs text-slate-500">{claim.notes}</p> : null}
+          {claim.notes ? (
+            <p className="mt-1 break-words text-xs text-slate-500">
+              <Tr text={claim.notes} />
+            </p>
+          ) : null}
           {claim.receiptUrl ? (
             <a href={claim.receiptUrl} target="_blank" className={`${linkAction} mt-1 text-xs`}>
               <Paperclip size={13} />
@@ -76,7 +81,12 @@ export function ExpenseClaimCard({
       {claim.decidedByName || claim.decisionNote || claim.paidAt ? (
         <p className="mt-2 text-xs leading-5 text-slate-500">
           {claim.decidedByName ? `${claim.status === "REJECTED" ? t("رفضه", "Rejected by") : t("اعتمده", "Approved by")} ${claim.decidedByName}` : ""}
-          {claim.decisionNote ? ` — ${claim.decisionNote}` : ""}
+          {claim.decisionNote ? (
+            <>
+              {" — "}
+              <Tr text={claim.decisionNote} />
+            </>
+          ) : null}
           {claim.paidAt && claim.payMethod ? ` · ${t("صُرف", "Paid")} ${pick(EXPENSE_PAY_LABEL[claim.payMethod], lang, claim.payMethod)} ${formatDateTime(claim.paidAt)}${claim.paidByName ? ` (${claim.paidByName})` : ""}` : ""}
         </p>
       ) : null}

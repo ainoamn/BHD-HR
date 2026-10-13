@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Inbox, ScrollText } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { LetterForm } from "@/components/letter-form";
 import { Card, PageHeader } from "@/components/ui";
@@ -70,7 +71,11 @@ export default async function NewLetterPage({
               {t("طلب من", "Requested by")} {lang === "en" && request.employee.nameEn ? request.employee.nameEn : request.employee.fullName} · {formatDateTime(request.createdAt)}
             </p>
             {request.subject ? <p className="font-semibold">{request.subject}</p> : null}
-            {request.details ? <p className="whitespace-pre-line break-words">{request.details}</p> : null}
+            {request.details ? (
+              <p className="whitespace-pre-line break-words">
+                <Tr text={request.details} />
+              </p>
+            ) : null}
             {request.addressee ? (
               <p>
                 {t("إلى:", "To:")} {request.addressee}

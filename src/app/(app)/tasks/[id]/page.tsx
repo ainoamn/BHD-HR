@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { ActionForm, FlashToast, Toaster } from "@/components/action-form";
+import { Tr } from "@/components/ai-translate";
 import { CommentComposer } from "@/components/comment-composer";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { InviteLink } from "@/components/invite-link";
@@ -110,10 +111,19 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   const company = lang === "en" && task.company.nameEn ? task.company.nameEn : task.company.name;
   const emailReady = channelReady("EMAIL");
   const hiddenEntries = sp.log === "all" ? 0 : Math.max(0, task.comments.length - TIMELINE_RECENT);
+  const aiContext = [
+    `Task: ${task.title}`,
+    task.description ? `Details: ${task.description.slice(0, 600)}` : "",
+    `Status: ${status}, priority: ${priority}`,
+    task.dueDate ? `Due: ${formatDate(task.dueDate)}` : "",
+    task.assignees.length ? `Assigned to: ${task.assignees.map(({ employee }) => nameOf(employee)).join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(". ");
 
   return (
     <TaskLive status={status} priority={priority} resumeTo={resumeTo}>
-      <div className="page-wide space-y-5">
+      <div className="page-wide space-y-5" data-ai-context={aiContext}>
         <Link href="/tasks" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
           {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
           {t("كل المهام", "All tasks")}
@@ -155,7 +165,9 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
                   ) : null}
                   {archived ? <ToneBadge tone="slate">{t("مؤرشفة", "Archived")}</ToneBadge> : null}
                 </div>
-                <LiveTitle className="break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{task.title}</LiveTitle>
+                <LiveTitle className="break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                  <Tr text={task.title} size="text-base sm:text-lg" />
+                </LiveTitle>
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {canAct ? (
@@ -290,7 +302,9 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
               <WhenStatus is={[status]} saved>
                 <div className={cn("mt-4 rounded-2xl px-4 py-3 text-sm leading-6 ring-1 ring-inset", status === "ON_HOLD" ? "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200" : "bg-slate-50 text-slate-700 ring-slate-200")}>
                   <span className="font-semibold">{status === "ON_HOLD" ? t("سبب التعليق: ", "On hold because: ") : t("ملاحظة الإغلاق: ", "Closing note: ")}</span>
-                  <span className="whitespace-pre-line break-words">{task.statusNote}</span>
+                  <span className="whitespace-pre-line break-words">
+                    <Tr text={task.statusNote} />
+                  </span>
                 </div>
               </WhenStatus>
             ) : null}
@@ -314,7 +328,9 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
             {task.description ? (
               <Card>
                 <SectionTitle>{t("الوصف", "Description")}</SectionTitle>
-                <p className="whitespace-pre-line break-words text-sm leading-7 text-slate-700">{task.description}</p>
+                <p className="whitespace-pre-line break-words text-sm leading-7 text-slate-700">
+                  <Tr text={task.description} />
+                </p>
               </Card>
             ) : null}
 

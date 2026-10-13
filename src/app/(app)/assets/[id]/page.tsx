@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, History } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, SectionTitle, ToneBadge, fieldClass } from "@/components/ui";
@@ -83,7 +84,11 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
                 </div>
               ))}
             </dl>
-            {asset.notes ? <p className="mt-3 whitespace-pre-line break-words rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{asset.notes}</p> : null}
+            {asset.notes ? (
+              <p className="mt-3 whitespace-pre-line break-words rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <Tr text={asset.notes} />
+              </p>
+            ) : null}
             {canEdit ? (
               <details className="group mt-4 border-t border-slate-100 pt-3">
                 <summary className="cursor-pointer list-none text-sm font-bold text-teal-800">{t("تعديل البيانات", "Edit details")}</summary>
@@ -141,7 +146,11 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
                     <span className="font-semibold">{pick(ASSET_EVENT_LABEL[event.kind], lang, event.kind)}</span>
                     {event.employeeName ? ` ${event.employeeName}` : ""}
                   </p>
-                  {event.note ? <p className="break-words text-slate-600">{event.note}</p> : null}
+                  {event.note ? (
+                    <p className="break-words text-slate-600">
+                      <Tr text={event.note} />
+                    </p>
+                  ) : null}
                   <p className="text-xs text-slate-400">
                     {formatDateTime(event.createdAt)}
                     {event.byName ? ` · ${event.byName}` : ""}

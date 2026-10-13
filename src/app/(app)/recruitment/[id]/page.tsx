@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, ChevronDown, Link2, Pencil, Sparkles, Star, UserPlus, Users } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { JobForm } from "@/components/job-form";
 import { ShareLetter } from "@/components/share-letter";
@@ -259,7 +260,9 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           <Card>
             <SectionTitle>{t("الوصف والمتطلبات", "Description & requirements")}</SectionTitle>
             {job.description ? (
-              <p className="whitespace-pre-line break-words text-sm leading-7 text-slate-700">{job.description}</p>
+              <p className="whitespace-pre-line break-words text-sm leading-7 text-slate-700">
+                <Tr text={job.description} />
+              </p>
             ) : (
               <p className="text-sm text-slate-500">{t("لم يُكتب وصف. أضفه ليفهم المتقدمون الوظيفة ويُقيَّموا بدقة.", "No description yet. Add one so applicants understand the job and screening is accurate.")}</p>
             )}

@@ -5,6 +5,7 @@ import { useOptimistic, useRef, useTransition } from "react";
 import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { toast } from "./action-form";
+import { Tr } from "./ai-translate";
 import { useLang } from "./lang-provider";
 import { fieldClass, secondaryBtn } from "./ui";
 
@@ -87,7 +88,7 @@ export function TaskChecklist({
                   {item.done ? <Check size={13} strokeWidth={3} /> : null}
                 </span>
               )}
-              <span className={cn("min-w-0 flex-1 break-words text-sm leading-6 transition-colors duration-150", item.done ? "text-slate-400 line-through" : "text-slate-800")}>{item.text}</span>
+              <span className={cn("min-w-0 flex-1 break-words text-sm leading-6 transition-colors duration-150", item.done ? "text-slate-400 line-through" : "text-slate-800")}>{temporary ? item.text : <Tr text={item.text} />}</span>
               {remove && !temporary ? (
                 <button
                   type="button"

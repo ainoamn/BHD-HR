@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Pin, PinOff, Plus, ScrollText, StickyNote, TriangleAlert } from "lucide-react";
+import { Tr } from "./ai-translate";
 import { pick, type Lang } from "@/lib/i18n";
 import { LETTER_KIND, letterState, nextWarningKind, type LetterKind } from "@/lib/letters";
 import { NOTE_KINDS } from "@/lib/tasks";
@@ -101,7 +102,9 @@ export function EmployeeNotesTab({
                       <span className="font-semibold text-slate-700">{note.authorName}</span>
                       <span className="tabular">{formatDateTime(note.createdAt)}</span>
                     </div>
-                    <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-800">{note.body}</p>
+                    <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-800">
+                      <Tr text={note.body} />
+                    </p>
                     {allow.edit || allow.remove ? (
                       <div className="mt-3 flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-slate-100 pt-2.5">
                         {allow.edit ? (
@@ -298,7 +301,9 @@ export function PinnedNotes({ notes, lang, href }: { notes: EmployeeNoteRow[]; l
           <li key={note.id} className="flex gap-2.5 text-sm">
             <Pin size={14} className="mt-1 shrink-0 text-amber-600" />
             <div className="min-w-0">
-              <p className="whitespace-pre-line break-words leading-6 text-slate-800">{note.body}</p>
+              <p className="whitespace-pre-line break-words leading-6 text-slate-800">
+                <Tr text={note.body} />
+              </p>
               <p className="mt-0.5 text-xs text-slate-500">
                 {pick((NOTE_KINDS[note.kind] || NOTE_KINDS.GENERAL).label, lang)} · {note.authorName} · {formatDate(note.createdAt)}
               </p>

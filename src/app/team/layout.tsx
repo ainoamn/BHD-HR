@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { KeyRound, LifeBuoy, LogOut, UserRound, Users } from "lucide-react";
+import { TranslateToggle } from "@/components/ai-translate";
+import { AiWriteAssist } from "@/components/ai-write";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { LangToggle } from "@/components/lang-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -31,6 +33,7 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
             <p className="mt-0.5 text-xs text-white/70">{pick(ACCOUNT_ROLE_LABEL[user.role], lang)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            <TranslateToggle tone="dark" compact />
             <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <Link href="/password" className={pill} title={t("تغيير كلمة المرور", "Change password")}>
@@ -75,6 +78,7 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
         </div>
       </nav>
       <main className="page-wide px-4 py-5 sm:px-6">{children}</main>
+      <AiWriteAssist />
     </div>
   );
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Archive, ListChecks, MessageSquare, PauseCircle } from "lucide-react";
 import { FlashToast, Toaster } from "@/components/action-form";
+import { TranslateToggle, Tr } from "@/components/ai-translate";
+import { AiWriteAssist } from "@/components/ai-write";
 import { CommentComposer } from "@/components/comment-composer";
 import { TaskChecklist } from "@/components/task-checklist";
 import { LiveBadges, StatusButtons, TaskLive } from "@/components/task-live";
@@ -43,15 +45,20 @@ export default async function GuestTaskPage({ params, searchParams }: { params: 
 
   return (
     <TaskLive status={status} priority={priority} resumeTo="TODO">
-      <div className="min-h-dvh bg-slate-50">
+      <div className="min-h-dvh bg-slate-50" data-ai-context={`Task: ${task.title}${task.description ? `. Details: ${task.description.slice(0, 600)}` : ""}`}>
         <header className="relative overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 text-white">
           <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
           <div className="relative mx-auto max-w-5xl px-4 pb-6 pt-5">
-            <p className="text-sm font-semibold text-white/75">
-              {t(`مهمة من «${company}»`, `A task from “${company}”`)}
-              {invite.invitedByName ? ` · ${t(`دعاك ${invite.invitedByName}`, `invited by ${invite.invitedByName}`)}` : ""}
-            </p>
-            <h1 className="mt-2 break-words text-xl font-bold sm:text-2xl">{task.title}</h1>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="min-w-0 text-sm font-semibold text-white/75">
+                {t(`مهمة من «${company}»`, `A task from “${company}”`)}
+                {invite.invitedByName ? ` · ${t(`دعاك ${invite.invitedByName}`, `invited by ${invite.invitedByName}`)}` : ""}
+              </p>
+              <TranslateToggle tone="dark" />
+            </div>
+            <h1 className="mt-2 break-words text-xl font-bold sm:text-2xl">
+              <Tr text={task.title} size="text-base sm:text-lg" tone="dark" />
+            </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <LiveBadges due={dueInfo(task.dueDate, "TODO", lang)} plainDue={task.dueDate ? formatDate(task.dueDate) : null} />
             </div>
@@ -68,7 +75,11 @@ export default async function GuestTaskPage({ params, searchParams }: { params: 
                   : status === "ON_HOLD"
                     ? t("المهمة معلّقة حالياً؛ ستتمكن من تحديثها عند استئنافها.", "The task is on hold; you can update it once it resumes.")
                     : t("أُغلقت هذه المهمة. شكراً لمتابعتك.", "This task is closed. Thank you for following up.")}
-                {task.statusNote ? <span className="mt-1 block whitespace-pre-line break-words text-slate-600">{task.statusNote}</span> : null}
+                {task.statusNote ? (
+                  <span className="mt-1 block whitespace-pre-line break-words text-slate-600">
+                    <Tr text={task.statusNote} />
+                  </span>
+                ) : null}
               </p>
             </div>
           ) : (
@@ -85,7 +96,9 @@ export default async function GuestTaskPage({ params, searchParams }: { params: 
               {task.description ? (
                 <Card>
                   <SectionTitle>{t("الوصف", "Description")}</SectionTitle>
-                  <p className="whitespace-pre-line break-words text-sm leading-7 text-slate-700">{task.description}</p>
+                  <p className="whitespace-pre-line break-words text-sm leading-7 text-slate-700">
+                    <Tr text={task.description} />
+                  </p>
                 </Card>
               ) : null}
 
@@ -141,6 +154,7 @@ export default async function GuestTaskPage({ params, searchParams }: { params: 
         </main>
       </div>
       <FlashToast error={sp.error} message={sp.message} />
+      {locked ? null : <AiWriteAssist />}
       <Toaster />
     </TaskLive>
   );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, ChevronDown, FileText, Mail, MessageCircle, Pencil, Phone, Sparkles, UserCheck } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, InfoItem, SectionTitle, ToneBadge, fieldClass, linkAction } from "@/components/ui";
@@ -139,7 +140,11 @@ export default async function CandidatePage({ params, searchParams }: { params: 
               <InfoItem label={t("موعد المقابلة", "Interview")} value={candidate.interviewAt ? muscatDateTime(candidate.interviewAt) : "—"} />
               <InfoItem label={t("تقييمك", "Your rating")} value={candidate.rating ? `${"★".repeat(candidate.rating)}${"☆".repeat(5 - candidate.rating)}` : "—"} />
               {candidate.coverNote ? <InfoItem wide label={t("رسالة المتقدم", "Applicant's note")} value={<span className="whitespace-pre-line">{candidate.coverNote}</span>} /> : null}
-              {candidate.notes ? <InfoItem wide label={t("ملاحظات", "Notes")} value={<span className="whitespace-pre-line">{candidate.notes}</span>} /> : null}
+              {candidate.notes ? <InfoItem wide label={t("ملاحظات", "Notes")} value={
+                    <span className="whitespace-pre-line">
+                      <Tr text={candidate.notes} />
+                    </span>
+                  } /> : null}
               {candidate.rejectReason ? <InfoItem wide label={t("سبب الاستبعاد", "Reason for rejection")} value={candidate.rejectReason} /> : null}
             </dl>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">

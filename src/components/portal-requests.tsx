@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { BadgeCheck, DoorOpen, FilePlus2, HandCoins, MessageSquarePlus, ScrollText } from "lucide-react";
+import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass } from "@/components/ui";
 import { pick, type Bi } from "@/lib/i18n";
@@ -214,10 +215,14 @@ export function PortalRequests({
                     </div>
                     <ToneBadge tone={status.tone}>{pick(status.label, lang)}</ToneBadge>
                   </div>
-                  {request.details ? <p className="mt-1.5 line-clamp-3 whitespace-pre-line break-words text-xs text-slate-600">{request.details}</p> : null}
+                  {request.details ? (
+                    <p className="mt-1.5 whitespace-pre-line break-words text-xs text-slate-600">
+                      <Tr text={request.details} />
+                    </p>
+                  ) : null}
                   {request.decisionNote ? (
                     <p className="mt-1.5 break-words text-xs text-slate-600">
-                      {t("ملاحظة الإدارة:", "Note from HR:")} {request.decisionNote}
+                      {t("ملاحظة الإدارة:", "Note from HR:")} <Tr text={request.decisionNote} />
                     </p>
                   ) : null}
                   {request.letter && !request.letter.cancelledAt ? (

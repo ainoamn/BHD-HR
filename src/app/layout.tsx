@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
 import { cookies } from "next/headers";
+import { TranslateProvider } from "@/components/ai-translate";
 import { LangProvider } from "@/components/lang-provider";
 import { getI18n } from "@/lib/lang";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/utils";
@@ -48,7 +49,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-dvh antialiased">
-        <LangProvider lang={lang}>{children}</LangProvider>
+        <LangProvider lang={lang}>
+          <TranslateProvider>{children}</TranslateProvider>
+        </LangProvider>
       </body>
     </html>
   );

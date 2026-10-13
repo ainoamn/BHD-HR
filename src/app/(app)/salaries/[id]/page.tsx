@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, BadgeCheck, ChevronDown, CircleDollarSign, HandCoins, PencilLine, Printer, ReceiptText, RefreshCw, Trash2 } from "lucide-react";
+import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
@@ -172,7 +173,7 @@ export default async function SalaryDetailPage({
                 <InfoItem label={t("تاريخ الصرف", "Pay date")} value={formatDate(salary.paidAt)} />
                 <InfoItem label={t("رقم العملية", "Reference")} value={salary.paymentReference || "—"} />
                 <InfoItem label={t("بواسطة", "By")} value={salary.paidByName || "—"} />
-                {salary.notes ? <InfoItem label={t("ملاحظات", "Notes")} value={salary.notes} wide /> : null}
+                {salary.notes ? <InfoItem label={t("ملاحظات", "Notes")} value={<Tr text={salary.notes} />} wide /> : null}
               </dl>
               {allow.pay ? (
                 <div className="mt-4 border-t border-slate-100 pt-4">

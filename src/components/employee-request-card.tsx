@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check, PenLine, X } from "lucide-react";
+import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
 import { pick } from "@/lib/i18n";
@@ -91,7 +92,11 @@ export function EmployeeRequestCard({
                 {t("المبلغ:", "Amount:")} <strong className="tabular">{money(request.amount, currency)}</strong> · {request.installments || 1} {t("قسط", "instalment(s)")}
               </p>
             ) : null}
-            {request.details ? <p className="whitespace-pre-line break-words">{request.details}</p> : null}
+            {request.details ? (
+              <p className="whitespace-pre-line break-words">
+                <Tr text={request.details} />
+              </p>
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-slate-400">
             {t("أُرسل", "Sent")} {formatDateTime(request.createdAt)}
