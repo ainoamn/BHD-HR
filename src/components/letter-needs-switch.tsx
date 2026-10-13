@@ -19,7 +19,7 @@ export function LetterNeedsSwitch({ panels }: { panels: Record<string, React.Rea
   return (
     <>
       <span ref={anchor} hidden />
-      {kind && panels[kind] ? <div className="min-w-0 sm:col-span-2">{panels[kind]}</div> : null}
+      {kind && panels[kind] ? <div className="min-w-0 @md:col-span-2">{panels[kind]}</div> : null}
     </>
   );
 }

@@ -27,7 +27,7 @@ export default async function PortalCvPage({ params, searchParams }: { params: P
     <div className="min-h-dvh bg-slate-50">
       <header className="relative overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 text-white">
         <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
-        <div className="relative mx-auto max-w-3xl px-4 pb-6 pt-5">
+        <div className="relative mx-auto max-w-7xl px-4 pb-6 pt-5 sm:px-6 lg:px-8">
           <Link href={`${base}#cv`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/80 transition hover:text-white">
             <Back size={16} />
             {t("رجوع إلى صفحتي", "Back to my page")}
@@ -41,7 +41,7 @@ export default async function PortalCvPage({ params, searchParams }: { params: P
           </p>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-5">
+      <main className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6 lg:px-8">
         <Flash error={sp.error} message={sp.message} />
         <CvEditor
           key={cvLang}

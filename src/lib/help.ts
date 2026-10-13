@@ -791,12 +791,19 @@ export const HELP_TOPICS: HelpTopic[] = [
     shots: [{ file: "portal", caption: b("البوابة على الهاتف بأقسامها", "The portal on a phone with its sections"), phone: true }],
     steps: [
       b("يدخل الموظف باسم المستخدم وكلمة المرور، أو يفتح رابط البوابة المرسل له.", "The employee signs in with their username and password, or opens the portal link they were sent."),
-      b("شريط الأقسام أعلى الصفحة ينقله مباشرة إلى ما يريد.", "The section bar at the top takes them straight to what they need."),
+      b(
+        "شريط الأقسام أعلى الصفحة على الهاتف، وقائمة جانبية ثابتة على الحاسوب والشاشات الكبيرة، تنقله مباشرة إلى ما يريد وتُبرز القسم الذي يقرؤه.",
+        "A section bar at the top on a phone, and a fixed side menu on computers and large screens, take them straight to what they need and highlight the section they are reading.",
+      ),
+      b(
+        "الصفحة تملأ الشاشة وتتكيّف مع كل جهاز: عمود واحد على الهاتف، وعمودان من البطاقات على الشاشات العريضة، وكل نموذج يرتّب خاناته حسب المساحة المتاحة له.",
+        "The page fills the screen and adapts to every device: one column on a phone, two columns of cards on wide screens, and every form arranges its fields to the space it has.",
+      ),
       b("لا يرى الموظف شيئاً عن غيره، ولا ملاحظات الإدارة الداخلية.", "Employees never see anyone else's data or management's internal notes."),
       b("زر اللغة والمظهر أعلى الصفحة، وزر «شرح» يفتح هذا الدليل.", "Language and theme buttons sit at the top, and “Help” opens this guide."),
     ],
     related: ["portal-profile", "portal-leave", "portal-requests", "portal-originals", "portal-cv", "portal-more"],
-    keywords: "بوابة الموظف صفحتي portal employee",
+    keywords: "بوابة الموظف صفحتي ملء الشاشة الحاسوب الجوال portal employee full screen desktop mobile responsive",
   },
   {
     slug: "portal-profile",

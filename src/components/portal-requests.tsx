@@ -77,7 +77,7 @@ export function PortalRequests({
   const defaultLastDay = new Date(Date.now() + RESIGNATION_NOTICE_DAYS * 86400000);
   const label = (text: string) => <span className="text-sm font-medium text-slate-700">{text}</span>;
   const block = (Icon: LucideIcon, title: string, children: React.ReactNode, open = false) => (
-    <details className="group rounded-2xl border border-slate-200 p-3 sm:p-4" open={open}>
+    <details className="group rounded-2xl border border-slate-200 p-3 @md:p-4" open={open}>
       <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-teal-800">
         <Icon size={16} />
         {title}
@@ -91,12 +91,12 @@ export function PortalRequests({
       {block(
         FilePlus2,
         t("طلب خطاب أو شهادة", "Request a letter or certificate"),
-        <form action={submitEmployeeRequest} className="mt-3 grid gap-3 sm:grid-cols-2">
+        <form action={submitEmployeeRequest} className="mt-3 grid gap-3 @md:grid-cols-2">
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="type" value="LETTER" />
-          <fieldset className="space-y-2 sm:col-span-2">
+          <fieldset className="space-y-2 @md:col-span-2">
             <legend className="mb-1.5 text-sm font-medium text-slate-700">{t("نوع الخطاب", "Letter type")}</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 @md:grid-cols-2">
               {REQUEST_LETTER_KINDS.map((kind, index) => (
                 <label
                   key={kind}
@@ -151,11 +151,11 @@ export function PortalRequests({
             {label(t("موضوع الخطاب (للخطاب الآخر)", "Subject (for another letter)"))}
             <input className={`${fieldClass} w-full`} name="subject" maxLength={120} />
           </label>
-          <label className="block space-y-1.5 sm:col-span-2">
+          <label className="block space-y-1.5 @md:col-span-2">
             {label(t("التفاصيل أو الغرض", "Details or purpose"))}
             <textarea className={`${fieldClass} min-h-20 w-full`} name="details" maxLength={2000} />
           </label>
-          <p className="flex items-start gap-2 text-xs leading-5 text-slate-500 sm:col-span-2">
+          <p className="flex items-start gap-2 text-xs leading-5 text-slate-500 @md:col-span-2">
             <BadgeCheck size={14} className="mt-0.5 shrink-0 text-emerald-600" />
             {autoKinds.length
               ? t(
@@ -167,8 +167,8 @@ export function PortalRequests({
                   "Once management approves, the letter is issued e-signed with a QR code and appears here to download. Anyone who scans the code can confirm it is authentic.",
                 )}
           </p>
-          <div className="sm:col-span-2">
-            <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
+          <div className="@md:col-span-2">
+            <SubmitButton className="w-full @md:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
               {t("إرسال الطلب", "Send request")}
             </SubmitButton>
           </div>
@@ -179,7 +179,7 @@ export function PortalRequests({
       {block(
         HandCoins,
         t("طلب سلفة", "Request a salary advance"),
-        <form action={submitEmployeeRequest} className="mt-3 grid gap-3 sm:grid-cols-2">
+        <form action={submitEmployeeRequest} className="mt-3 grid gap-3 @md:grid-cols-2">
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="type" value="ADVANCE" />
           <label className="block space-y-1.5">
@@ -190,13 +190,13 @@ export function PortalRequests({
             {label(t("عدد الأقساط الشهرية", "Monthly instalments"))}
             <input className={`${fieldClass} w-full`} name="installments" type="number" min="1" max={MAX_ADVANCE_INSTALLMENTS} defaultValue={1} required dir="ltr" />
           </label>
-          <label className="block space-y-1.5 sm:col-span-2">
+          <label className="block space-y-1.5 @md:col-span-2">
             {label(t("السبب", "Reason"))}
             <input className={`${fieldClass} w-full`} name="details" maxLength={500} />
           </label>
-          <p className="text-xs leading-5 text-slate-500 sm:col-span-2">{t("بعد الاعتماد تُخصم الأقساط تلقائياً من رواتبك القادمة.", "Once approved, instalments are deducted from your coming salaries automatically.")}</p>
-          <div className="sm:col-span-2">
-            <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
+          <p className="text-xs leading-5 text-slate-500 @md:col-span-2">{t("بعد الاعتماد تُخصم الأقساط تلقائياً من رواتبك القادمة.", "Once approved, instalments are deducted from your coming salaries automatically.")}</p>
+          <div className="@md:col-span-2">
+            <SubmitButton className="w-full @md:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
               {t("إرسال الطلب", "Send request")}
             </SubmitButton>
           </div>
@@ -218,7 +218,7 @@ export function PortalRequests({
             <textarea className={`${fieldClass} min-h-24 w-full`} name="details" required maxLength={2000} />
           </label>
           <div>
-            <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
+            <SubmitButton className="w-full @md:w-auto" pendingLabel={t("جارٍ الإرسال...", "Sending...")}>
               {t("إرسال الطلب", "Send request")}
             </SubmitButton>
           </div>

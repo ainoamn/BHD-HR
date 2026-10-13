@@ -70,13 +70,13 @@ export function SelfDataFields({ fields, lang, t, required, intro }: { fields: r
   };
 
   return (
-    <div className="min-w-0 space-y-3 rounded-2xl bg-amber-50/70 p-3 ring-1 ring-inset ring-amber-200 sm:p-4">
+    <div className="min-w-0 space-y-3 rounded-2xl bg-amber-50/70 p-3 ring-1 ring-inset ring-amber-200 @md:p-4">
       <p className="text-sm leading-6 font-semibold text-amber-900">
         {intro || t("هذه البيانات غير موجودة في ملفك. أدخلها لتُحفظ في ملفك.", "These details are missing from your file. Enter them to save them to your file.")}
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 @md:grid-cols-2">
         {fields.map((field) => (
-          <label key={field} className={`block min-w-0 space-y-1.5 ${field === "address" ? "sm:col-span-2" : ""}`}>
+          <label key={field} className={`block min-w-0 space-y-1.5 ${field === "address" ? "@md:col-span-2" : ""}`}>
             <span className="text-sm font-medium text-slate-700">{pick(SELF_FIELD_LABEL[field], lang)}</span>
             {control(field)}
           </label>

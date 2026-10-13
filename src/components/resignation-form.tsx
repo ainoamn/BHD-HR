@@ -64,7 +64,7 @@ export function ResignationForm({
       <input type="hidden" name="type" value="RESIGNATION" />
       <input type="hidden" name="signedTextEn" value={textEn} />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 @md:grid-cols-2">
         <label className="block min-w-0 space-y-1.5">
           <span className="text-sm font-medium text-slate-700">{t("آخر يوم عمل مقترح", "Proposed last working day")}</span>
           <input className={`${fieldClass} w-full`} type="date" name="lastDay" required min={minDay} value={lastDay} onChange={(event) => changeDay(event.target.value)} />
@@ -139,7 +139,7 @@ export function ResignationForm({
         </span>
       </label>
 
-      <div className="grid gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200 sm:p-4">
+      <div className="grid gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200 @md:p-4">
         <p className="text-sm font-bold text-slate-800">{t("التوقيع الإلكتروني", "Electronic signature")}</p>
         <label className="block min-w-0 space-y-1.5">
           <span className="text-sm font-medium text-slate-700">{t("اكتب اسمك الكامل", "Type your full name")}</span>
@@ -172,7 +172,7 @@ export function ResignationForm({
       <div>
         <SubmitButton
           variant="danger"
-          className="w-full sm:w-auto"
+          className="w-full @md:w-auto"
           disabled={!ready}
           confirm={t("توقيع الاستقالة وإرسالها إلى الإدارة؟", "Sign and send your resignation to management?")}
           pendingLabel={t("جارٍ الإرسال...", "Sending...")}

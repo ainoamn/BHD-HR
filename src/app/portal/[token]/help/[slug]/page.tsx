@@ -20,7 +20,7 @@ export default async function PortalHelpTopicPage({ params }: { params: Promise<
   return (
     <div className="min-h-dvh bg-slate-50">
       <div className="h-1.5 bg-gradient-to-l from-ink-900 to-teal-800" aria-hidden="true" />
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <HelpTopicView topic={topic} audience="employee" lang={lang} basePath={`/portal/${token}/help`} token={token} />
       </main>
     </div>
