@@ -11,12 +11,14 @@ export function Modal({
   triggerClassName,
   children,
   defaultOpen = false,
+  size = "lg",
 }: {
   label: React.ReactNode;
   title: string;
   triggerClassName?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  size?: "lg" | "sm";
 }) {
   const { t } = useLang();
   const ref = useRef<HTMLDialogElement>(null);
@@ -30,7 +32,7 @@ export function Modal({
           ref.current = node;
           if (node && defaultOpen && !node.open) node.showModal();
         }}
-        className="m-auto w-[min(56rem,calc(100vw-1.5rem))] rounded-3xl border border-slate-200 bg-surface p-0 text-slate-900 shadow-float backdrop:bg-ink-950/45 backdrop:backdrop-blur-[2px] open:animate-fade-up"
+        className={`m-auto ${size === "sm" ? "w-[min(32rem,calc(100vw-1.5rem))]" : "w-[min(56rem,calc(100vw-1.5rem))]"} rounded-3xl border border-slate-200 bg-surface p-0 text-slate-900 shadow-float backdrop:bg-ink-950/45 backdrop:backdrop-blur-[2px] open:animate-fade-up`}
         onClick={(event) => {
           if (event.target === ref.current) ref.current?.close();
         }}

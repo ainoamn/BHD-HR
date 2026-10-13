@@ -602,23 +602,57 @@ model Task {
   company       Company        @relation(fields: [companyId], references: [id])
   title         String
   description   String?
-  /// TODO, IN_PROGRESS, REVIEW or DONE.
+  /// TODO, IN_PROGRESS, REVIEW, ON_HOLD, DONE or CANCELLED (closed without completion).
   status        String         @default("TODO")
   /// URGENT, HIGH, NORMAL or LOW.
   priority      String         @default("NORMAL")
   startDate     DateTime?
   dueDate       DateTime?
+  /// When it was closed (DONE or CANCELLED).
   completedAt   DateTime?
+  /// Why it is on hold or was closed without completion.
+  statusNote    String?
+  /// The status an ON_HOLD task returns to when resumed.
+  resumeStatus  String?
+  postponeCount Int            @default(0)
+  /// Archived tasks leave the board, lists, alerts and calendar until restored.
+  archivedAt    DateTime?
   position      Float          @default(0)
   createdById   String?
   createdByName String?
   assignees     TaskAssignee[]
   items         TaskItem[]
   comments      TaskComment[]
+  invites       TaskInvite[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([companyId, status])
+}
+
+/// Someone invited to a task by email. `token` opens /task/<token> without an account, where they can
+/// follow the task, tick steps, comment and move it between To do, In progress and Review.
+/// `employeeId` is set when the address belongs to one of the company's employees (who is then an assignee).
+model TaskInvite {
+  id            String    @id @default(cuid())
+  taskId        String
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  email         String
+  name          String?
+  employeeId    String?
+  token         String    @unique
+  invitedById   String?
+  invitedByName String?
+  /// PENDING (no mail service yet; share the link), SENT or FAILED.
+  emailStatus   String    @default("PENDING")
+  emailError    String?
+  sentAt        DateTime?
+  lastSeenAt    DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@unique([taskId, email])
+  @@index([taskId])
 }
 
 model TaskAssignee {
@@ -650,6 +684,8 @@ model TaskComment {
   task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId     String?
   authorName String
+  /// COMMENT, or a history entry: STATUS, PRIORITY, ASSIGN, TRANSFER, INVITE, POSTPONE, ARCHIVE (see TASK_EVENT).
+  kind       String   @default("COMMENT")
   body       String
   createdAt  DateTime @default(now())
 

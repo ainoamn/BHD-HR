@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { AlarmClock, CheckCircle2, Flag, KanbanSquare, List, ListTodo, Plus, Search } from "lucide-react";
+import { AlarmClock, Archive, CheckCircle2, Flag, KanbanSquare, List, ListTodo, Plus, Search } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { Modal } from "@/components/modal";
@@ -13,7 +13,7 @@ import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { employeeOptions, loadBoardTasks } from "@/lib/task-data";
-import { TASK_PRIORITIES, TASK_PRIORITY, isTaskPriority } from "@/lib/tasks";
+import { ACTIVE_STATUSES, CLOSED_STATUSES, TASK_PRIORITIES, TASK_PRIORITY, TASK_STATUS, TASK_STATUSES, isTaskPriority, isTaskStatus } from "@/lib/tasks";
 import { createTask } from "@/server/task-actions";
 
 const DONE_WINDOW_DAYS = 30;
@@ -21,13 +21,15 @@ const DONE_WINDOW_DAYS = 30;
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; q?: string; employeeId?: string; priority?: string; due?: string; done?: string; new?: string; error?: string; message?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; employeeId?: string; priority?: string; status?: string; due?: string; done?: string; archived?: string; new?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("tasks.view");
   const { lang, t } = await getI18n();
   const allow = { create: can(user, "tasks.create"), edit: can(user, "tasks.edit") };
-  const view = sp.view === "list" ? "list" : "board";
+  const archived = sp.archived === "1";
+  const status = isTaskStatus(sp.status || "") ? sp.status! : "";
+  const view = sp.view === "list" || archived || status === "CANCELLED" ? "list" : "board";
   const q = (sp.q || "").trim().slice(0, 100);
   const priority = isTaskPriority(sp.priority || "") ? sp.priority! : "";
   const due = ["overdue", "today", "week", "none"].includes(sp.due || "") ? sp.due! : "";
@@ -39,34 +41,36 @@ export default async function TasksPage({
   const weekEnd = new Date(today.getTime() + 8 * 86400000);
   const doneSince = new Date(now.getTime() - DONE_WINDOW_DAYS * 86400000);
 
-  const filters: Prisma.TaskWhereInput[] = [{ companyId: user.companyId }];
+  const filters: Prisma.TaskWhereInput[] = [{ companyId: user.companyId, archivedAt: archived ? { not: null } : null }];
   if (q) filters.push({ OR: [{ title: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }] });
   if (sp.employeeId) filters.push({ assignees: { some: { employeeId: sp.employeeId } } });
   if (priority) filters.push({ priority });
-  if (due === "overdue") filters.push({ dueDate: { lt: today }, status: { not: "DONE" } });
+  if (status) filters.push({ status });
+  if (due === "overdue") filters.push({ dueDate: { lt: today }, status: { in: ACTIVE_STATUSES } });
   if (due === "today") filters.push({ dueDate: { gte: today, lt: tomorrow } });
   if (due === "week") filters.push({ dueDate: { gte: today, lt: weekEnd } });
   if (due === "none") filters.push({ dueDate: null });
-  if (!allDone) filters.push({ OR: [{ status: { not: "DONE" } }, { completedAt: { gte: doneSince } }, { completedAt: null }] });
+  if (!allDone && !archived) filters.push({ OR: [{ status: { notIn: CLOSED_STATUSES } }, { completedAt: { gte: doneSince } }, { completedAt: null }] });
 
   const [tasks, employees, counts] = await Promise.all([
     loadBoardTasks({ AND: filters }, lang),
     employeeOptions(user.companyId, lang),
     Promise.all([
-      prisma.task.count({ where: { companyId: user.companyId, status: { not: "DONE" } } }),
-      prisma.task.count({ where: { companyId: user.companyId, status: { not: "DONE" }, dueDate: { lt: today } } }),
-      prisma.task.count({ where: { companyId: user.companyId, status: { not: "DONE" }, dueDate: { gte: today, lt: weekEnd } } }),
+      prisma.task.count({ where: { companyId: user.companyId, archivedAt: null, status: { notIn: CLOSED_STATUSES } } }),
+      prisma.task.count({ where: { companyId: user.companyId, archivedAt: null, status: { in: ACTIVE_STATUSES }, dueDate: { lt: today } } }),
+      prisma.task.count({ where: { companyId: user.companyId, archivedAt: null, status: { in: ACTIVE_STATUSES }, dueDate: { gte: today, lt: weekEnd } } }),
       prisma.task.count({ where: { companyId: user.companyId, status: "DONE", completedAt: { gte: new Date(now.getFullYear(), now.getMonth(), 1) } } }),
+      prisma.task.count({ where: { companyId: user.companyId, archivedAt: { not: null } } }),
     ]),
   ]);
-  const [openCount, overdueCount, weekCount, doneMonth] = counts;
+  const [openCount, overdueCount, weekCount, doneMonth, archivedCount] = counts;
   const boardTasks = tasks.map(({ dueDate: _dueDate, createdAt: _createdAt, ...task }) => task);
-  const hasAny = openCount > 0 || doneMonth > 0 || tasks.length > 0;
-  const filtered = Boolean(q || sp.employeeId || priority || due);
+  const hasAny = openCount > 0 || doneMonth > 0 || archivedCount > 0 || tasks.length > 0;
+  const filtered = Boolean(q || sp.employeeId || priority || status || due);
 
   const params = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams();
-    const base: Record<string, string> = { view, q, employeeId: sp.employeeId || "", priority, due, done: allDone ? "all" : "" };
+    const base: Record<string, string> = { view, q, employeeId: sp.employeeId || "", priority, status, due, done: allDone ? "all" : "", archived: archived ? "1" : "" };
     for (const [key, value] of Object.entries({ ...base, ...patch })) if (value) next.set(key, value);
     const query = next.toString();
     return query ? `/tasks?${query}` : "/tasks";
@@ -119,6 +123,7 @@ export default async function TasksPage({
         <GetForm className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
           <input type="hidden" name="view" value={view} />
           {allDone ? <input type="hidden" name="done" value="all" /> : null}
+          {archived ? <input type="hidden" name="archived" value="1" /> : null}
           <label className="col-span-2 min-w-0 space-y-1.5 text-xs font-medium text-slate-500 sm:w-56">
             {t("بحث", "Search")}
             <span className="relative block">
@@ -149,6 +154,17 @@ export default async function TasksPage({
             </select>
           </label>
           <label className="min-w-0 space-y-1.5 text-xs font-medium text-slate-500">
+            {t("الحالة", "Status")}
+            <select name="status" defaultValue={status} className={`${fieldClass} block w-full sm:w-auto`}>
+              <option value="">{t("الكل", "All")}</option>
+              {TASK_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {pick(TASK_STATUS[value].label, lang)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-0 space-y-1.5 text-xs font-medium text-slate-500">
             {t("الاستحقاق", "Due")}
             <select name="due" defaultValue={due} className={`${fieldClass} block w-full sm:w-auto`}>
               <option value="">{t("أي وقت", "Any time")}</option>
@@ -161,14 +177,14 @@ export default async function TasksPage({
           <div className="flex gap-2">
             <button className={secondaryBtn}>{t("تطبيق", "Apply")}</button>
             {filtered ? (
-              <Link href={params({ q: null, employeeId: null, priority: null, due: null })} className="self-center text-sm font-semibold text-slate-500 hover:text-teal-800">
+              <Link href={params({ q: null, employeeId: null, priority: null, status: null, due: null })} className="self-center text-sm font-semibold text-slate-500 hover:text-teal-800">
                 {t("مسح", "Clear")}
               </Link>
             ) : null}
           </div>
         </GetForm>
         <nav className="segmented self-start lg:self-end" aria-label={t("طريقة العرض", "View")}>
-          <Link href={params({ view: "board" })} aria-current={view === "board" ? "page" : undefined}>
+          <Link href={params({ view: "board", archived: null, status: status === "CANCELLED" ? null : status })} aria-current={view === "board" ? "page" : undefined}>
             <KanbanSquare size={16} />
             {t("لوحة", "Board")}
           </Link>
@@ -200,18 +216,29 @@ export default async function TasksPage({
         </Card>
       )}
 
-      <p className="mt-4 text-xs text-slate-500">
-        {allDone ? (
+      <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
+        {archived ? (
+          <Link href={params({ archived: null })} className="inline-flex items-center gap-1.5 font-semibold text-teal-800 hover:underline">
+            <Archive size={14} />
+            {t("رجوع إلى المهام الحالية", "Back to current tasks")}
+          </Link>
+        ) : archivedCount ? (
+          <Link href={params({ archived: "1", view: "list" })} className="inline-flex items-center gap-1.5 font-semibold text-teal-800 hover:underline">
+            <Archive size={14} />
+            {t(`المؤرشفة (${archivedCount})`, `Archived (${archivedCount})`)}
+          </Link>
+        ) : null}
+        {archived ? null : allDone ? (
           <Link href={params({ done: null })} className="font-semibold text-teal-800 hover:underline">
             {t(`إخفاء المهام المكتملة قبل أكثر من ${DONE_WINDOW_DAYS} يوماً`, `Hide tasks completed more than ${DONE_WINDOW_DAYS} days ago`)}
           </Link>
         ) : (
-          <>
-            {t(`تظهر المهام المكتملة خلال آخر ${DONE_WINDOW_DAYS} يوماً. `, `Showing tasks completed in the last ${DONE_WINDOW_DAYS} days. `)}
+          <span>
+            {t(`تظهر المهام المكتملة والمغلقة خلال آخر ${DONE_WINDOW_DAYS} يوماً. `, `Showing tasks completed or closed in the last ${DONE_WINDOW_DAYS} days. `)}
             <Link href={params({ done: "all" })} className="font-semibold text-teal-800 hover:underline">
-              {t("عرض كل المكتملة", "Show all completed")}
+              {t("عرض الكل", "Show all")}
             </Link>
-          </>
+          </span>
         )}
       </p>
     </div>

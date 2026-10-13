@@ -80,7 +80,7 @@ export async function reviewFacts(employeeId: string, companyId: string, start: 
     prisma.attendance.findMany({ where: { employeeId, date: { gte: start, lt: until } }, select: { type: true, deductsSalary: true } }),
     prisma.clockEntry.findMany({ where: { employeeId, inAt: { gte: start, lt: until } }, select: { lateMinutes: true } }),
     prisma.task.findMany({
-      where: { companyId, assignees: { some: { employeeId } }, OR: [{ dueDate: { gte: start, lt: until } }, { completedAt: { gte: start, lt: until } }] },
+      where: { companyId, status: { not: "CANCELLED" }, assignees: { some: { employeeId } }, OR: [{ dueDate: { gte: start, lt: until } }, { completedAt: { gte: start, lt: until } }] },
       select: { title: true, status: true, dueDate: true, completedAt: true },
       take: 60,
     }),
@@ -118,7 +118,7 @@ export async function reviewFacts(employeeId: string, companyId: string, start: 
   if (tasks.length) {
     const done = tasks.filter((task) => task.status === "DONE");
     const onTime = done.filter((task) => !task.dueDate || (task.completedAt && task.completedAt.getTime() <= task.dueDate.getTime() + 86400000));
-    const overdue = tasks.filter((task) => task.status !== "DONE" && task.dueDate && task.dueDate < new Date());
+    const overdue = tasks.filter((task) => task.status !== "DONE" && task.status !== "ON_HOLD" && task.dueDate && task.dueDate < new Date());
     facts.push(
       t(
         `المهام في الفترة: ${tasks.length}، أنجز ${done.length} (${onTime.length} في موعدها)، متأخرة غير منجزة ${overdue.length}`,

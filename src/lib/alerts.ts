@@ -12,7 +12,7 @@ import { getI18n } from "./lang";
 import { attendanceLabel, computeLeaveBalances, groupAttendance, leaveWarningText, leaveWarnings } from "./leave";
 import { prisma } from "./prisma";
 import { REQUEST_TYPE, decidableTypes, type RequestType } from "./requests";
-import { TASK_ALERT_DAYS } from "./tasks";
+import { ACTIVE_STATUSES, TASK_ALERT_DAYS } from "./tasks";
 import { daysLabel, daysPhrase, formatDate, money, monthRange } from "./utils";
 
 export type AlertItem = {
@@ -83,7 +83,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
     }),
     can(user, "tasks.view")
       ? prisma.task.findMany({
-          where: { companyId: company.id, status: { not: "DONE" }, dueDate: { lt: taskHorizon } },
+          where: { companyId: company.id, archivedAt: null, status: { in: ACTIVE_STATUSES }, dueDate: { lt: taskHorizon } },
           select: { id: true, title: true, dueDate: true, assignees: { select: { employee: { select: { fullName: true, nameEn: true } } } } },
           orderBy: { dueDate: "asc" },
           take: 30,

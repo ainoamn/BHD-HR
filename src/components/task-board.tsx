@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Flag, ListChecks, MessageSquare } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
-import { TASK_PRIORITY, TASK_STATUS, TASK_STATUSES, type TaskPriority, type TaskStatus } from "@/lib/tasks";
+import { BOARD_STATUSES, TASK_PRIORITY, TASK_STATUS, type TaskPriority, type TaskStatus } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 import { moveTask } from "@/server/task-actions";
 import { useLang } from "./lang-provider";
@@ -101,8 +101,8 @@ export function TaskBoard({ tasks, canEdit }: { tasks: BoardTask[]; canEdit: boo
           {error}
         </p>
       ) : null}
-      <div className="thin-scroll -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible">
-        {TASK_STATUSES.map((status) => {
+      <div className="thin-scroll -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 xl:grid xl:grid-cols-5 xl:overflow-visible">
+        {BOARD_STATUSES.map((status) => {
           const meta = TASK_STATUS[status];
           const items = board.filter((task) => task.status === status);
           return (
@@ -110,7 +110,7 @@ export function TaskBoard({ tasks, canEdit }: { tasks: BoardTask[]; canEdit: boo
               key={status}
               aria-label={pick(meta.label, lang)}
               className={cn(
-                "flex w-[82vw] max-w-80 shrink-0 snap-start flex-col rounded-2xl p-2.5 ring-1 ring-inset ring-slate-200/70 transition sm:w-72 lg:w-auto lg:max-w-none",
+                "flex w-[82vw] max-w-80 shrink-0 snap-start flex-col rounded-2xl p-2.5 ring-1 ring-inset ring-slate-200/70 transition sm:w-72 xl:w-auto xl:max-w-none",
                 meta.column,
                 over?.status === status && dragging && "ring-2 ring-teal-500/60",
               )}
@@ -197,7 +197,7 @@ export function TaskBoard({ tasks, canEdit }: { tasks: BoardTask[]; canEdit: boo
                           value={task.status}
                           onChange={(event) => move(task.id, event.target.value as TaskStatus, 0)}
                         >
-                          {TASK_STATUSES.map((option) => (
+                          {BOARD_STATUSES.map((option) => (
                             <option key={option} value={option}>
                               {t("نقل إلى: ", "Move to: ")}
                               {pick(TASK_STATUS[option].label, lang)}

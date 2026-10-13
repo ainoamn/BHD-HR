@@ -6,14 +6,16 @@ import { useLang } from "./lang-provider";
 import { fieldClass, secondaryBtn } from "./ui";
 
 /** There is no outgoing mail server, so the admin shares the link by copy, mail app or WhatsApp. */
-export function InviteLink({ url, email, company }: { url: string; email: string; company: string }) {
+export function InviteLink({ url, email, company, subject, message: custom }: { url: string; email: string; company: string; subject?: string; message?: string }) {
   const { t } = useLang();
   const [copied, setCopied] = useState(false);
   const inputId = useId();
-  const message = t(
-    `تمت دعوتك إلى «${company}» في نظام الموظفين والرواتب BHD. افتح الرابط وادخل بحساب BHD المسجّل بالبريد ${email}:\n${url}`,
-    `You are invited to “${company}” on the BHD HR & Payroll system. Open the link and sign in with the BHD account for ${email}:\n${url}`,
-  );
+  const message =
+    custom ||
+    t(
+      `تمت دعوتك إلى «${company}» في نظام الموظفين والرواتب BHD. افتح الرابط وادخل بحساب BHD المسجّل بالبريد ${email}:\n${url}`,
+      `You are invited to “${company}” on the BHD HR & Payroll system. Open the link and sign in with the BHD account for ${email}:\n${url}`,
+    );
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
@@ -37,7 +39,7 @@ export function InviteLink({ url, email, company }: { url: string; email: string
       <div className="flex flex-wrap gap-2">
         <a
           className={secondaryBtn}
-          href={`mailto:${email}?subject=${encodeURIComponent(t(`دعوة إلى ${company}`, `Invitation to ${company}`))}&body=${encodeURIComponent(message)}`}
+          href={`mailto:${email}?subject=${encodeURIComponent(subject || t(`دعوة إلى ${company}`, `Invitation to ${company}`))}&body=${encodeURIComponent(message)}`}
         >
           <Mail className="size-4" />
           {t("إرسال بالبريد", "Send by email")}

@@ -13,7 +13,7 @@ export async function loadBoardTasks(where: Prisma.TaskWhereInput, lang: Lang): 
     include: {
       assignees: { include: { employee: { select: { id: true, fullName: true, nameEn: true } } } },
       items: { select: { done: true } },
-      _count: { select: { comments: true } },
+      _count: { select: { comments: { where: { kind: "COMMENT" } } } },
     },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
     take: 500,

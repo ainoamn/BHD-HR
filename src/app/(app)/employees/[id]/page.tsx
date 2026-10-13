@@ -72,6 +72,7 @@ import { EmployeeHrTab } from "@/components/employee-hr-tab";
 import { EmployeeLettersTab, EmployeeNotesTab, EmployeeTasksTab, PinnedNotes } from "@/components/employee-workspace";
 import { LETTER_KIND, WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
 import { employeeOptions, loadBoardTasks } from "@/lib/task-data";
+import { isClosedStatus } from "@/lib/tasks";
 import { ShareLetter } from "@/components/share-letter";
 import { muscatTime, workedLabel } from "@/lib/clock";
 import { portalUrl } from "@/lib/portal";
@@ -137,7 +138,7 @@ export default async function EmployeePage({
           orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
         })
       : [],
-    allow.tasks ? loadBoardTasks({ companyId: user.companyId, assignees: { some: { employeeId: employee.id } } }, lang) : [],
+    allow.tasks ? loadBoardTasks({ companyId: user.companyId, archivedAt: null, assignees: { some: { employeeId: employee.id } } }, lang) : [],
     allow.taskAdd ? employeeOptions(user.companyId, lang) : [],
     allow.letters
       ? prisma.letter.findMany({
@@ -155,7 +156,7 @@ export default async function EmployeePage({
   const acceptedResignation = employee.status === "TERMINATED" ? null : openRequests.find((request) => request.type === "RESIGNATION" && request.status === "APPROVED");
   const pendingRequests = openRequests.filter((request) => request.status === "PENDING").length;
   const activeWarnings = letters.filter((letter) => !letter.cancelledAt && WARNING_KINDS.includes(letter.kind as LetterKind) && letter.issuedAt >= warningSince).length;
-  const openTasks = employeeTasks.filter((task) => task.status !== "DONE").length;
+  const openTasks = employeeTasks.filter((task) => !isClosedStatus(task.status)).length;
   const balances = computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes);
   const annual = balances.find((item) => item.key === "annual") || balances[0];
   const periods = groupAttendance(employee.attendance);

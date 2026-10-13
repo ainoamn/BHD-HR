@@ -92,7 +92,7 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
       include: { employee: { select: { id: true, fullName: true, nameEn: true } } },
     }),
     prisma.task.findMany({
-      where: { companyId, dueDate: { gte: start, lt: end } },
+      where: { companyId, archivedAt: null, status: { not: "CANCELLED" }, dueDate: { gte: start, lt: end } },
       select: { id: true, title: true, status: true, dueDate: true, assignees: { select: { employee: { select: { fullName: true, nameEn: true } } } } },
       take: 300,
     }),
@@ -256,7 +256,7 @@ export async function getCalendarEvents(companyId: string, year: number, month: 
       title: t(`استحقاق مهمة: ${task.title}`, `Task due: ${task.title}`),
       detail: names.length ? (names.length > 2 ? `${names.slice(0, 2).join("، ")} +${names.length - 2}` : names.join(lang === "en" ? ", " : "، ")) : undefined,
       href: `/tasks/${task.id}`,
-      urgent: !done && daysUntil(task.dueDate!) <= 0,
+      urgent: !done && task.status !== "ON_HOLD" && daysUntil(task.dueDate!) <= 0,
       done,
     });
   }

@@ -206,17 +206,40 @@ export const HELP_TOPICS: HelpTopic[] = [
     href: "/tasks",
     video: "tasks",
     title: b("المهام", "Tasks"),
-    summary: b("لوحة مهام بأعمدة وسحب وإفلات لمتابعة العمل المسند للموظفين، مع خطوات يقترحها الذكاء الاصطناعي.", "A drag-and-drop task board to follow work assigned to employees, with AI-suggested steps."),
-    shots: [{ file: "tasks", caption: b("اللوحة: للتنفيذ، قيد التنفيذ، للمراجعة، مكتملة", "The board: To do, In progress, Review, Done") }],
+    summary: b(
+      "لوحة مهام بأعمدة وسحب وإفلات لمتابعة العمل المسند للموظفين، مع تحويل المهمة ودعوة أي شخص بالبريد، وألوان للحالة والأولوية، والتعليق والتأجيل والإغلاق والأرشفة.",
+      "A drag-and-drop task board to follow work assigned to employees, with transfers, email invites for anyone, coloured status and priority, and hold, postpone, close and archive.",
+    ),
+    shots: [{ file: "tasks", caption: b("اللوحة: للتنفيذ، قيد التنفيذ، للمراجعة، معلّقة، مكتملة", "The board: To do, In progress, Review, On hold, Done") }],
     steps: [
       b("«مهمة جديدة»: العنوان، الموظفون المسندون، الأولوية، تاريخ الاستحقاق، الوصف وخطوات التنفيذ.", "“New task”: title, assigned employees, priority, due date, description and steps."),
       b("اسحب البطاقة إلى عمود آخر لتغيير حالتها، أو داخل العمود لترتيبها. على الهاتف استخدم «نقل إلى».", "Drag a card to another column to change its status, or within a column to reorder. On a phone use “Move to”."),
-      b("افتح المهمة لتعلّم الخطوات المنجزة، وتكتب التعليقات، أو «اقترح خطوات بالذكاء الاصطناعي».", "Open a task to tick off steps, add comments, or “Suggest steps with AI”."),
-      b("ابحث وصفِّ بالموظف أو الأولوية أو الاستحقاق (متأخرة، اليوم، هذا الأسبوع).", "Search and filter by employee, priority or due date (late, today, this week)."),
+      b(
+        "في صفحة المهمة غيّر الحالة والأولوية بزر واحد؛ يتلوّن الزر المختار (عاجلة أحمر، عالية برتقالي، متوسطة أزرق، منخفضة رمادي).",
+        "On the task page change status and priority with one click; the chosen button takes its colour (urgent red, high orange, medium blue, low grey).",
+      ),
+      b(
+        "في بطاقة «الأشخاص»: زر ⇄ بجانب الموظف يحوّل المهمة منه إلى موظف آخر، و«إضافة موظف» يشرك غيره، و«دعوة بالبريد» يدعو أي شخص ولو من خارج النظام.",
+        "In the “People” card: ⇄ next to an employee transfers the task to someone else, “Add employee” brings in another, and “Invite by email” invites anyone, even outside the system.",
+      ),
+      b(
+        "المدعو بالبريد يفتح المهمة من رابطه دون حساب: يرى التفاصيل، ويحدّث الحالة، ويؤشّر الخطوات، ويعلّق. تابع «فتح الرابط» وألغِ الدعوة متى شئت.",
+        "An email invitee opens the task from their link with no account: they see the details, update the status, tick steps and comment. Watch “Opened” and revoke the invite any time.",
+      ),
+      b(
+        "الإجراءات: «تأجيل» (يوم، 3 أيام، أسبوع، أسبوعان أو تاريخ)، «تعليق» مع السبب ثم «استئناف»، «إغلاق» دون إنجاز مع السبب، «إعادة فتح»، «نسخ»، «أرشفة» و«حذف».",
+        "Actions: “Postpone” (1 day, 3 days, a week, two weeks or a date), “Hold” with a reason then “Resume”, “Close” without completion with a reason, “Reopen”, “Duplicate”, “Archive” and “Delete”.",
+      ),
+      b("كل تغيير يُسجَّل في «السجل والتعليقات» باسم من قام به ووقته.", "Every change is recorded in “History & comments” with who made it and when."),
+      b("ابحث وصفِّ بالموظف أو الأولوية أو الحالة أو الاستحقاق، و«المؤرشفة» أسفل الصفحة لعرض المؤرشفة واستعادتها.", "Search and filter by employee, priority, status or due date; “Archived” at the bottom shows archived tasks to restore."),
     ],
-    tips: [b("المهام المتأخرة تظهر في التنبيهات، وكل مهمة في التقويم يوم استحقاقها.", "Late tasks appear in alerts, and every task shows in the calendar on its due date.")],
+    tips: [
+      b("المهام المتأخرة تظهر في التنبيهات، وكل مهمة في التقويم يوم استحقاقها. المعلّقة لا تُحتسب متأخرة.", "Late tasks appear in alerts, and every task shows in the calendar on its due date. Tasks on hold are not counted as late."),
+      b("إن لم يكن البريد الآلي مفعّلاً فانسخ رابط المدعو أو أرسله ببريدك أو واتساب من قائمة «المدعوّون بالبريد».", "If automatic email isn't set up, copy an invitee's link or send it by your own mail or WhatsApp from “Invited by email”."),
+      b("الأرشفة تخفي المهمة دون حذفها؛ استخدمها للمهام القديمة بدل الحذف.", "Archiving hides a task without deleting it; use it for old tasks instead of deleting."),
+    ],
     related: ["calendar", "employee-file"],
-    keywords: "مهام لوحة مهمة tasks board kanban",
+    keywords: "مهام لوحة مهمة تحويل دعوة بريد تأجيل تعليق إغلاق أرشفة أولوية عاجلة tasks board kanban transfer invite email postpone hold close archive priority urgent",
   },
 
   // ───────────── People

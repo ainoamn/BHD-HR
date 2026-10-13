@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Flag } from "lucide-react";
 import { pick, type Lang } from "@/lib/i18n";
-import { TASK_PRIORITY, TASK_STATUS, TASK_STATUSES } from "@/lib/tasks";
+import { TASK_PRIORITY, TASK_STATUS, TASK_STATUSES, isClosedStatus } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 import { Avatars, type BoardTask } from "./task-board";
 import { ToneBadge } from "./ui";
@@ -27,7 +27,7 @@ export function TaskList({ tasks, lang, emptyText }: { tasks: BoardTask[]; lang:
                 <li key={task.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
                   <div className="flex min-w-0 flex-1 items-start gap-2">
                     <Flag size={14} className={cn("mt-1 shrink-0", TASK_PRIORITY[task.priority].flag)} />
-                    <Link href={`/tasks/${task.id}`} className={cn("min-w-0 break-words font-semibold text-slate-900 hover:text-teal-800", status === "DONE" && "text-slate-500 line-through")}>
+                    <Link href={`/tasks/${task.id}`} className={cn("min-w-0 break-words font-semibold text-slate-900 hover:text-teal-800", isClosedStatus(status) && "text-slate-500 line-through")}>
                       {task.title}
                     </Link>
                   </div>

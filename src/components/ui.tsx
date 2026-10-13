@@ -29,6 +29,7 @@ const tones: Record<string, string> = {
   slate: "bg-slate-100 text-slate-600 ring-slate-200/70",
   teal: "bg-teal-50 text-teal-800 ring-teal-200/70",
   gold: "bg-gold-50 text-gold-700 ring-gold-200/70",
+  fuchsia: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200/70",
 };
 
 export function ToneBadge({ tone, children, className }: { tone: string; children: React.ReactNode; className?: string }) {
