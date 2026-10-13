@@ -305,6 +305,27 @@ export async function aiJobDescription(input: { titleAr: string; titleEn: string
   return parseJson<Record<string, unknown>>(text, "{");
 }
 
+/** Answers a how-to question from the help centre's topics only, naming the topics to open. */
+export async function aiHelpAnswer(input: { question: string; corpus: string; lang: Lang; audience: string }) {
+  const { text } = await generateText({
+    model: VISION_MODEL,
+    temperature: 0.2,
+    providerOptions: { gateway: { models: VISION_FALLBACKS } },
+    system: [
+      `You are the help desk of BHD HR, an HR and payroll web app used in Oman. The person asking is ${input.audience === "employee" ? "an employee using their personal portal" : input.audience === "team" ? "a team manager or sponsor using the team area" : "a company HR or admin user"}.`,
+      "Answer only from the guide below; if the guide does not cover it, say so briefly and suggest the closest topic. Never invent buttons, pages or features.",
+      input.lang === "ar"
+        ? "Reply in clear Modern Standard Arabic. Quote button and page names exactly as written in the guide, between « »."
+        : "Reply in clear English. Quote button and page names exactly as written in the guide, in quotes.",
+      "Keep it short: one sentence, then numbered steps (max 7), then at most one tip. Plain text, no markdown headings or bold.",
+      'Reply with JSON only: {"answer":"…","topics":["slug", …]} where topics are 1–3 slugs from the guide (the [slug] before each title) most useful to open next.',
+      `GUIDE:\n${input.corpus}`,
+    ].join("\n"),
+    prompt: input.question,
+  });
+  return parseJson<{ answer?: unknown; topics?: unknown }>(text, "{");
+}
+
 /** Translates many terms in one request; entries the model skips come back as null. */
 export async function aiTranslateMany(texts: string[], to: Lang) {
   if (!texts.length) return [];

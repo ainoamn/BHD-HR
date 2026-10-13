@@ -291,8 +291,8 @@ export default async function EmployeePage({
         <div className="relative h-24 overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 sm:h-28" aria-hidden="true">
           <div className="higher-horizon absolute -bottom-10 end-4 h-44 w-72 bg-[length:100%] opacity-[0.1]" />
         </div>
-        <div className="flex flex-col gap-4 px-4 pb-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
-          <div className="flex min-w-0 items-end gap-4">
+        <div className="flex flex-col gap-4 px-4 pb-5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:px-6">
+          <div className="flex min-w-0 items-end gap-4 sm:min-w-[18rem] sm:flex-1">
             <EmployeeAvatar
               name={displayName}
               photo={employee.photoUrl}
@@ -311,7 +311,7 @@ export default async function EmployeePage({
               ) : null}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:items-center">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             {allow.edit ? (
               <Link href={`${base}/edit`} className={primaryBtn}>
                 <Pencil size={16} />

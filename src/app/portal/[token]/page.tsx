@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, Clock3, Contact, FileUp, FileUser, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { CalendarCheck2, CircleHelp, Clock3, Contact, FileUp, FileUser, Files, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
 import { cvCompleteness, cvFor, hasCvContent, readCv } from "@/lib/cv";
 import { PortalRequests } from "@/components/portal-requests";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
@@ -168,6 +168,10 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
+            <Link href={`${base}/help`} className={headerPill} title={t("شرح استخدام صفحتي", "How to use my page")}>
+              <CircleHelp size={15} />
+              {t("شرح", "Help")}
+            </Link>
             {signedIn ? (
               <>
                 {isTeamRole(signedIn.role) ? (

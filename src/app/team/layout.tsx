@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { KeyRound, LogOut, UserRound, Users } from "lucide-react";
+import { KeyRound, LifeBuoy, LogOut, UserRound, Users } from "lucide-react";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { LangToggle } from "@/components/lang-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -58,6 +58,10 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
               {t("صفحتي", "My page")}
             </Link>
           ) : null}
+          <Link href="/team/help" className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-teal-50 hover:text-teal-800">
+            <LifeBuoy size={16} />
+            {t("المساعدة", "Help")}
+          </Link>
           {user.memberships.length > 1 ? (
             <div className="ms-auto">
               <CompanySwitcher

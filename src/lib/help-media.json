@@ -1,0 +1,619 @@
+{
+  "videos": {
+    "tour": {
+      "duration": 44,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.6,
+          "ar": "هذه الصفحة الرئيسية: ملخص الشهر وأهم ما يحتاج متابعتك اليوم.",
+          "en": "This is the home page: the month at a glance and what needs you today."
+        },
+        {
+          "start": 3.6,
+          "end": 8.7,
+          "ar": "القائمة الجانبية مقسّمة إلى مجموعات حسب نوع العمل، ولا يظهر فيها إلا ما تملك صلاحيته.",
+          "en": "The sidebar is grouped by type of work and only shows what you are allowed to open."
+        },
+        {
+          "start": 8.7,
+          "end": 12.4,
+          "ar": "«ملخص اليوم» يكتبه الذكاء الاصطناعي كل صباح، مرتباً من الأعجل.",
+          "en": "The daily brief is written by AI every morning, most urgent first."
+        },
+        {
+          "start": 12.4,
+          "end": 17.4,
+          "ar": "الجرس أعلى الصفحة يعرض عدد التنبيهات المهمة. اضغطه لترى كل ما يحتاج متابعة.",
+          "en": "The bell at the top shows how many important alerts there are. Press it to see everything that needs attention."
+        },
+        {
+          "start": 17.4,
+          "end": 20.2,
+          "ar": "كل تنبيه يفتح المكان الذي يُعالج منه مباشرة.",
+          "en": "Each alert opens the place where it is handled."
+        },
+        {
+          "start": 20.2,
+          "end": 27.2,
+          "ar": "زر المظهر يبدّل بين النهاري والليلي، ويتذكر اختيارك.",
+          "en": "The theme button switches between light and dark, and remembers your choice."
+        },
+        {
+          "start": 27.2,
+          "end": 33.7,
+          "ar": "زر اللغة يحوّل الواجهة كلها إلى الإنجليزية، ويعيدها إلى العربية.",
+          "en": "The language button switches the whole interface to English, and back to Arabic."
+        },
+        {
+          "start": 33.7,
+          "end": 39.2,
+          "ar": "زر «؟» يفتح شرح الصفحة التي أنت فيها، و«مركز المساعدة» يجمع كل الشروحات من الألف إلى الياء.",
+          "en": "The ? button opens the guide for the page you are on, and the Help centre holds every guide from A to Z."
+        },
+        {
+          "start": 39.2,
+          "end": 44,
+          "ar": "ابدأ بأي موضوع، أو اسأل المساعد بالذكاء الاصطناعي عن أي شيء في النظام.",
+          "en": "Start with any topic, or ask the AI assistant about anything in the system."
+        }
+      ]
+    },
+    "add-employee": {
+      "duration": 51.7,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.9,
+          "ar": "من «الموظفون» اضغط «إضافة موظف». رقم الموظف يُنشأ تلقائياً.",
+          "en": "From Employees press “Add employee”. The employee number is generated for you."
+        },
+        {
+          "start": 3.9,
+          "end": 11.5,
+          "ar": "اكتب الاسم بالعربية، وعند الانتقال إلى الحقل التالي يُكتب بالإنجليزية تلقائياً.",
+          "en": "Type the name in Arabic; when you move on, the English name is filled in automatically."
+        },
+        {
+          "start": 11.5,
+          "end": 15.5,
+          "ar": "أكمل الجنس وتاريخ الميلاد ورقم الهاتف؛ رمز عُمان +968 مختار مسبقاً.",
+          "en": "Fill in gender, date of birth and phone; Oman's +968 code is already selected."
+        },
+        {
+          "start": 15.5,
+          "end": 20.6,
+          "ar": "في الوثائق اكتب رقم البطاقة وتاريخ انتهائها، أو اختر صورتها ليقرأها الذكاء الاصطناعي.",
+          "en": "Under documents type the ID number and expiry, or choose a photo of it for AI to read."
+        },
+        {
+          "start": 20.6,
+          "end": 30.9,
+          "ar": "في بيانات العمل اختر المسمى الوظيفي والقسم من القوائم، ثم المدير المباشر وتاريخ الالتحاق.",
+          "en": "Under job details pick the title and department from the lists, then the manager and joining date."
+        },
+        {
+          "start": 30.9,
+          "end": 35.1,
+          "ar": "في الراتب: الأساسي والبدلات، وبنك الموظف ورقم حسابه لملف حماية الأجور.",
+          "en": "Under salary: basic pay and allowances, plus the employee's bank and account for the WPS file."
+        },
+        {
+          "start": 35.1,
+          "end": 46.1,
+          "ar": "«حساب الدخول»: اترك «موظف» ليُفتح له حساب تلقائياً، ثم اضغط «حفظ الموظف».",
+          "en": "“Sign-in account”: keep “Employee” so an account is opened automatically, then press “Save employee”."
+        },
+        {
+          "start": 46.1,
+          "end": 51.7,
+          "ar": "يُحفظ الموظف ويُفتح ملفه مباشرة، ومعه اسم المستخدم وكلمة المرور المؤقتة لتسليمها له.",
+          "en": "The employee is saved and their file opens, with the username and temporary password to hand over."
+        }
+      ]
+    },
+    "cv-prints": {
+      "duration": 44.9,
+      "cues": [
+        {
+          "start": 0,
+          "end": 5.3,
+          "ar": "في ملف الموظف، بطاقة «الملف الشخصي والمطبوعات» تجمع السيرة الذاتية والمطبوعات الاحترافية.",
+          "en": "In the employee file, the “Profile & prints” card gathers the CV and professional prints."
+        },
+        {
+          "start": 5.3,
+          "end": 10.4,
+          "ar": "«الملف الكامل» يطبع بيانات الموظف وسيرته الذاتية بتصميم أنيق، بالعربية أو الإنجليزية.",
+          "en": "“Full profile” prints the employee's details and CV in an elegant layout, in Arabic or English."
+        },
+        {
+          "start": 10.4,
+          "end": 14.5,
+          "ar": "اختر اللغة والأقسام التي تريدها، ثم «طباعة / حفظ PDF».",
+          "en": "Choose the language and sections you want, then “Print / save PDF”."
+        },
+        {
+          "start": 14.5,
+          "end": 28,
+          "ar": "«بطاقة الوصف الوظيفي» يكتبها الذكاء الاصطناعي للمسمى الوظيفي: المهام والمؤهلات والمهارات ومؤشرات الأداء.",
+          "en": "The job description card is written by AI for the job title: duties, qualifications, skills and KPIs."
+        },
+        {
+          "start": 28,
+          "end": 33.4,
+          "ar": "راجع النص وعدّله إن شئت، ثم اطبع. الوصف يُحفظ للمسمى فيشترك فيه كل من يحمله.",
+          "en": "Review and edit the text if you like, then print. It is saved for the job title, so everyone with that title shares it."
+        },
+        {
+          "start": 33.4,
+          "end": 44.9,
+          "ar": "و«بطاقة العمل» تطبع بطاقة أعمال برمز QR يحفظ بيانات الموظف في هاتف من يمسحه.",
+          "en": "And “Business card” prints a card whose QR code saves the employee's contact on any phone."
+        }
+      ]
+    },
+    "attendance": {
+      "duration": 25.7,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.9,
+          "ar": "من «الحضور والغياب» سجّل غياباً أو إجازة لأي موظف بفترة من – إلى.",
+          "en": "From Attendance, record an absence or leave for any employee over a from–to period."
+        },
+        {
+          "start": 3.9,
+          "end": 8.7,
+          "ar": "اختر نوع الحالة: غياب، أو إجازة بخصم راتب، أو إجازة من الرصيد كالسنوية والمرضية.",
+          "en": "Pick the type: absence, unpaid leave, or leave from a balance such as annual or sick."
+        },
+        {
+          "start": 8.7,
+          "end": 15.8,
+          "ar": "حدّد الفترة، فيُحسب عدد الأيام ويُخصم من الرصيد تلقائياً.",
+          "en": "Set the period; the days are counted and taken from the balance automatically."
+        },
+        {
+          "start": 15.8,
+          "end": 21.1,
+          "ar": "تظهر الفترة في الجدول، ويمكنك تعديلها أو حذفها. الغياب يُخصم من الراتب عند إنشاء المسير.",
+          "en": "The period appears in the table, where you can edit or delete it. Absence is deducted when the payroll is created."
+        },
+        {
+          "start": 21.1,
+          "end": 25.7,
+          "ar": "وفي «سجل الدوام» ترى أوقات الحضور من بوابة الموظفين ودقائق التأخير.",
+          "en": "In the clock-in log you see portal clock-in times and minutes late."
+        }
+      ]
+    },
+    "approvals": {
+      "duration": 31.9,
+      "cues": [
+        {
+          "start": 0,
+          "end": 5.5,
+          "ar": "«طلبات الموظفين» تجمع ما يرسله الموظفون من بواباتهم: خطابات وسلف وإجازات ومستندات ومصروفات.",
+          "en": "Requests gathers what employees send from their portal: letters, advances, leave, documents and expenses."
+        },
+        {
+          "start": 5.5,
+          "end": 10.6,
+          "ar": "طلب شهادة راتب: راجع الجهة الموجّه إليها، ثم «اعتماد وإصدار الخطاب موقّعاً».",
+          "en": "A salary certificate request: check who it is addressed to, then “Approve and issue signed”."
+        },
+        {
+          "start": 10.6,
+          "end": 15.1,
+          "ar": "يصدر الخطاب موقّعاً إلكترونياً برمز تحقق، ويظهر للموظف في بوابته فوراً.",
+          "en": "The letter is issued e-signed with a verification code and appears in the employee's portal at once."
+        },
+        {
+          "start": 15.1,
+          "end": 20.8,
+          "ar": "طلب سلفة: عدّل المبلغ أو الأقساط إن لزم، ثم «اعتماد السلفة» فتُخصم من الرواتب القادمة.",
+          "en": "An advance request: adjust the amount or instalments if needed, then “Approve advance” and it is deducted from coming salaries."
+        },
+        {
+          "start": 20.8,
+          "end": 26.2,
+          "ar": "طلب إجازة: يظهر الرصيد المتبقي، ثم «موافقة» فتُسجَّل الإجازة في الحضور تلقائياً.",
+          "en": "A leave request: the remaining balance is shown; press “Approve” and the leave is recorded in attendance automatically."
+        },
+        {
+          "start": 26.2,
+          "end": 31.9,
+          "ar": "وفي الأسفل: المستندات المرسلة من البوابة لقبولها، وطلبات المصروفات للموافقة أو الرفض.",
+          "en": "Further down: documents sent from the portal to accept, and expense claims to approve or reject."
+        }
+      ]
+    },
+    "assistant": {
+      "duration": 23.6,
+      "cues": [
+        {
+          "start": 0,
+          "end": 8.2,
+          "ar": "اكتب سؤالك بلغتك؛ يجيب المساعد من بيانات منشأتك وفي حدود صلاحياتك.",
+          "en": "Type your question in your own words; the assistant answers from your company's data within your permissions."
+        },
+        {
+          "start": 8.2,
+          "end": 11.6,
+          "ar": "تحت الرد روابط تفتح ملف الموظف أو الصفحة المعنية مباشرة.",
+          "en": "Under the reply are links that open the employee file or page directly."
+        },
+        {
+          "start": 11.6,
+          "end": 17.5,
+          "ar": "ويمكنك أن تطلب منه عملاً: «أنشئ مهمة عاجلة…» فتظهر بطاقة بما سيُحفظ.",
+          "en": "You can also ask it to do something: “Create an urgent task…” and a card shows what will be saved."
+        },
+        {
+          "start": 17.5,
+          "end": 23.6,
+          "ar": "راجع البطاقة ثم «تأكيد وحفظ». لا يُحفظ شيء دون تأكيدك، وكل ما يُحفظ يُسجَّل في سجل العمليات.",
+          "en": "Review the card, then “Confirm and save”. Nothing is saved without you, and everything saved goes to the activity log."
+        }
+      ]
+    },
+    "pay-items": {
+      "duration": 21.3,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.7,
+          "ar": "«السلف والمكافآت»: كل ما يُضاف إلى الراتب أو يُخصم منه شهرياً.",
+          "en": "Advances & bonuses: everything added to or deducted from salaries each month."
+        },
+        {
+          "start": 3.7,
+          "end": 10.4,
+          "ar": "اختر الموظف والنوع: سلفة بأقساط، أو مكافأة، أو بدل، أو استحقاق، أو خصم.",
+          "en": "Pick the employee and type: an advance in instalments, a bonus, allowance, entitlement or deduction."
+        },
+        {
+          "start": 10.4,
+          "end": 15.7,
+          "ar": "حدّد شهر البداية وعدد الأشهر، ثم احفظ. يظهر البند في مسير ذلك الشهر تلقائياً.",
+          "en": "Set the start month and number of months, then save. It appears in that month's payroll automatically."
+        },
+        {
+          "start": 15.7,
+          "end": 21.3,
+          "ar": "القائمة تعرض كل بند بحالته والمتبقي منه، ويمكن إيقافه أو طباعة إيصال استلام السلفة.",
+          "en": "The list shows each item with its status and what remains; you can stop it or print an advance receipt."
+        }
+      ]
+    },
+    "payroll": {
+      "duration": 30.7,
+      "cues": [
+        {
+          "start": 0,
+          "end": 10.9,
+          "ar": "«الرواتب»: اختر الشهر، ثم «إنشاء رواتب» فيُحسب كل راتب تلقائياً.",
+          "en": "Payroll: choose the month, then “Generate” and every salary is calculated automatically."
+        },
+        {
+          "start": 10.9,
+          "end": 16.3,
+          "ar": "يدخل في الحساب: الأساسي والبدلات، والغياب، والسلف والمكافآت، واشتراك الحماية الاجتماعية.",
+          "en": "It includes basic pay and allowances, absences, advances and bonuses, and the social protection contribution."
+        },
+        {
+          "start": 16.3,
+          "end": 19.9,
+          "ar": "افتح أي راتب لترى تفاصيله، أو تعدّل خصماً، أو تطبع قسيمته.",
+          "en": "Open any salary to see its details, adjust a deduction or print its payslip."
+        },
+        {
+          "start": 19.9,
+          "end": 25.5,
+          "ar": "للصرف: اختر طريقة الدفع وتاريخه، ثم اصرف الرواتب كلها دفعة واحدة.",
+          "en": "To pay: choose the payment method and date, then pay every salary at once."
+        },
+        {
+          "start": 25.5,
+          "end": 30.7,
+          "ar": "يفتح كشف الرواتب مع إيصالات الصرف للطباعة، وتصل القسائم إلى بوابات الموظفين.",
+          "en": "The payroll sheet opens with payment receipts to print, and payslips reach the employees' portals."
+        }
+      ]
+    },
+    "roles": {
+      "duration": 22,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.5,
+          "ar": "من «الإعدادات» ← «الأدوار والحسابات» تحدد ما يراه كل دور.",
+          "en": "In Settings → Roles & accounts you decide what each role can see."
+        },
+        {
+          "start": 3.5,
+          "end": 8.7,
+          "ar": "موظف: صفحته فقط. مدير فريق: صفحته وفريقه. صاحب عمل: عمّاله المكفولون. ثم أدوار الإدارة.",
+          "en": "Employee: their own page. Team manager: their page and team. Sponsor: their sponsored workers. Then the staff roles."
+        },
+        {
+          "start": 8.7,
+          "end": 12.9,
+          "ar": "«تعديل الصلاحيات» يفتح قائمة الصلاحيات لتفعيلها أو إيقافها لكل دور.",
+          "en": "“Edit permissions” opens the list of permissions to turn on or off for each role."
+        },
+        {
+          "start": 12.9,
+          "end": 17.2,
+          "ar": "«فتح الحسابات» يُنشئ حسابات دخول لكل الموظفين أو أصحاب العمل دفعة واحدة.",
+          "en": "“Open accounts” creates sign-in accounts for all employees or sponsors at once."
+        },
+        {
+          "start": 17.2,
+          "end": 22,
+          "ar": "وفي «المستخدمون والصلاحيات» تدعو زملاءك في الإدارة وتحدد دور كل منهم.",
+          "en": "In Users & permissions you invite staff colleagues and set each one's role."
+        }
+      ]
+    },
+    "portal-cv": {
+      "duration": 31.8,
+      "phone": true,
+      "cues": [
+        {
+          "start": 0,
+          "end": 4.1,
+          "ar": "«سيرتي الذاتية»: يملأ الموظف بياناته بأسلوبه، ويرى نسبة اكتمال سيرته.",
+          "en": "“My CV”: the employee fills in their details their own way and sees how complete the CV is."
+        },
+        {
+          "start": 4.1,
+          "end": 9.5,
+          "ar": "أضف خبرة أو مؤهلاً أو مهارة أو لغة بزر الإضافة في كل قسم.",
+          "en": "Add experience, education, a skill or a language with each section's add button."
+        },
+        {
+          "start": 9.5,
+          "end": 21.3,
+          "ar": "ثم «صياغة احترافية بالذكاء الاصطناعي» تحسّن الصياغة دون إضافة خبرات غير موجودة.",
+          "en": "Then “Polish with AI” improves the wording without inventing experience."
+        },
+        {
+          "start": 21.3,
+          "end": 31.8,
+          "ar": "احفظ السيرة، ثم «معاينة وطباعة» لطباعة ملفك الكامل بشكل احترافي.",
+          "en": "Save the CV, then “Preview & print” to print your full profile professionally."
+        }
+      ]
+    },
+    "employee-file": {
+      "duration": 30.3,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.5,
+          "ar": "افتح «الموظفون» واضغط اسم الموظف لفتح ملفه.",
+          "en": "Open Employees and press a name to open the file."
+        },
+        {
+          "start": 3.5,
+          "end": 7.9,
+          "ar": "رأس الملف: الاسم والحالة، وأزرار التعديل والطباعة وكشف الرواتب والخطابات.",
+          "en": "The header: name and status, with Edit, Print, Statement and Letter buttons."
+        },
+        {
+          "start": 7.9,
+          "end": 12.4,
+          "ar": "بطاقات الملخص: إجمالي الراتب، ورصيد الإجازة، وأقرب انتهاء وثيقة، وآخر راتب.",
+          "en": "Summary cards: total pay, leave balance, nearest document expiry and the last salary."
+        },
+        {
+          "start": 12.4,
+          "end": 18.2,
+          "ar": "التبويبات تجمع كل شيء عن الموظف: الملاحظات والمهام والخطابات والحضور والوثائق والرواتب.",
+          "en": "The tabs hold everything about the employee: notes, tasks, letters, attendance, documents and salaries."
+        },
+        {
+          "start": 18.2,
+          "end": 24.4,
+          "ar": "وعلى الجانب: حساب الدخول، ورابط بوابة الموظف، وبطاقة QR، ومستندات الموارد البشرية الجاهزة.",
+          "en": "On the side: sign-in account, portal link, QR ID card, and ready-made HR documents."
+        },
+        {
+          "start": 24.4,
+          "end": 30.3,
+          "ar": "مثال: «شهادة راتب» تُنشأ فوراً بترويسة الكفيل وباللغتين، جاهزة للطباعة.",
+          "en": "For example, “Salary certificate” is created instantly on the sponsor's letterhead in both languages, ready to print."
+        }
+      ]
+    },
+    "letters": {
+      "duration": 29.5,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.2,
+          "ar": "من «الإنذارات والخطابات» اضغط «خطاب جديد».",
+          "en": "From Warnings & letters press “New letter”."
+        },
+        {
+          "start": 3.2,
+          "end": 7.5,
+          "ar": "اختر الموظف أو أكثر، ثم نوع الخطاب: لفت نظر، إنذار، شكر، أو شهادة.",
+          "en": "Pick one or more employees, then the type: notice, warning, thanks or a certificate."
+        },
+        {
+          "start": 7.5,
+          "end": 17.7,
+          "ar": "اكتب باختصار ما حدث، ثم «صياغة بالذكاء الاصطناعي» فيكتب الموضوع والنص باللغتين.",
+          "en": "Briefly write what happened, then “Draft with AI” writes the subject and text in both languages."
+        },
+        {
+          "start": 17.7,
+          "end": 22.2,
+          "ar": "راجع النص وعدّله إن شئت. اسم الموقّع وصفته من إعدادات التوقيع.",
+          "en": "Review and edit the text if needed. The signatory's name and title come from the signature settings."
+        },
+        {
+          "start": 22.2,
+          "end": 29.5,
+          "ar": "اضغط «إصدار الخطاب موقّعاً»: يُختم إلكترونياً برمز QR للتحقق، ويصل للموظف ليؤكد استلامه.",
+          "en": "Press “Issue signed”: it is sealed electronically with a QR check code and sent for the employee to acknowledge."
+        }
+      ]
+    },
+    "tasks": {
+      "duration": 36,
+      "cues": [
+        {
+          "start": 0,
+          "end": 3.7,
+          "ar": "«المهام» لوحة بأعمدة: للتنفيذ، قيد التنفيذ، للمراجعة، مكتملة.",
+          "en": "Tasks is a board with columns: To do, In progress, Review, Done."
+        },
+        {
+          "start": 3.7,
+          "end": 13.5,
+          "ar": "«مهمة جديدة»: العنوان، والموظفون المكلّفون، والأولوية، وتاريخ الاستحقاق.",
+          "en": "“New task”: title, assigned employees, priority and due date."
+        },
+        {
+          "start": 13.5,
+          "end": 21.2,
+          "ar": "أضف خطوات التنفيذ سطراً لكل خطوة، ثم «إضافة المهمة».",
+          "en": "Add the steps one per line, then “Add task”."
+        },
+        {
+          "start": 21.2,
+          "end": 27.1,
+          "ar": "اسحب البطاقة إلى عمود آخر لتغيير حالتها. على الهاتف استخدم «نقل إلى».",
+          "en": "Drag a card to another column to change its status. On a phone use “Move to”."
+        },
+        {
+          "start": 27.1,
+          "end": 36,
+          "ar": "افتح أي مهمة لتعلّم الخطوات المنجزة وتكتب التعليقات، أو تطلب من الذكاء الاصطناعي اقتراح الخطوات.",
+          "en": "Open any task to tick steps, comment, or ask AI to suggest steps."
+        }
+      ]
+    },
+    "recruitment": {
+      "duration": 23.7,
+      "cues": [
+        {
+          "start": 0,
+          "end": 5.1,
+          "ar": "«التوظيف»: أنشئ شاغراً بوصفه وراتبه، وشارك رابط التقديم العام عبر واتساب أو البريد.",
+          "en": "Recruitment: create a vacancy with its description and pay, and share the public apply link by WhatsApp or email."
+        },
+        {
+          "start": 5.1,
+          "end": 10.8,
+          "ar": "المرشحون مرتبون بالمراحل: جديد، فرز، مقابلة، عرض وظيفي، تعيين.",
+          "en": "Candidates are arranged by stage: new, screening, interview, offer, hired."
+        },
+        {
+          "start": 10.8,
+          "end": 15.5,
+          "ar": "يقيّم الذكاء الاصطناعي كل سيرة مقابل وصف الوظيفة: نسبة تطابق ونقاط قوة وفجوات.",
+          "en": "AI scores each CV against the job description: a match percentage, strengths and gaps."
+        },
+        {
+          "start": 15.5,
+          "end": 23.7,
+          "ar": "حدّث المرحلة وموعد المقابلة، وعند الاختيار «تعيين وإنشاء ملف موظف» بضغطة واحدة.",
+          "en": "Update the stage and interview time, and when you decide, “Hire and create employee file” in one click."
+        }
+      ]
+    },
+    "portal": {
+      "duration": 41.9,
+      "phone": true,
+      "cues": [
+        {
+          "start": 0,
+          "end": 5.1,
+          "ar": "هذه صفحة الموظف، يفتحها من هاتفه دون تطبيق: حضور، إجازات، رواتب، مستندات، وطلبات.",
+          "en": "This is the employee's page, opened on their phone with no app: clock-in, leave, payslips, documents and requests."
+        },
+        {
+          "start": 5.1,
+          "end": 8.6,
+          "ar": "«تسجيل الحضور» يعمل من موقع العمل فقط، ويحسب دقائق التأخير.",
+          "en": "“Clock in” works only at the work site and counts minutes late."
+        },
+        {
+          "start": 8.6,
+          "end": 18.7,
+          "ar": "في «الإجازات» يرى رصيده، ويطلب إجازة باختيار النوع والتاريخ.",
+          "en": "Under Leave they see their balance and ask for leave by choosing the type and dates."
+        },
+        {
+          "start": 18.7,
+          "end": 22.8,
+          "ar": "يصل الطلب للموارد البشرية ولمدير الفريق، وتظهر حالته هنا فور القرار.",
+          "en": "The request reaches HR and the team manager, and its status shows here once decided."
+        },
+        {
+          "start": 22.8,
+          "end": 25.7,
+          "ar": "في «الرواتب» قسائم كل شهر جاهزة للعرض والطباعة.",
+          "en": "Under Payslips, every month's payslip is ready to view and print."
+        },
+        {
+          "start": 25.7,
+          "end": 37.5,
+          "ar": "وفي «الطلبات»: شهادة راتب أو خبرة، أو سلفة، أو أي طلب آخر — تصدر الشهادة موقّعة إلكترونياً بعد الموافقة.",
+          "en": "Under Requests: a salary or experience certificate, an advance or anything else — certificates are issued e-signed once approved."
+        },
+        {
+          "start": 37.5,
+          "end": 41.9,
+          "ar": "وزر «شرح» أعلى الصفحة يفتح دليلاً مصوّراً لكل ما في هذه الصفحة.",
+          "en": "The “Help” button at the top opens an illustrated guide to everything on this page."
+        }
+      ]
+    }
+  },
+  "shots": [
+    "alerts",
+    "analytics",
+    "approvals",
+    "assets",
+    "assistant",
+    "attendance",
+    "badge-print",
+    "business-card",
+    "calendar",
+    "documents",
+    "employee-file",
+    "employee-new",
+    "employees-list",
+    "employers",
+    "expenses",
+    "interface-mobile",
+    "job-description",
+    "letter",
+    "org",
+    "pay-items",
+    "payroll",
+    "payslip",
+    "performance",
+    "portal",
+    "portal-cv",
+    "portal-leave",
+    "portal-payslips",
+    "portal-requests",
+    "profile-print",
+    "recruitment",
+    "reports",
+    "roles",
+    "settings",
+    "settings-hr",
+    "tasks",
+    "team",
+    "tour-dashboard",
+    "tour-sidebar"
+  ]
+}

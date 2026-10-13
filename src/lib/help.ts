@@ -1,0 +1,847 @@
+import type { Bi, Lang } from "./i18n";
+import media from "./help-media.json";
+
+/** Who a topic is for: staff in the system, employees in their portal, team managers and sponsors in /team. */
+export type HelpAudience = "staff" | "employee" | "team";
+
+export type HelpGroupKey = "start" | "daily" | "people" | "talent" | "finance" | "admin" | "portal" | "team";
+
+export type HelpShot = { file: string; caption: Bi; phone?: boolean };
+
+export type HelpTopic = {
+  slug: string;
+  group: HelpGroupKey;
+  audience: HelpAudience[];
+  title: Bi;
+  summary: Bi;
+  /** Page in the system the topic explains (staff); portal and team topics use portalHref / teamHref relative to their area. */
+  href?: string;
+  portalHref?: string;
+  teamHref?: string;
+  /** Walkthrough video id in help-media.json (public/guide/videos/<id>.webm). */
+  video?: string;
+  shots?: HelpShot[];
+  steps: Bi[];
+  sections?: { title: Bi; items: Bi[] }[];
+  tips?: Bi[];
+  related?: string[];
+  keywords?: string;
+};
+
+export type HelpVideo = { duration: number; phone?: boolean; cues: { start: number; end: number; ar: string; en: string }[] };
+
+type Media = { videos: Record<string, HelpVideo>; shots: string[] };
+const MEDIA = media as Media;
+
+const b = (ar: string, en: string): Bi => ({ ar, en });
+
+export const HELP_GROUPS: { key: HelpGroupKey; title: Bi; hint: Bi }[] = [
+  { key: "start", title: b("البداية", "Getting started"), hint: b("الدخول والتنقل في النظام", "Signing in and finding your way") },
+  { key: "daily", title: b("العمل اليومي", "Everyday work"), hint: b("ما تفتحه كل صباح", "What you open every morning") },
+  { key: "people", title: b("الموظفون وشؤونهم", "People"), hint: b("من الإضافة حتى الخطابات", "From hiring the record to letters") },
+  { key: "talent", title: b("التوظيف والأداء والعهد", "Hiring, performance & assets"), hint: b("الشواغر والتقييم والعهد", "Vacancies, reviews and custody") },
+  { key: "finance", title: b("الرواتب والمالية", "Payroll & finance"), hint: b("المسير الشهري وما يتصل به", "The monthly payroll and everything around it") },
+  { key: "admin", title: b("الإدارة والإعدادات", "Administration"), hint: b("ضبط المنشأة والصلاحيات", "Company setup and permissions") },
+  { key: "portal", title: b("بوابة الموظف", "Employee portal"), hint: b("ما يراه الموظف ويفعله من هاتفه", "What employees see and do from their phone") },
+  { key: "team", title: b("مدير الفريق وصاحب العمل", "Team managers & sponsors"), hint: b("متابعة الفريق أو العمّال المكفولين", "Following a team or sponsored workers") },
+];
+
+export const HELP_TOPICS: HelpTopic[] = [
+  // ───────────── Getting started
+  {
+    slug: "tour",
+    group: "start",
+    audience: ["staff"],
+    href: "/",
+    video: "tour",
+    title: b("جولة سريعة في النظام", "A quick tour of the system"),
+    summary: b(
+      "في دقيقتين: أين تجد كل قسم، وكيف تقرأ لوحة المعلومات والتنبيهات، وكيف تبدّل اللغة والمظهر، وأين تجد هذا المركز متى احتجته.",
+      "In two minutes: where each section lives, how to read the dashboard and alerts, how to switch language and theme, and where to find this help centre.",
+    ),
+    shots: [
+      { file: "tour-dashboard", caption: b("لوحة المعلومات: ملخص الشهر وملخص اليوم بالذكاء الاصطناعي", "The dashboard: the month at a glance and the AI daily brief") },
+      { file: "tour-sidebar", caption: b("القائمة الجانبية مقسّمة إلى مجموعات حسب نوع العمل", "The sidebar, grouped by type of work") },
+    ],
+    steps: [
+      b("القائمة الجانبية على اليمين مقسّمة إلى: عام، الموارد البشرية، المالية، النظام. لا يظهر فيها إلا ما تملك صلاحيته.", "The sidebar is grouped into General, People, Finance and System. It shows only what you are allowed to open."),
+      b("«الرئيسية» تعرض ملخص الشهر: عدد الموظفين، الرواتب، ما بانتظار الصرف، المستندات التي تنتهي قريباً، وملخص اليوم.", "The Dashboard shows the month: headcount, payroll, what is waiting to be paid, documents expiring soon, and the daily brief."),
+      b("الجرس أعلى الصفحة يعرض عدد التنبيهات المهمة؛ اضغطه لترى كل ما يحتاج متابعة.", "The bell at the top shows how many important alerts there are; press it to see everything that needs attention."),
+      b("زر المظهر (شمس / قمر) يبدّل بين النهاري والليلي، وزر اللغة يحوّل الواجهة كلها إلى الإنجليزية أو العربية.", "The theme button (sun / moon) switches between light and dark, and the language button switches the whole interface."),
+      b("«مركز المساعدة» في القائمة (وزر ؟ أعلى الصفحة) يفتح الشرح المناسب للصفحة التي أنت فيها.", "“Help centre” in the menu (and the ? button at the top) opens the guide for the page you are on."),
+    ],
+    tips: [
+      b("على الكمبيوتر يمكنك طيّ القائمة إلى أيقونات من زر السهمين أسفلها لتتسع الصفحة.", "On a computer, collapse the menu to icons with the double-arrow button at its bottom to get more room."),
+      b("على الهاتف: شريط سفلي بأهم الأقسام، و«المزيد» يفتح القائمة كاملة.", "On a phone: a bottom bar holds the main sections, and “More” opens the full menu."),
+    ],
+    related: ["dashboard", "interface", "alerts"],
+    keywords: "جولة بداية مقدمة tour start overview",
+  },
+  {
+    slug: "sign-in",
+    group: "start",
+    audience: ["staff", "employee", "team"],
+    title: b("الدخول والخروج وكلمة المرور", "Signing in, out and passwords"),
+    summary: b(
+      "الإدارة تدخل بحساب BHD الموحّد، والموظفون والمديرون وأصحاب العمل باسم المستخدم وكلمة المرور التي تصلهم من الموارد البشرية.",
+      "Staff sign in with their BHD account; employees, team managers and sponsors use the username and password HR sends them.",
+    ),
+    steps: [
+      b("افتح رابط النظام. الإدارة تُحوَّل إلى صفحة الدخول الموحّدة لـ BHD (بالبريد أو جوجل)، ثم تعود إلى النظام.", "Open the system link. Staff are sent to the BHD sign-in page (email or Google) and come straight back."),
+      b("الموظف أو المدير أو صاحب العمل يفتح الرابط المرسل له، ويكتب اسم المستخدم (مثل u482193) وكلمة المرور المؤقتة.", "Employees, team managers and sponsors open the link they received and type their username (like u482193) and temporary password."),
+      b("في أول دخول يطلب النظام اختيار كلمة مرور خاصة (8 أحرف على الأقل)، وبعدها لا تعمل المؤقتة.", "On first sign-in the system asks for a new password (at least 8 characters); the temporary one stops working."),
+      b("تفتح صفحتك حسب دورك: الإدارة ← النظام، الموظف ← بوابته، مدير الفريق ← «فريقي»، صاحب العمل ← «عمّالي».", "You land on the page for your role: staff → the system, employee → their portal, team manager → “My team”, sponsor → “My workers”."),
+      b("للخروج: صورتك أعلى الصفحة ← «خروج» (أو زر «خروج» في البوابة وصفحة الفريق).", "To sign out: your picture at the top → “Sign out” (or the “Sign out” button in the portal and team pages)."),
+    ],
+    tips: [
+      b("تبقى داخلاً حتى تخرج بنفسك، حتى لو أغلقت المتصفح.", "You stay signed in until you sign out yourself, even if you close the browser."),
+      b("نسيت كلمة المرور؟ اطلب من الموارد البشرية «كلمة مرور جديدة» من بطاقة «حساب الدخول» في ملفك.", "Forgot your password? Ask HR for a “New password” from the sign-in card in your file."),
+    ],
+    related: ["roles", "portal", "team"],
+    keywords: "دخول خروج كلمة المرور اسم المستخدم login password username",
+  },
+  {
+    slug: "interface",
+    group: "start",
+    audience: ["staff"],
+    title: b("الواجهة: القائمة واللغة والمظهر والهاتف", "The interface: menu, language, theme and phone"),
+    summary: b("كيف يتكيف النظام مع شاشتك ولغتك، وما معنى كل زر في رأس الصفحة.", "How the system adapts to your screen and language, and what each button in the header does."),
+    shots: [{ file: "interface-mobile", caption: b("على الهاتف: شريط سفلي وجداول تتحول إلى بطاقات", "On a phone: a bottom bar, and tables become cards"), phone: true }],
+    steps: [
+      b("رأس الصفحة: اسمك وتاريخ اليوم، الجرس (التنبيهات)، المظهر، اللغة، ومشغّل تطبيقات BHD وصورتك.", "The header: your name and today's date, the bell (alerts), theme, language, the BHD app launcher and your picture."),
+      b("زر المظهر يتنقل بين «حسب الجهاز» و«نهاري» و«ليلي»، ويتذكر اختيارك. المطبوعات تخرج نهارية دائماً.", "The theme button cycles through “device”, “light” and “dark”, and remembers your choice. Prints are always light."),
+      b("زر اللغة يبدّل الواجهة كلها. المطبوعات الرسمية (القسائم والخطابات) ثنائية اللغة دائماً.", "The language button switches the whole interface. Official prints (payslips, letters) are always bilingual."),
+      b("إن كنت عضواً في أكثر من منشأة تظهر قائمة لاختيار المنشأة؛ كل منشأة معزولة ببياناتها.", "If you belong to more than one company, a list lets you switch; each company's data is kept separate."),
+    ],
+    tips: [b("الجداول الطويلة تظهر على الهاتف بطاقات، وزر الحفظ يبقى ظاهراً أسفل الشاشة في النماذج الطويلة.", "Long tables show as cards on a phone, and the save button stays visible at the bottom of long forms.")],
+    related: ["tour"],
+    keywords: "لغة مظهر ليلي نهاري هاتف قائمة language theme dark mobile menu",
+  },
+
+  // ───────────── Everyday work
+  {
+    slug: "dashboard",
+    group: "daily",
+    audience: ["staff"],
+    href: "/",
+    title: b("لوحة المعلومات وملخص اليوم", "Dashboard and daily brief"),
+    summary: b(
+      "صفحة البداية: أرقام الشهر، وبطاقة يكتبها الذكاء الاصطناعي كل صباح بما يحتاج متابعتك مرتباً من الأعجل.",
+      "Your start page: the month's figures, and a card AI writes every morning listing what needs you, most urgent first.",
+    ),
+    shots: [{ file: "tour-dashboard", caption: b("ملخص الشهر وملخص اليوم", "The month and the daily brief") }],
+    steps: [
+      b("البطاقات العليا: الموظفون النشطون (ونسبة التعمين تحتها)، إجمالي رواتب الشهر، ما بانتظار الصرف، أيام الخصم.", "Top cards: active employees (with Omanization below), the month's payroll, what is waiting to be paid, deducted days."),
+      b("«ملخص اليوم» يذكر الوثائق التي تنتهي، والإجازات المتجاوزة، والمهام المتأخرة، والخطابات غير المستلمة… وما المطلوب في كل سطر.", "The daily brief lists expiring documents, overdrawn leave, late tasks, unacknowledged letters… and what to do about each."),
+      b("زر «تحديث» يعيد كتابة الملخص بعد أن تنجز بعض المهام.", "“Refresh” rewrites the brief after you have cleared some items."),
+      b("الأزرار السريعة «إضافة موظف» و«صرف الرواتب» تختصر الطريق لأكثر عملين شيوعاً.", "The quick buttons “Add employee” and “Pay salaries” take you straight to the two most common jobs."),
+    ],
+    tips: [b("الملخص لا يعرض إلا ما تسمح لك صلاحياتك برؤيته.", "The brief only shows what your permissions allow you to see.")],
+    related: ["alerts", "assistant"],
+    keywords: "الرئيسية لوحة ملخص اليوم تعمين dashboard brief",
+  },
+  {
+    slug: "alerts",
+    group: "daily",
+    audience: ["staff"],
+    href: "/notifications",
+    title: b("التنبيهات", "Alerts"),
+    summary: b("كل ما يحتاج متابعة في مكان واحد، يُحسب تلقائياً ويختفي عند معالجته.", "Everything that needs follow-up in one place, calculated automatically and gone once handled."),
+    shots: [{ file: "alerts", caption: b("التنبيهات مجمّعة حسب النوع، والعاجلة بالأحمر", "Alerts grouped by type, urgent ones in red") }],
+    steps: [
+      b("افتح الجرس أعلى الصفحة أو «التنبيهات» من القائمة.", "Open the bell at the top or “Alerts” in the menu."),
+      b("التنبيهات مجمّعة: وثائق وعقود تنتهي، أرصدة إجازات، تذكيرات وأعياد ميلاد، رواتب لم تُصرف، مهام متأخرة، طلبات بانتظار الموافقة.", "They are grouped: expiring documents and contracts, leave balances, reminders and birthdays, unpaid salaries, late tasks, requests waiting for approval."),
+      b("اضغط أي تنبيه لفتح المكان الذي يُعالج منه مباشرة.", "Press any alert to open the place where it is handled."),
+      b("مواعيد التنبيه للوثائق (عاجل / تحذير / مبكر) تُضبط من الإعدادات.", "When document alerts start (urgent / warning / early) is set in Settings."),
+    ],
+    related: ["documents", "dashboard", "settings"],
+    keywords: "تنبيهات جرس انتهاء alerts notifications expiry",
+  },
+  {
+    slug: "assistant",
+    group: "daily",
+    audience: ["staff"],
+    href: "/assistant",
+    video: "assistant",
+    title: b("المساعد الذكي", "AI assistant"),
+    summary: b(
+      "اسأل بلغتك عن الموظفين والإجازات والرواتب والتنبيهات، أو اطلب إضافة مهمة أو ملاحظة أو تذكير — لا يحفظ شيئاً إلا بعد تأكيدك.",
+      "Ask in your own words about employees, leave, payroll and alerts, or ask it to add a task, note or reminder — it saves nothing until you confirm.",
+    ),
+    shots: [{ file: "assistant", caption: b("سؤال وجواب من بيانات المنشأة مع روابط للصفحات", "A question answered from company data, with links to pages") }],
+    steps: [
+      b("افتح «المساعد الذكي» واكتب سؤالك، مثل: «من الغائب اليوم؟» أو «لخّص رواتب هذا الشهر».", "Open “AI assistant” and type a question, such as “Who is absent today?” or “Summarise this month's payroll”."),
+      b("يجيب من بيانات منشأتك وفي حدود صلاحياتك، وتحت الرد روابط لفتح الملف أو الصفحة.", "It answers from your company's data within your permissions, with links under the reply to open the file or page."),
+      b("اطلب: «أنشئ مهمة عاجلة لمتابعة إقامة فلان» فتظهر بطاقة بما سيُحفظ.", "Ask: “Create an urgent task to follow up X's residence permit” and a card shows what will be saved."),
+      b("راجع البطاقة ثم «تأكيد وحفظ» أو «تجاهل». كل ما يُحفظ يُكتب في سجل العمليات.", "Review the card, then “Confirm and save” or “Dismiss”. Everything saved is written to the activity log."),
+    ],
+    tips: [
+      b("إذا ظهرت «المساعد مشغول الآن» فانتظر دقيقة وأعد السؤال.", "If you see “The assistant is busy”, wait a minute and ask again."),
+      b("راجع الأرقام المهمة من صفحاتها قبل الاعتماد عليها.", "Check important figures on their own pages before relying on them."),
+    ],
+    related: ["dashboard", "tasks"],
+    keywords: "مساعد ذكاء اصطناعي سؤال assistant ai chat",
+  },
+  {
+    slug: "calendar",
+    group: "daily",
+    audience: ["staff"],
+    href: "/calendar",
+    title: b("التقويم والتذكيرات", "Calendar and reminders"),
+    summary: b("شهر كامل يجمع استحقاق الرواتب وانتهاء الوثائق وأعياد الميلاد والإجازات والمهام وتذكيراتك.", "A full month of payday, expiring documents, birthdays, leave, tasks and your own reminders."),
+    shots: [{ file: "calendar", caption: b("كل حدث بلونه، والتفاصيل في اللوحة الجانبية", "Each event in its colour, details in the side panel") }],
+    steps: [
+      b("الألوان: أخضر للرواتب، برتقالي لانتهاء الوثائق، وردي لأعياد الميلاد، أزرق للإجازات، أصفر لتذكيراتك، زمردي للمهام.", "Colours: green payday, orange expiring documents, pink birthdays, blue leave, yellow your reminders, emerald tasks."),
+      b("اضغط يوماً لترى أحداثه، وانتقل بين الأشهر بالأسهم.", "Press a day to see its events, and move between months with the arrows."),
+      b("«تذكير جديد»: العنوان، التاريخ، التكرار (مرة / شهرياً / سنوياً)، موظف مرتبط اختياري، ملاحظات.", "“New reminder”: title, date, repeat (once / monthly / yearly), an optional employee, notes."),
+      b("علّم التذكير «تم» عند إنجازه أو احذفه.", "Mark a reminder “Done” when finished, or delete it."),
+    ],
+    related: ["alerts", "tasks"],
+    keywords: "تقويم تذكير مواعيد calendar reminder",
+  },
+  {
+    slug: "tasks",
+    group: "daily",
+    audience: ["staff"],
+    href: "/tasks",
+    video: "tasks",
+    title: b("المهام", "Tasks"),
+    summary: b("لوحة مهام بأعمدة وسحب وإفلات لمتابعة العمل المسند للموظفين، مع خطوات يقترحها الذكاء الاصطناعي.", "A drag-and-drop task board to follow work assigned to employees, with AI-suggested steps."),
+    shots: [{ file: "tasks", caption: b("اللوحة: للتنفيذ، قيد التنفيذ، للمراجعة، مكتملة", "The board: To do, In progress, Review, Done") }],
+    steps: [
+      b("«مهمة جديدة»: العنوان، الموظفون المسندون، الأولوية، تاريخ الاستحقاق، الوصف وخطوات التنفيذ.", "“New task”: title, assigned employees, priority, due date, description and steps."),
+      b("اسحب البطاقة إلى عمود آخر لتغيير حالتها، أو داخل العمود لترتيبها. على الهاتف استخدم «نقل إلى».", "Drag a card to another column to change its status, or within a column to reorder. On a phone use “Move to”."),
+      b("افتح المهمة لتعلّم الخطوات المنجزة، وتكتب التعليقات، أو «اقترح خطوات بالذكاء الاصطناعي».", "Open a task to tick off steps, add comments, or “Suggest steps with AI”."),
+      b("ابحث وصفِّ بالموظف أو الأولوية أو الاستحقاق (متأخرة، اليوم، هذا الأسبوع).", "Search and filter by employee, priority or due date (late, today, this week)."),
+    ],
+    tips: [b("المهام المتأخرة تظهر في التنبيهات، وكل مهمة في التقويم يوم استحقاقها.", "Late tasks appear in alerts, and every task shows in the calendar on its due date.")],
+    related: ["calendar", "employee-file"],
+    keywords: "مهام لوحة مهمة tasks board kanban",
+  },
+
+  // ───────────── People
+  {
+    slug: "add-employee",
+    group: "people",
+    audience: ["staff"],
+    href: "/employees/new",
+    video: "add-employee",
+    title: b("إضافة موظف", "Adding an employee"),
+    summary: b(
+      "نموذج واحد للبيانات الشخصية والوثائق والعمل والراتب، مع ترجمة الاسم وقراءة البطاقة والجواز بالذكاء الاصطناعي، وفتح حساب للموظف تلقائياً.",
+      "One form for personal details, documents, job and salary, with AI name translation and ID/passport reading, and an account opened for the employee automatically.",
+    ),
+    shots: [
+      { file: "employee-new", caption: b("نموذج الموظف: أقسام واضحة وزر حفظ ثابت", "The employee form: clear sections and a sticky save button") },
+      { file: "employees-list", caption: b("قائمة الموظفين بالشارات والإجراءات", "The employee list with badges and actions") },
+    ],
+    steps: [
+      b("الموظفون ← «إضافة موظف». رقم الموظف يُنشأ تلقائياً (EMP-0001…).", "Employees → “Add employee”. The employee number is generated (EMP-0001…)."),
+      b("اكتب الاسم بالعربية ثم انتقل للحقل التالي فيُكتب بالإنجليزية تلقائياً (زر ✨ يعيد الترجمة).", "Type the Arabic name and move on — the English name is filled in automatically (✨ translates again)."),
+      b("في الوثائق اضغط «اختر صورة أو PDF» لبطاقة أو جواز أو إقامة، فيقرأ الذكاء الاصطناعي الرقم والانتهاء ويرفق الملف.", "In Documents press “Choose an image or PDF” for an ID, passport or residence card; AI reads the number and expiry and attaches the file."),
+      b("في العمل اختر المسمى والقسم من القائمة، والمدير المباشر، وتاريخ الالتحاق، وصاحب العمل (الكفيل).", "Under Job pick the title and department from the list, the direct manager, joining date and sponsor."),
+      b("في الراتب: الأساسي والبدلات والعلاوات، وبنك الموظف وحسابه لملف WPS.", "Under Salary: basic, allowances and recurring allowances, plus the employee's bank and account for the WPS file."),
+      b("«حساب الدخول»: اترك «موظف» ليُفتح له حساب، ثم «حفظ الموظف».", "“Sign-in account”: keep “Employee” to open an account for them, then “Save employee”."),
+    ],
+    tips: [
+      b("لا يُحفظ شيء قرأه الذكاء الاصطناعي قبل أن تضغط الحفظ؛ راجع الأرقام والتواريخ.", "Nothing AI read is saved until you press save; check numbers and dates."),
+      b("الهاتف يأخذ رمز عُمان +968 افتراضياً؛ لغير ذلك اضغط زر الرمز واختر الدولة.", "Phone numbers default to Oman +968; press the code button to pick another country."),
+    ],
+    related: ["employee-file", "photo-badge", "hr-catalog"],
+    keywords: "إضافة موظف جديد نموذج بطاقة جواز إقامة add employee new form passport",
+  },
+  {
+    slug: "employee-file",
+    group: "people",
+    audience: ["staff"],
+    href: "/employees",
+    video: "employee-file",
+    title: b("ملف الموظف", "The employee file"),
+    summary: b(
+      "كل ما يخص الموظف في صفحة واحدة: البيانات والملاحظات والمهام والخطابات والحضور والمستندات والرواتب والأداء، مع الحساب والبوابة والمطبوعات.",
+      "Everything about an employee on one page: details, notes, tasks, letters, attendance, documents, salaries and performance, plus account, portal and prints.",
+    ),
+    shots: [{ file: "employee-file", caption: b("رأس الملف والتبويبات والبطاقات الجانبية", "The file header, tabs and side cards") }],
+    steps: [
+      b("افتح الموظفين واضغط اسم الموظف.", "Open Employees and press the employee's name."),
+      b("التبويبات: البيانات، الملاحظات، المهام، الخطابات، الحضور والإجازات، المستندات، الرواتب، الأداء والعهد والمصروفات.", "Tabs: Details, Notes, Tasks, Letters, Attendance & leave, Documents, Salaries, Performance, assets & expenses."),
+      b("البطاقات الجانبية: حساب الدخول، بوابة الموظف، بطاقة الموظف برمز QR، الملف الشخصي والمطبوعات، مستندات الموارد البشرية.", "Side cards: sign-in account, employee portal, QR ID card, profile & prints, HR documents."),
+      b("أزرار الرأس: «تعديل»، «طباعة الملف»، «كشف حساب»، «خطاب / إنذار».", "Header buttons: “Edit”, “Print profile”, “Statement”, “Letter / warning”."),
+      b("الشريط الأحمر أعلى الملف ينبهك إلى تجاوز رصيد الإجازة أو قرب نفاده.", "A red bar at the top warns when leave is overdrawn or about to run out."),
+    ],
+    sections: [
+      {
+        title: b("مستندات الموارد البشرية الجاهزة", "Ready-made HR documents"),
+        items: [
+          b("شهادة راتب، شهادة خبرة، رسالة تحويل راتب، وتسوية نهاية الخدمة — بترويسة الكفيل وبالعربية والإنجليزية.", "Salary certificate, experience certificate, salary transfer letter and end-of-service settlement — on the sponsor's letterhead, in Arabic and English."),
+          b("لغير العماني تظهر مكافأة نهاية الخدمة المستحقة حتى اليوم وفق قانون العمل.", "For non-Omanis, the end-of-service gratuity due today is shown, per the Labour Law."),
+        ],
+      },
+    ],
+    related: ["add-employee", "attendance", "cv-prints", "photo-badge"],
+    keywords: "ملف الموظف تبويبات ملاحظات employee file profile tabs notes",
+  },
+  {
+    slug: "photo-badge",
+    group: "people",
+    audience: ["staff"],
+    href: "/employees",
+    title: b("صورة الموظف وبطاقته برمز QR", "Employee photo and QR ID card"),
+    summary: b(
+      "أضف صورة الموظف لتظهر في كل مكان، واطبع له بطاقة برمز QR يفتح صفحة تحقق بصورته ووظيفته فقط.",
+      "Add the employee's photo so it shows everywhere, and print an ID card whose QR code opens a check page with only their photo and job.",
+    ),
+    shots: [{ file: "badge-print", caption: b("بطاقة الموظف وجهاً وظهراً بمقاس بطاقات الهوية", "The ID card front and back at standard card size") }],
+    steps: [
+      b("تعديل الموظف ← «إضافة صورة». يقصّها النظام مربعة ويصغّرها تلقائياً.", "Edit the employee → “Add photo”. It is cropped square and resized automatically."),
+      b("في ملف الموظف بطاقة «بطاقة الموظف» فيها رمز QR الخاص به.", "In the employee file, the “Employee ID card” shows their QR code."),
+      b("«طباعة البطاقة» تطبع وجهاً وظهراً بمقاس 85.6 × 54 مم؛ اطبع بمقياس 100% وقصّ على الخط.", "“Print card” prints front and back at 85.6 × 54 mm; print at 100% and cut along the line."),
+      b("ضاعت البطاقة؟ «رمز جديد» يوقف القديم فوراً.", "Card lost? “New code” stops the old one at once."),
+    ],
+    tips: [b("صفحة التحقق لا تعرض الهاتف ولا أرقام الوثائق ولا الراتب.", "The check page never shows phone numbers, document numbers or salary.")],
+    related: ["employee-file", "cv-prints"],
+    keywords: "صورة بطاقة باركود QR تحقق photo badge id card",
+  },
+  {
+    slug: "cv-prints",
+    group: "people",
+    audience: ["staff"],
+    href: "/employees",
+    video: "cv-prints",
+    title: b("السيرة الذاتية والملف المطبوع والوصف الوظيفي وبطاقة العمل", "CV, printed profile, job description and business card"),
+    summary: b(
+      "اطبع ملف الموظف كاملاً بشكل سيرة ذاتية، وبطاقة وصف وظيفي يكتبها الذكاء الاصطناعي، وبطاقة عمل برمز QR.",
+      "Print the employee's full profile as a CV, an AI-written job description card, and a business card with a QR code.",
+    ),
+    shots: [
+      { file: "profile-print", caption: b("الملف الشخصي المطبوع بأسلوب السيرة الذاتية", "The printed profile in CV style") },
+      { file: "job-description", caption: b("بطاقة الوصف الوظيفي بالعربية والإنجليزية", "The bilingual job description card") },
+      { file: "business-card", caption: b("بطاقة العمل 90 × 50 مم", "The 90 × 50 mm business card") },
+    ],
+    steps: [
+      b("في ملف الموظف بطاقة «الملف الشخصي والمطبوعات» بنسبة اكتمال السيرة.", "In the employee file, the “Profile & prints” card shows how complete the CV is."),
+      b("«طباعة الملف الشخصي»: اختر العربية أو English، وأضف الوثائق والراتب إن شئت، ثم «طباعة / حفظ PDF».", "“Print profile”: choose Arabic or English, add documents and salary if you like, then “Print / save PDF”."),
+      b("«الوصف الوظيفي» ← «صياغة الوصف بالذكاء الاصطناعي» فيكتب المهام والمؤهلات والمهارات ومؤشرات الأداء باللغتين. عدّل ثم اطبع.", "“Job description” → “Draft with AI” writes duties, qualifications, skills and KPIs in both languages. Edit, then print."),
+      b("«بطاقة العمل»: ورقة A4 بعشر بطاقات أو بطاقة واحدة؛ رمز QR يحفظ بيانات الموظف في جهات الاتصال.", "“Business card”: an A4 sheet of ten or a single card; the QR code saves the employee's contact."),
+      b("«تعديل السيرة الذاتية» يفتح المحرّر نفسه الذي يراه الموظف في بوابته.", "“Edit CV” opens the same editor the employee sees in their portal."),
+    ],
+    tips: [b("الوصف الوظيفي يُحفظ للمسمى، فيشترك فيه كل من يحمل المسمى نفسه.", "The job description is saved for the job title, so everyone with that title shares it.")],
+    related: ["portal-cv", "employee-file"],
+    keywords: "سيرة ذاتية طباعة ملف وصف وظيفي بطاقة عمل cv profile job description business card",
+  },
+  {
+    slug: "attendance",
+    group: "people",
+    audience: ["staff"],
+    href: "/attendance",
+    video: "attendance",
+    title: b("الحضور والغياب والإجازات", "Attendance, absence and leave"),
+    summary: b("سجّل الغياب والإجازات بفترات، وتابع الأرصدة وتسجيل الحضور من البوابة.", "Record absence and leave by period, and follow balances and portal clock-ins."),
+    shots: [{ file: "attendance", caption: b("تسجيل فترة، والأرصدة، وسجل الدوام", "Recording a period, balances and the clock-in log") }],
+    steps: [
+      b("الحضور والغياب ← اختر الموظف ونوع اليوم (غياب، إجازة سنوية، مرضية، نصف يوم…).", "Attendance → pick the employee and the type (absence, annual leave, sick, half day…)."),
+      b("اختر الفترة من – إلى؛ يُحسب عدد الأيام مباشرة، ثم «حفظ».", "Pick the period from – to; the days are counted at once, then “Save”."),
+      b("الغياب والإجازة بخصم راتب يُخصمان من الراتب؛ الإجازات تُخصم من رصيدها.", "Absence and unpaid leave are deducted from salary; leave comes out of its balance."),
+      b("إن تجاوزت الأيام الرصيد يظهر تحذير أحمر؛ أكّد «أوافق على تجاوز الرصيد» للحفظ.", "If the days exceed the balance a red warning appears; tick “I approve exceeding the balance” to save."),
+      b("«تعديل» أو «حذف» أي فترة من القائمة. إن كان الراتب قد أُنشئ اضغط فيه «إعادة الحساب».", "“Edit” or “Delete” any period in the list. If the salary already exists, press “Recalculate” in it."),
+    ],
+    tips: [b("سجل الدوام من البوابة للمتابعة فقط؛ لا يخصم شيئاً تلقائياً.", "The portal clock-in log is for follow-up only; it deducts nothing by itself.")],
+    related: ["approvals", "payroll", "hr-catalog"],
+    keywords: "حضور غياب إجازة رصيد attendance absence leave balance",
+  },
+  {
+    slug: "approvals",
+    group: "people",
+    audience: ["staff"],
+    href: "/approvals",
+    video: "approvals",
+    title: b("طلبات الموظفين والموافقة عليها", "Employee requests and approvals"),
+    summary: b(
+      "كل ما يطلبه الموظفون من بواباتهم: خطابات وشهادات، سلف، استقالات، إجازات، مستندات، ومصروفات — تعتمدها إلكترونياً من مكان واحد.",
+      "Everything employees ask for from their portal — letters and certificates, advances, resignations, leave, documents and expenses — approved electronically in one place.",
+    ),
+    shots: [{ file: "approvals", caption: b("الطلبات بانتظار القرار", "Requests waiting for a decision") }],
+    steps: [
+      b("افتح «طلبات الموظفين». تصلك الطلبات أيضاً في التنبيهات وملخص اليوم.", "Open “Requests”. They also arrive in alerts and the daily brief."),
+      b("خطاب جاهز (شهادة راتب، خبرة، تحويل راتب…): عدّل الجهة إن لزم ثم «اعتماد وإصدار الخطاب موقّعاً» فيصدر فوراً برمز QR.", "A ready letter (salary, experience, salary transfer…): adjust the addressee if needed, then “Approve and issue signed” — it is issued at once with a QR code."),
+      b("الإجازة: راجع الرصيد المتبقي ثم «موافقة» فتُسجَّل في الحضور تلقائياً، أو «رفض» مع ملاحظة.", "Leave: check the remaining balance, then “Approve” to record it in attendance, or “Reject” with a note."),
+      b("السلفة: عدّل المبلغ والأقساط ثم «اعتماد السلفة» فتُخصم من الرواتب تلقائياً.", "Advance: adjust the amount and instalments, then “Approve advance” — it is deducted from salaries automatically."),
+      b("الاستقالة: راجع آخر يوم عمل ثم «قبول الاستقالة» فيصدر خطاب القبول.", "Resignation: check the last working day, then “Accept resignation” to issue the acceptance letter."),
+    ],
+    tips: [b("ملاحظتك عند الموافقة أو الرفض تظهر للموظف في بوابته.", "Your note on approval or rejection is shown to the employee in their portal.")],
+    related: ["letters", "attendance", "portal-requests"],
+    keywords: "طلبات موافقة اعتماد إجازة سلفة استقالة approvals requests approve",
+  },
+  {
+    slug: "documents",
+    group: "people",
+    audience: ["staff"],
+    href: "/documents",
+    title: b("المستندات وتواريخ الانتهاء", "Documents and expiry dates"),
+    summary: b("كل وثائق الموظفين في مكان واحد بألوان حسب قرب الانتهاء، مع قراءة المستند بالذكاء الاصطناعي.", "All employee documents in one place, coloured by how soon they expire, with AI document reading."),
+    shots: [{ file: "documents", caption: b("الأحمر منتهٍ، والبرتقالي عاجل، والأصفر تحذير، والأخضر ساري", "Red expired, orange urgent, yellow warning, green valid") }],
+    steps: [
+      b("المستندات ← «إضافة مستند»: الموظف والنوع والرقم والانتهاء والملف.", "Documents → “Add document”: employee, type, number, expiry and file."),
+      b("أو «اختر صورة أو PDF» فيقرأ الذكاء الاصطناعي النوع والرقم والانتهاء، ثم راجع واحفظ.", "Or “Choose an image or PDF” to let AI read the type, number and expiry, then review and save."),
+      b("صفِّ بالحالة لترى ما ينتهي قريباً، واضغط «تعديل» لتجديد التاريخ أو استبدال الملف.", "Filter by status to see what expires soon, and press “Edit” to renew the date or replace the file."),
+    ],
+    tips: [b("البطاقة والجواز والإقامة جزء من بيانات الموظف وتُعدّل من نموذجه.", "ID, passport and residence are part of the employee record and are edited from their form.")],
+    related: ["alerts", "add-employee"],
+    keywords: "مستندات وثائق انتهاء documents expiry",
+  },
+  {
+    slug: "letters",
+    group: "people",
+    audience: ["staff"],
+    href: "/letters",
+    video: "letters",
+    title: b("الخطابات والإنذارات والتوقيع الإلكتروني", "Letters, warnings and e-signatures"),
+    summary: b(
+      "أصدر لفت نظر أو إنذاراً أو شكراً أو شهادة جاهزة بترويسة رسمية ورقم مرجعي، موقّعة إلكترونياً برمز QR للتحقق.",
+      "Issue notices, warnings, thank-you letters or ready certificates on official letterhead with a reference number, e-signed with a QR code for verification.",
+    ),
+    shots: [{ file: "letter", caption: b("الخطاب الرسمي بالتوقيع والختم ورمز التحقق", "The official letter with signature, stamp and verification code") }],
+    steps: [
+      b("الإنذارات والخطابات ← «خطاب جديد»، واختر موظفاً أو أكثر.", "Letters → “New letter”, and choose one or more employees."),
+      b("اختر النوع؛ لموظف واحد يظهر الإنذار المقترح التالي حسب آخر 12 شهراً.", "Choose the type; for one employee the next suggested warning appears, based on the last 12 months."),
+      b("اكتب السبب ثم «صياغة بالذكاء الاصطناعي» (عربي وإنجليزي) أو «القالب الجاهز»، وعدّل النص.", "Write the reason, then “Draft with AI” (Arabic and English) or “Use the template”, and edit the text."),
+      b("«إصدار الخطاب». من صفحته: الطباعة، المشاركة بواتساب أو البريد، ورابط الموظف لتأكيد الاستلام.", "“Issue letter”. From its page: print, share by WhatsApp or email, and the employee's link to acknowledge it."),
+      b("من يمسح رمز QR يرى «مستند أصلي معتمد» ويحمّل الأصل PDF.", "Anyone scanning the QR code sees “Authentic document” and can download the original PDF."),
+    ],
+    tips: [b("ارفع صورة التوقيع والختم مرة واحدة من الإعدادات ← «التوقيع الإلكتروني والختم».", "Upload the signature and stamp images once in Settings → “E-signature and stamp”.")],
+    related: ["approvals", "settings"],
+    keywords: "خطاب إنذار لفت نظر شهادة توقيع ختم letter warning certificate signature",
+  },
+  {
+    slug: "org",
+    group: "people",
+    audience: ["staff"],
+    href: "/org",
+    title: b("الهيكل التنظيمي", "Org chart"),
+    summary: b("الفرق حسب «المدير المباشر» في ملف كل موظف، تتحدث تلقائياً.", "Teams built from each employee's “direct manager”, updated automatically."),
+    shots: [{ file: "org", caption: b("كل مدير وتحته فريقه", "Each manager with their team below") }],
+    steps: [
+      b("حدد «المدير المباشر» لكل موظف من نموذج التعديل.", "Set each employee's “Direct manager” in their edit form."),
+      b("افتح «الهيكل التنظيمي» لترى كل مدير وعدد فريقه ومن تحته بكل المستويات.", "Open “Org chart” to see each manager, team size and everyone below them."),
+      b("من ليس له مدير يظهر في «بدون مدير مباشر» مجمّعاً حسب القسم. اضغط أي اسم لفتح ملفه.", "Anyone without a manager appears under “No direct manager”, grouped by department. Press a name to open the file."),
+    ],
+    tips: [b("اختيار موظف مديراً لغيره يرقّي حسابه تلقائياً إلى «مدير فريق».", "Choosing someone as a manager upgrades their account to “Team manager” automatically.")],
+    related: ["team", "roles"],
+    keywords: "هيكل تنظيمي مدير مباشر فريق org chart manager",
+  },
+  {
+    slug: "address-book",
+    group: "people",
+    audience: ["staff"],
+    href: "/employers",
+    title: b("دفتر العناوين والكفلاء", "Address book and sponsors"),
+    summary: b("سجل أصحاب العمل والكفلاء وجهات الاتصال، وشعار كل كفيل على قسائم موظفيه.", "The register of sponsors and contacts; each sponsor's logo goes on their workers' payslips."),
+    shots: [{ file: "employers", caption: b("بطاقات الكفلاء وعدد موظفي كل منهم", "Sponsor cards with their number of workers") }],
+    steps: [
+      b("دفتر العناوين ← «كفيل جديد»: شركة أو فرد، الاسم، الهاتف، البريد، الشعار.", "Address book → “New sponsor”: company or person, name, phone, email, logo."),
+      b("بدّل العرض بين بطاقات وقائمة وجهات اتصال، وابحث بالاسم أو الهاتف.", "Switch between cards, list and contacts, and search by name or phone."),
+      b("«طباعة جهات الاتصال» للكل أو لكفيل معيّن مع موظفيه.", "“Print contacts” for everyone or one sponsor with their workers."),
+    ],
+    tips: [b("يُفتح لكل كفيل حساب «صاحب عمل» يرى به عمّاله المكفولين فقط.", "Each sponsor gets an “Employer” account that shows only their own workers.")],
+    related: ["team", "employee-file"],
+    keywords: "دفتر عناوين كفيل صاحب عمل جهات اتصال sponsor employer contacts",
+  },
+
+  // ───────────── Hiring, performance, assets
+  {
+    slug: "recruitment",
+    group: "talent",
+    audience: ["staff"],
+    href: "/recruitment",
+    video: "recruitment",
+    title: b("التوظيف", "Recruitment"),
+    summary: b(
+      "شواغر برابط تقديم عام، وتقييم السير الذاتية بالذكاء الاصطناعي، ومراحل المرشحين والمقابلات، ثم التعيين بضغطة.",
+      "Vacancies with a public application link, AI CV screening, candidate stages and interviews, then hiring in one press.",
+    ),
+    shots: [{ file: "recruitment", caption: b("الشاغر ومسار المرشحين بدرجات التقييم", "A vacancy and its candidates with screening scores") }],
+    steps: [
+      b("التوظيف ← «إضافة شاغر»: المسمى والقسم والعدد والراتب والوصف والمتطلبات، مع «رابط تقديم عام».", "Recruitment → “Add vacancy”: title, department, openings, salary, description and requirements, with a “public application link”."),
+      b("شارك رابط التقديم؛ المتقدم يرفع سيرته من أي جهاز دون حساب.", "Share the application link; applicants upload their CV from any device without an account."),
+      b("«تقييم السير بالذكاء الاصطناعي» يعطي كل مرشح درجة من 100 ونقاط قوة وفجوات مقارنة بالمتطلبات.", "“Screen CVs with AI” gives each candidate a score out of 100 with strengths and gaps against the requirements."),
+      b("انقل المرشح بين المراحل (فرز، مقابلة، عرض)، وحدد موعد المقابلة فيظهر في التقويم.", "Move candidates through stages (screening, interview, offer) and set the interview time — it shows in the calendar."),
+      b("«تعيين وإنشاء ملف موظف» ينشئ ملفه ويحفظ سيرته في مستنداته.", "“Hire and create employee” creates their file and keeps the CV in their documents."),
+    ],
+    tips: [b("تقييم الذكاء الاصطناعي رأي مساعد لا يعتمد على العمر أو الجنس أو الجنسية — القرار لك.", "AI screening is advice that ignores age, gender and nationality — the decision is yours.")],
+    related: ["add-employee", "calendar"],
+    keywords: "توظيف شاغر مرشح سيرة مقابلة recruitment vacancy candidate interview",
+  },
+  {
+    slug: "performance",
+    group: "talent",
+    audience: ["staff"],
+    href: "/performance",
+    title: b("تقييم الأداء", "Performance reviews"),
+    summary: b("جولات تقييم بمعايير من 1 إلى 5، مع حقائق الفترة من ملف الموظف ومسودة يكتبها الذكاء الاصطناعي.", "Review rounds with 1–5 criteria, the period's facts from the employee file, and an AI-written draft."),
+    shots: [{ file: "performance", caption: b("جولة التقييم ونسبة الإنجاز", "A review round and its progress") }],
+    steps: [
+      b("تقييم الأداء ← «بدء جولة تقييم»: الاسم، الفترة، الموعد، الموظفون، والمعايير.", "Performance → “Start a review round”: name, period, due date, employees and criteria."),
+      b("افتح تقييم موظف: في الجانب «حقائق الفترة» (الغياب، التأخير، المهام، الإنذارات…).", "Open an employee's review: the side panel shows the period's facts (absence, lateness, tasks, warnings…)."),
+      b("اختر درجة لكل معيار، واكتب نقاط القوة والتحسين والأهداف، أو «اكتب مسودة» بالذكاء الاصطناعي.", "Score each criterion and write strengths, improvements and goals, or press “Write a draft” with AI."),
+      b("«اعتماد التقييم» ثم «إظهار في بوابة الموظف» ليراه.", "“Approve review”, then “Show in employee portal” so they can see it."),
+    ],
+    related: ["employee-file", "portal"],
+    keywords: "تقييم أداء جولة معايير performance review appraisal",
+  },
+  {
+    slug: "assets",
+    group: "talent",
+    audience: ["staff"],
+    href: "/assets",
+    title: b("العُهد والأصول", "Assets and custody"),
+    summary: b("سجل الأجهزة والمركبات والبطاقات مع من هي، وسجل كل تسليم واستلام وصيانة.", "A register of devices, vehicles and cards, who holds them, and every hand-over, return and repair."),
+    shots: [{ file: "assets", caption: b("العهد بحالتها ومن يحملها", "Assets with their status and holder") }],
+    steps: [
+      b("العُهد ← «إضافة عهدة»: الاسم والنوع والرقم والقيمة، و«تسليمها الآن إلى» موظف إن أردت.", "Assets → “Add asset”: name, type, tag and value, and “Hand over now to” an employee if you like."),
+      b("من صفحة العهدة: «تسليم لموظف»، «تسجيل الاستلام»، أو «تغيير الحالة» إلى صيانة.", "From the asset page: “Hand over”, “Record return”, or “Change status” to maintenance."),
+      b("السجل يحفظ كل حركة بالتاريخ ومن نفّذها.", "The history keeps every movement with its date and who did it."),
+    ],
+    tips: [b("إذا انتهت خدمة موظف وعهدة معه يظهر تنبيه أحمر حتى تستلمها.", "If an employee leaves while holding an asset, a red alert stays until you record its return.")],
+    related: ["employee-file"],
+    keywords: "عهدة أصول جهاز تسليم assets custody laptop",
+  },
+
+  // ───────────── Payroll & finance
+  {
+    slug: "payroll",
+    group: "finance",
+    audience: ["staff"],
+    href: "/salaries",
+    video: "payroll",
+    title: b("الرواتب: من الإنشاء حتى الصرف", "Payroll: from creating to paying"),
+    summary: b(
+      "مسير الشهر بضغطة، مراجعة ذكية قبل الصرف، صرف فردي أو جماعي، قسائم وإيصالات ثنائية اللغة، وملف WPS والحماية الاجتماعية.",
+      "The month's payroll in one press, a smart pre-payment check, single or bulk payment, bilingual payslips and receipts, and the WPS and social-protection files.",
+    ),
+    shots: [
+      { file: "payroll", caption: b("مسير الشهر ومراجعة ما قبل الصرف", "The month's payroll and the pre-payment check") },
+      { file: "payslip", caption: b("قسيمة الراتب بالعربية والإنجليزية", "The bilingual payslip") },
+    ],
+    steps: [
+      b("الرواتب ← اختر الشهر والسنة (وصاحب العمل إن أردت) ← «إنشاء رواتب الشهر».", "Payroll → pick the month and year (and sponsor if you like) → “Create the month's salaries”."),
+      b("يُنشأ راتب لكل موظف نشط مع الغياب والسلف والمكافآت والعلاوات والحماية الاجتماعية.", "A salary is created for every active employee, with absence, advances, bonuses, allowances and social protection."),
+      b("راجع بطاقة «مراجعة قبل الصرف»: صافٍ سالب، تغيّر كبير عن الشهر السابق، موظف بلا بنك… وكل ملاحظة رابط لإصلاحها.", "Check the “Before you pay” card: negative net, big change from last month, no bank details… each note links to the fix."),
+      b("افتح أي راتب لتعديله، ثم «صرف الكل» أو «تأكيد صرف الراتب» بطريقة الدفع والمرجع.", "Open any salary to adjust it, then “Pay all” or “Confirm payment” with the method and reference."),
+      b("من «الطباعة»: القسائم والإيصالات وكشف المسير، وملف WPS للبنك، وكشف الحماية الاجتماعية.", "From “Prints”: payslips, receipts, the payroll sheet, the WPS bank file and the social-protection sheet."),
+    ],
+    sections: [
+      {
+        title: b("كيف يُحسب الصافي", "How the net is calculated"),
+        items: [
+          b("الإجمالي = الأساسي + السكن + النقل + البدلات الأخرى.", "Gross = basic + housing + transport + other allowances."),
+          b("خصم الغياب = (الإجمالي ÷ 30) × أيام الغياب، ونصف اليوم 0.5.", "Absence deduction = (gross ÷ 30) × absent days; a half day counts 0.5."),
+          b("الصافي = الإجمالي + العلاوات والمكافآت − الغياب − الخصومات وأقساط السلف − حصة الموظف في الحماية الاجتماعية.", "Net = gross + allowances and bonuses − absence − deductions and advance instalments − the employee's social-protection share."),
+        ],
+      },
+    ],
+    tips: [
+      b("الراتب المصروف لا يتغير. صُرف بالخطأ؟ افتحه و«إلغاء الصرف».", "A paid salary never changes. Paid by mistake? Open it and “Cancel payment”."),
+      b("تأكد من تخطيط ملف WPS مع بنكك قبل أول رفع.", "Confirm the WPS file layout with your bank before the first upload."),
+    ],
+    related: ["pay-items", "attendance", "settings"],
+    keywords: "رواتب مسير صرف قسيمة إيصال WPS حماية اجتماعية payroll salary payslip",
+  },
+  {
+    slug: "pay-items",
+    group: "finance",
+    audience: ["staff"],
+    href: "/pay-items",
+    video: "pay-items",
+    title: b("السلف والمكافآت والخصومات", "Advances, bonuses and deductions"),
+    summary: b("سلفة على أقساط، أو مكافأة أو بدل أو استحقاق أو خصم لمرة أو لعدة أشهر — تدخل الرواتب تلقائياً.", "An advance in instalments, or a bonus, allowance, entitlement or deduction once or for several months — applied to salaries automatically."),
+    shots: [{ file: "pay-items", caption: b("البنود السارية ومتبقي السلف", "Active items and outstanding advances") }],
+    steps: [
+      b("السلف والمكافآت ← اختر الموظف والنوع، واكتب الوصف والمبلغ.", "Advances & bonuses → pick the employee and type, and write the description and amount."),
+      b("للسلفة: تاريخ التسليم وعدد الأقساط وأول شهر للخصم؛ يظهر القسط الشهري مباشرة.", "For an advance: date given, number of instalments and first month; the monthly instalment shows at once."),
+      b("لغيرها: أول شهر والتكرار (مرة، عدد أشهر، كل شهر حتى الإيقاف).", "For others: first month and repeat (once, a number of months, every month until stopped)."),
+      b("اطبع «إيصال استلام سلفة» ليوقّعه الموظف.", "Print the “Advance receipt” for the employee to sign."),
+    ],
+    tips: [b("«إيقاف / إعفاء» يوقف البند على الرواتب غير المصروفة فقط؛ المصروف لا يتغير.", "“Stop / waive” stops the item on unpaid salaries only; paid ones never change.")],
+    related: ["payroll", "approvals"],
+    keywords: "سلفة مكافأة خصم بدل أقساط advance bonus deduction instalment",
+  },
+  {
+    slug: "expenses",
+    group: "finance",
+    audience: ["staff"],
+    href: "/expenses",
+    title: b("المصروفات وتعويضها", "Expense claims"),
+    summary: b("مبالغ صرفها الموظف للعمل: يطلبها بإيصال، تعتمدها، ثم تصرفها مع الراتب أو نقداً.", "Money employees spent for work: they claim it with a receipt, you approve it, then pay it with salary or directly."),
+    shots: [{ file: "expenses", caption: b("الطلبات بانتظار الموافقة والصرف", "Claims waiting for approval and payment") }],
+    steps: [
+      b("يطلب الموظف التعويض من بوابته بصورة الإيصال، أو تسجّله أنت «تسجيل مصروف لموظف».", "The employee claims from their portal with a receipt photo, or you use “Record an expense”."),
+      b("«موافقة» أو «رفض» مع السبب.", "“Approve” or “Reject” with a reason."),
+      b("تحت «بانتظار الصرف» اختر الطريقة: مع الراتب القادم، أو نقداً، أو تحويل، أو شيك، ثم «صرف».", "Under “Waiting for payment” pick how: with the next salary, cash, transfer or cheque, then “Pay”."),
+    ],
+    related: ["approvals", "payroll", "portal-more"],
+    keywords: "مصروفات تعويض إيصال expenses claim receipt",
+  },
+  {
+    slug: "analytics",
+    group: "finance",
+    audience: ["staff"],
+    href: "/analytics",
+    title: b("لوحة المالك", "Owner analytics"),
+    summary: b("صورة الشركة لآخر 12 شهراً: العدد والتكلفة والدوران والغياب والتعمين، مع قراءة بالذكاء الاصطناعي.", "The company over 12 months: headcount, cost, turnover, absence and Omanization, with an AI reading."),
+    shots: [{ file: "analytics", caption: b("المؤشرات والرسوم الشهرية", "Indicators and monthly charts") }],
+    steps: [
+      b("افتح «لوحة المالك» لترى المؤشرات: النشطون، تكلفة المسير، الدوران، الغياب، التعمين، مكافآت نهاية الخدمة.", "Open “Owner analytics” for the indicators: active staff, payroll cost, turnover, absence, Omanization, gratuities."),
+      b("مرّر المؤشر على أي عمود لترى رقمه.", "Hover over any bar to see its figure."),
+      b("«حلّل الأرقام بالذكاء الاصطناعي» يكتب أهم الاتجاهات والمخاطر وإجراءً مقترحاً لكل منها.", "“Analyse with AI” writes the main trends and risks, with a suggested action for each."),
+    ],
+    related: ["reports"],
+    keywords: "تحليلات مالك مؤشرات دوران analytics owner kpi",
+  },
+  {
+    slug: "reports",
+    group: "finance",
+    audience: ["staff"],
+    href: "/reports",
+    title: b("التقارير وسجل العمليات", "Reports and activity log"),
+    summary: b("ملخص الشهر للطباعة أو Excel أو PDF، ونسبة التعمين، وسجل بكل عملية ومن نفّذها.", "The month's summary to print or download as Excel or PDF, Omanization, and a log of every action and who did it."),
+    shots: [{ file: "reports", caption: b("تقرير الشهر وأزرار التصدير", "The monthly report and export buttons") }],
+    steps: [
+      b("التقارير ← اختر الشهر والسنة.", "Reports → pick the month and year."),
+      b("«طباعة» أو «تحميل Excel» (أوراق الرواتب والسلف والغياب والمستندات والموظفين) أو «تحميل PDF».", "“Print”, “Download Excel” (sheets for payroll, advances, absence, documents and employees) or “Download PDF”."),
+      b("«سجل العمليات» يبيّن من أضاف أو عدّل أو صرف، ومتى.", "The “Activity log” shows who added, changed or paid what, and when."),
+    ],
+    related: ["analytics", "payroll"],
+    keywords: "تقارير excel pdf سجل العمليات reports export activity log",
+  },
+
+  // ───────────── Administration
+  {
+    slug: "settings",
+    group: "admin",
+    audience: ["staff"],
+    href: "/settings",
+    title: b("إعدادات المنشأة", "Company settings"),
+    summary: b(
+      "بيانات المنشأة وشعارها، أيام الراتب والتنبيهات، الحماية الاجتماعية وبنك WPS، تسجيل الحضور، والتوقيع والختم.",
+      "Company details and logo, salary days and alerts, social protection and the WPS bank, clock-in, and the signature and stamp.",
+    ),
+    shots: [{ file: "settings", caption: b("أقسام الإعدادات", "The settings sections") }],
+    steps: [
+      b("المنشأة: الاسم باللغتين، السجل التجاري، الهاتف، العنوان، والشعار (يظهر على المطبوعات).", "Company: name in both languages, CR, phone, address and logo (shown on prints)."),
+      b("الرواتب والتنبيهات: أيام حساب الراتب، ومتى تبدأ تنبيهات الوثائق، ويوم الاستحقاق.", "Payroll & alerts: salary days, when document alerts start, and payday."),
+      b("عُمان والبنك: تفعيل الحماية الاجتماعية ونسبها، وبنك المنشأة وحسابها لملف WPS.", "Oman & bank: turn on social protection and its rates, and the company bank and account for WPS."),
+      b("تسجيل الحضور: موقع العمل («موقعي الحالي») ونطاقه وبداية الدوام.", "Clock-in: the work site (“My current location”), radius and start time."),
+      b("التوقيع الإلكتروني والختم: الموقّع وصورتا التوقيع والختم للخطابات.", "E-signature & stamp: the signatory and the signature and stamp images for letters."),
+    ],
+    tips: [b("راجع نسب الحماية الاجتماعية مع الصندوق قبل التفعيل.", "Check the social-protection rates with the fund before turning it on.")],
+    related: ["hr-catalog", "roles"],
+    keywords: "إعدادات منشأة شعار حماية اجتماعية بنك توقيع ختم settings company logo spf",
+  },
+  {
+    slug: "hr-catalog",
+    group: "admin",
+    audience: ["staff"],
+    href: "/settings/hr",
+    title: b("المسميات والأقسام والإجازات والعلاوات", "Job titles, departments, leave types and allowances"),
+    summary: b("القوائم التي يختار منها نموذج الموظف، باللغتين، مع ترجمة تلقائية بالذكاء الاصطناعي.", "The lists the employee form picks from, in both languages, with automatic AI translation."),
+    shots: [{ file: "settings-hr", caption: b("تبويبات الموارد البشرية", "The HR tabs") }],
+    steps: [
+      b("الإعدادات ← «الموارد البشرية».", "Settings → “HR”."),
+      b("المسميات والأقسام: قوائم جاهزة؛ أضف أو عدّل (يتحدث عند كل موظف) أو احذف غير المستخدم.", "Job titles and departments: ready lists; add, edit (updates every employee) or delete unused ones."),
+      b("أنواع الإجازات: الاسم، الأيام المستحقة، ولكل الوظائف أو لمسميات محددة.", "Leave types: name, days per year, and for all jobs or chosen titles."),
+      b("العلاوات: مبلغ أو نسبة، شهرية أو ربعية أو سنوية، مع «إضافتها الآن لكل الموظفين».", "Allowances: amount or percentage, monthly, quarterly or yearly, with “Add to all employees now”."),
+    ],
+    tips: [b("اكتب الاسم بلغة واحدة فتكمل الأخرى تلقائياً.", "Type a name in one language and the other is filled in.")],
+    related: ["add-employee", "settings"],
+    keywords: "مسميات أقسام أنواع الإجازات علاوات job titles departments leave types allowances",
+  },
+  {
+    slug: "roles",
+    group: "admin",
+    audience: ["staff"],
+    href: "/settings",
+    video: "roles",
+    title: b("الأدوار والحسابات والصلاحيات", "Roles, accounts and permissions"),
+    summary: b(
+      "من يرى ماذا: أدوار جاهزة لكل نوع مستخدم، حسابات تلقائية للموظفين وأصحاب العمل، ودعوة مستخدمين بصلاحيات مخصصة.",
+      "Who sees what: ready roles for each kind of user, automatic accounts for employees and sponsors, and invitations with custom permissions.",
+    ),
+    shots: [{ file: "roles", caption: b("بطاقة لكل دور وما يستطيعه", "A card for each role and what it can do") }],
+    steps: [
+      b("الإعدادات ← «الأدوار والحسابات»: موظف، مدير فريق، صاحب عمل، مدير الموارد البشرية، مستخدم عرض فقط، مسؤول.", "Settings → “Roles & accounts”: employee, team manager, sponsor, HR manager, view-only user, admin."),
+      b("«تعديل الصلاحيات» لأي دور قابل للتعديل، فيسري على كل من يحمله فوراً.", "“Edit permissions” on any editable role; it applies to everyone with it at once."),
+      b("«فتح الحسابات» يفتح حساباً لكل موظف أو صاحب عمل ليس له حساب.", "“Open accounts” opens an account for every employee or sponsor who has none."),
+      b("«المستخدمون والصلاحيات» ← «دعوة مستخدم» بالبريد، واختر دوراً جاهزاً أو «مخصص».", "“Users & permissions” → “Invite user” by email, choosing a ready role or “Custom”."),
+      b("من ملف الموظف ← «حساب الدخول»: اسم المستخدم وكلمة المرور المؤقتة وأزرار المشاركة وتغيير الدور.", "From the employee file → “Sign-in account”: username, temporary password, share buttons and role."),
+    ],
+    tips: [b("ما لا يملكه المستخدم يختفي من شاشته، ويرفضه النظام حتى لو حاول مباشرة.", "Anything a user is not allowed disappears from their screen, and the system refuses it even if tried directly.")],
+    related: ["sign-in", "team", "settings"],
+    keywords: "أدوار صلاحيات حسابات دعوة مستخدم roles permissions accounts invite",
+  },
+
+  // ───────────── Employee portal
+  {
+    slug: "portal",
+    group: "portal",
+    audience: ["staff", "employee", "team"],
+    portalHref: "",
+    video: "portal",
+    title: b("بوابة الموظف: نظرة عامة", "The employee portal at a glance"),
+    summary: b(
+      "صفحة الموظف الشخصية على هاتفه: الحضور، الإجازات، القسائم، المستندات، المصروفات، الطلبات، الخطابات، التقييم، سيرته وبطاقته.",
+      "The employee's own page on their phone: clock-in, leave, payslips, documents, expenses, requests, letters, reviews, CV and ID card.",
+    ),
+    shots: [{ file: "portal", caption: b("البوابة على الهاتف بأقسامها", "The portal on a phone with its sections"), phone: true }],
+    steps: [
+      b("يدخل الموظف باسم المستخدم وكلمة المرور، أو يفتح رابط البوابة المرسل له.", "The employee signs in with their username and password, or opens the portal link they were sent."),
+      b("شريط الأقسام أعلى الصفحة ينقله مباشرة إلى ما يريد.", "The section bar at the top takes them straight to what they need."),
+      b("لا يرى الموظف شيئاً عن غيره، ولا ملاحظات الإدارة الداخلية.", "Employees never see anyone else's data or management's internal notes."),
+      b("زر اللغة والمظهر أعلى الصفحة، وزر «شرح» يفتح هذا الدليل.", "Language and theme buttons sit at the top, and “Help” opens this guide."),
+    ],
+    related: ["portal-leave", "portal-requests", "portal-cv", "portal-more"],
+    keywords: "بوابة الموظف صفحتي portal employee",
+  },
+  {
+    slug: "portal-leave",
+    group: "portal",
+    audience: ["staff", "employee", "team"],
+    portalHref: "#leave",
+    title: b("طلب إجازة ومتابعته", "Asking for leave"),
+    summary: b("الموظف يرى رصيده ويطلب الإجازة، ويتابع القرار وملاحظة الإدارة.", "Employees see their balance, ask for leave and follow the decision and HR's note."),
+    shots: [{ file: "portal-leave", caption: b("الأرصدة ونموذج طلب الإجازة", "Balances and the leave request form"), phone: true }],
+    steps: [
+      b("البوابة ← «الإجازات»: الرصيد المتبقي من كل نوع.", "Portal → “Leave”: the remaining balance of each type."),
+      b("اختر النوع والفترة واكتب السبب ثم «إرسال الطلب».", "Choose the type and dates, write the reason, then “Send request”."),
+      b("يظهر الطلب «بانتظار الموافقة»، ثم «موافق عليها» أو «مرفوضة» مع ملاحظة الإدارة.", "The request shows “Pending”, then “Approved” or “Rejected” with HR's note."),
+      b("يمكن إلغاء الطلب ما دام معلّقاً.", "A request can be cancelled while it is still pending."),
+    ],
+    related: ["approvals", "portal"],
+    keywords: "طلب إجازة رصيد بوابة leave request portal",
+  },
+  {
+    slug: "portal-requests",
+    group: "portal",
+    audience: ["staff", "employee", "team"],
+    portalHref: "#requests",
+    title: b("طلب خطاب أو شهادة أو سلفة أو استقالة", "Asking for a letter, certificate, advance or resignation"),
+    summary: b("الموظف يطلب من الإدارة، ويستلم الخطاب موقّعاً إلكترونياً برمز QR بعد الاعتماد.", "Employees ask HR and receive the letter e-signed with a QR code once approved."),
+    shots: [{ file: "portal-requests", caption: b("قسم الطلبات و«طلباتي»", "The requests section and “My requests”"), phone: true }],
+    steps: [
+      b("البوابة ← «الطلبات» ← اختر: خطاب أو شهادة، سلفة، طلب آخر، أو الاستقالة.", "Portal → “Requests” → choose: letter or certificate, advance, other request, or resignation."),
+      b("للخطاب اختر نوعه (شهادة راتب، خبرة، تحويل راتب، عدم ممانعة…) والجهة المرسل إليها.", "For a letter choose its type (salary, experience, salary transfer, no-objection…) and who it is for."),
+      b("«طلباتي» تعرض الحالة وملاحظة الإدارة، وبعد الاعتماد رابط «فتح الخطاب الموقّع وتحميله».", "“My requests” shows the status and HR's note, and after approval a link to open and download the signed letter."),
+    ],
+    related: ["approvals", "letters"],
+    keywords: "طلب خطاب شهادة سلفة استقالة بوابة request letter certificate advance resignation",
+  },
+  {
+    slug: "portal-cv",
+    group: "portal",
+    audience: ["staff", "employee", "team"],
+    portalHref: "/cv",
+    video: "portal-cv",
+    title: b("سيرتي الذاتية وطباعة ملفي", "My CV and printing my profile"),
+    summary: b(
+      "الموظف يكتب سيرته بأسلوبه ويصوغها الذكاء الاصطناعي باحترافية، بالعربية والإنجليزية، ثم يطبع ملفه كاملاً بضغطة.",
+      "Employees write their CV in their own words, AI polishes it professionally in Arabic and English, then they print their full profile in one press.",
+    ),
+    shots: [
+      { file: "portal-cv", caption: b("محرّر السيرة ونسبة الاكتمال", "The CV editor and completeness"), phone: true },
+      { file: "profile-print", caption: b("الملف المطبوع بأسلوب السيرة", "The printed profile in CV style") },
+    ],
+    steps: [
+      b("البوابة ← «سيرتي» ← «تعديل سيرتي».", "Portal → “My CV” → “Edit my CV”."),
+      b("اكتب المسمى المهني والنبذة، وأضف الخبرات والمؤهلات والمهارات (Enter بعد كل مهارة) واللغات والشهادات.", "Write a headline and summary, then add experience, education, skills (Enter after each), languages and certificates."),
+      b("«صياغة احترافية بالذكاء الاصطناعي» يحسّن الصياغة دون إضافة ما لم تكتبه؛ راجعها ثم «حفظ السيرة».", "“Polish with AI” improves the wording without adding anything you did not write; review it, then “Save CV”."),
+      b("في تبويب «English version» زر «ترجمة من النسخة العربية» يملأ النسخة الإنجليزية.", "On the “English version” tab, “Translate from the Arabic version” fills it in."),
+      b("«طباعة ملفي كاملاً» يطبع سيرتك وبياناتك، و«بطاقة العمل» بطاقتك برمز QR.", "“Print my full profile” prints your CV and details, and “Business card” your card with a QR code."),
+    ],
+    related: ["cv-prints", "portal"],
+    keywords: "سيرة ذاتية سيرتي طباعة ملفي cv portal print",
+  },
+  {
+    slug: "portal-more",
+    group: "portal",
+    audience: ["staff", "employee", "team"],
+    portalHref: "#payslips",
+    title: b("الحضور والقسائم والمستندات والمصروفات", "Clock-in, payslips, documents and expenses"),
+    summary: b("ما يفعله الموظف يومياً وشهرياً من بوابته.", "What employees do daily and monthly from their portal."),
+    shots: [{ file: "portal-payslips", caption: b("القسائم والمستندات في البوابة", "Payslips and documents in the portal"), phone: true }],
+    steps: [
+      b("الحضور: زر «تسجيل الحضور» ثم «تسجيل الانصراف» (إن فعّلته الإدارة)؛ يُطلب الموقع للتحقق من مكان العمل.", "Clock-in: “Clock in” then “Clock out” (when HR turns it on); location is asked to check the work site."),
+      b("الرواتب: قسائم آخر 12 شهراً، وكل قسيمة تُفتح للطباعة أو الحفظ PDF.", "Payslips: the last 12 months, each one opens to print or save as PDF."),
+      b("المستندات: الوثائق بتواريخ انتهائها، و«إرسال مستند» لرفع نسخة محدّثة تراجعها الإدارة.", "Documents: papers with expiry dates, and “Send a document” to upload a renewed copy for HR to review."),
+      b("المصروفات: «طلب تعويض جديد» بالمبلغ وصورة الإيصال، ومتابعة حالته حتى الصرف.", "Expenses: “New claim” with the amount and a receipt photo, then follow it until paid."),
+      b("بطاقتي: رمز QR الخاص بالموظف ليعرضه عند الطلب.", "My ID card: the employee's QR code to show when asked."),
+    ],
+    related: ["expenses", "payroll", "documents"],
+    keywords: "حضور قسيمة مستند مصروف بوابة clock payslip document expense portal",
+  },
+
+  // ───────────── Team managers & sponsors
+  {
+    slug: "team",
+    group: "team",
+    audience: ["staff", "team"],
+    teamHref: "/team",
+    title: b("منطقة الفريق: فريقي وعمّالي", "The team area: my team and my workers"),
+    summary: b(
+      "مدير الفريق يتابع كل من يتبعه في الهيكل التنظيمي، وصاحب العمل يتابع عمّاله المكفولين فقط.",
+      "Team managers follow everyone below them in the org chart; sponsors follow only their own sponsored workers.",
+    ),
+    shots: [{ file: "team", caption: b("صفحة الفريق: الإحصاءات والطلبات والأشخاص", "The team page: figures, requests and people") }],
+    steps: [
+      b("بعد الدخول تفتح «فريقي» (أو «عمّالي» لصاحب العمل).", "After signing in, “My team” opens (or “My workers” for a sponsor)."),
+      b("الطلبات المعلّقة: وافق على الإجازات والمصروفات أو ارفضها مع ملاحظة.", "Pending requests: approve or reject leave and expenses with a note."),
+      b("«تسجيل غياب أو إجازة» لأحد أفراد الفريق.", "“Record absence or leave” for someone in the team."),
+      b("بطاقة كل شخص: حالته اليوم وأقرب وثيقة تنتهي؛ اضغطها لترى رصيده ووثائقه ورواتبه حسب صلاحياتك.", "Each person's card: today's status and the next expiring document; press it for balances, documents and salaries as your permissions allow."),
+      b("«صفحتي» تفتح بوابتك الشخصية كموظف.", "“My page” opens your own employee portal."),
+    ],
+    tips: [b("ما يراه مدير الفريق وصاحب العمل يحدده مسؤول المنشأة من «الأدوار والحسابات».", "What team managers and sponsors can see is set by the company admin in “Roles & accounts”.")],
+    related: ["roles", "org", "sign-in"],
+    keywords: "فريقي عمالي مدير فريق صاحب عمل team manager sponsor workers",
+  },
+];
+
+export function helpTopic(slug: string) {
+  return HELP_TOPICS.find((topic) => topic.slug === slug) ?? null;
+}
+
+export function topicsFor(audience: HelpAudience) {
+  return HELP_TOPICS.filter((topic) => topic.audience.includes(audience));
+}
+
+export function helpVideo(id: string | undefined): (HelpVideo & { id: string }) | null {
+  if (!id) return null;
+  const video = MEDIA.videos[id];
+  return video ? { id, ...video } : null;
+}
+
+export function shotsOf(topic: HelpTopic) {
+  return (topic.shots ?? []).filter((shot) => MEDIA.shots.includes(shot.file));
+}
+
+export const videoSrc = (id: string) => `/guide/videos/${id}.webm`;
+export const videoPoster = (id: string) => `/guide/videos/${id}.jpg`;
+export const shotSrc = (file: string) => `/guide/shots/${file}.jpg`;
+
+/** Total video minutes for the audience, for the hero line. */
+export function videoCount(audience: HelpAudience) {
+  return topicsFor(audience).filter((topic) => helpVideo(topic.video)).length;
+}
+
+/** Plain text of the audience's topics in one language, the context AI answers from. */
+export function helpCorpus(audience: HelpAudience, lang: Lang) {
+  const t = (value: Bi) => value[lang];
+  return topicsFor(audience)
+    .map((topic) =>
+      [
+        `### [${topic.slug}] ${t(topic.title)}`,
+        t(topic.summary),
+        ...topic.steps.map((step, index) => `${index + 1}. ${t(step)}`),
+        ...(topic.sections ?? []).flatMap((section) => [t(section.title), ...section.items.map((item) => `- ${t(item)}`)]),
+        ...(topic.tips ?? []).map((tip) => `* ${t(tip)}`),
+      ].join("\n"),
+    )
+    .join("\n\n");
+}

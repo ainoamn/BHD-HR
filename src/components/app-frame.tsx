@@ -13,12 +13,14 @@ import {
   ChartNoAxesCombined,
   ChevronsLeft,
   ChevronsRight,
+  CircleHelp,
   Files,
   HandCoins,
   History,
   Inbox,
   LaptopMinimal,
   LayoutDashboard,
+  LifeBuoy,
   ListTodo,
   Menu,
   MoreHorizontal,
@@ -33,6 +35,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { helpHrefFor } from "@/lib/help-search";
 import { SIDEBAR_COOKIE, cn } from "@/lib/utils";
 import { useLang } from "./lang-provider";
 import { NavSpeed } from "./nav-speed";
@@ -49,6 +52,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
       { href: "/assistant", ar: "المساعد الذكي", en: "AI assistant", icon: Sparkles, short: { ar: "المساعد", en: "Assistant" } },
       { href: "/calendar", ar: "التقويم", en: "Calendar", icon: CalendarClock },
       { href: "/tasks", ar: "المهام", en: "Tasks", icon: ListTodo },
+      { href: "/help", ar: "مركز المساعدة", en: "Help centre", icon: LifeBuoy, short: { ar: "المساعدة", en: "Help" } },
     ],
   },
   {
@@ -88,7 +92,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
   },
 ];
 
-const ALWAYS = ["/", "/notifications", "/assistant", "/settings"];
+const ALWAYS = ["/", "/notifications", "/assistant", "/settings", "/help"];
 /** Bottom bar on phones: the first four of these the user may open, then "More". */
 const BOTTOM_PREFERENCE = ["/", "/assistant", "/employees", "/tasks", "/salaries", "/attendance", "/documents", "/pay-items", "/reports", "/employers", "/calendar", "/letters"];
 
@@ -249,6 +253,17 @@ export function AppFrame({
               <p className="hidden truncate text-xs text-slate-500 sm:block">{dateLabel}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <Link
+                href={helpHrefFor(pathname)}
+                aria-label={t("شرح هذه الصفحة", "Help for this page")}
+                title={t("شرح هذه الصفحة", "Help for this page")}
+                className={cn(
+                  "hidden size-10 items-center justify-center rounded-xl border border-slate-200 bg-surface text-slate-600 shadow-card transition hover:border-slate-300 hover:text-slate-900 sm:flex",
+                  pathname.startsWith("/help") && "border-teal-200 text-teal-700",
+                )}
+              >
+                <CircleHelp size={18} />
+              </Link>
               <Link
                 href="/notifications"
                 prefetch
