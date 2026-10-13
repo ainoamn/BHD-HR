@@ -1164,3 +1164,10 @@ model AuditLog {
 
   @@index([companyId, createdAt])
 }
+
+/// When data last changed, per scope: "c:<companyId>", "p:<companyId>" (what every portal shows),
+/// "e:<employeeId>", "t:<taskId>". Written after every database write (src/lib/live.ts); open pages poll it.
+model LiveSignal {
+  scope String   @id
+  at    DateTime @default(now())
+}

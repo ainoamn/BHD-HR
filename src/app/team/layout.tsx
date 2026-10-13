@@ -5,6 +5,7 @@ import { TranslateToggle } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { LangToggle } from "@/components/lang-provider";
+import { LiveUpdates } from "@/components/live-updates";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -79,6 +80,7 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
       </nav>
       <main className="page-wide px-4 py-5 sm:px-6">{children}</main>
       <AiWriteAssist />
+      <LiveUpdates />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { BhdAppSwitcher } from "@/components/bhd/BhdAppSwitcher";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { SiteFooter } from "@/components/bhd/site-footer";
 import { LangToggle } from "@/components/lang-provider";
+import { LiveUpdates } from "@/components/live-updates";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getAlerts } from "@/lib/alerts";
 import { redirect } from "next/navigation";
@@ -100,6 +101,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ) : null}
       {children}
       <AiWriteAssist />
+      <LiveUpdates />
     </AppFrame>
   );
 }

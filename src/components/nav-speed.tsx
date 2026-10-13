@@ -18,14 +18,13 @@ function pageHref(target: EventTarget | null) {
 
 /**
  * Keeps navigation instant: warms every section the user can open, prefetches any in-app link
- * on hover/touch, refreshes data when the tab comes back, and shows a slim progress bar only
- * when a page is not ready yet.
+ * on hover/touch, and shows a slim progress bar only when a page is not ready yet. Fresh data comes
+ * from LiveUpdates when something changes, never from the tab regaining focus (BHD-SESSION-POLICY).
  */
 export function NavSpeed({ sections }: { sections: string[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const query = useSearchParams().toString();
-  const [warmTick, setWarmTick] = useState(0);
   const [bar, setBar] = useState({ visible: false, width: 0 });
   const timers = useRef<{ show?: number; trickle?: number; hide?: number; safety?: number }>({});
   const finishRef = useRef(() => {});
@@ -40,7 +39,7 @@ export function NavSpeed({ sections }: { sections: string[] }) {
     }
     const id = setTimeout(run, 300);
     return () => clearTimeout(id);
-  }, [router, sectionsKey, pathname, query, warmTick]);
+  }, [router, sectionsKey, pathname, query]);
 
   useEffect(() => {
     const recent = new Map<string, number>();
@@ -50,26 +49,13 @@ export function NavSpeed({ sections }: { sections: string[] }) {
       recent.set(href, Date.now());
       router.prefetch(href, FULL);
     };
-    let hiddenAt = 0;
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        hiddenAt = Date.now();
-      } else if (hiddenAt && Date.now() - hiddenAt > 30_000) {
-        hiddenAt = 0;
-        recent.clear();
-        router.refresh();
-        window.setTimeout(() => setWarmTick((tick) => tick + 1), 1500);
-      }
-    };
     document.addEventListener("pointerover", warm, { passive: true });
     document.addEventListener("touchstart", warm, { passive: true });
     document.addEventListener("focusin", warm);
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       document.removeEventListener("pointerover", warm);
       document.removeEventListener("touchstart", warm);
       document.removeEventListener("focusin", warm);
-      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [router]);
 

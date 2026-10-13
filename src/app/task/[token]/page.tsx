@@ -4,6 +4,7 @@ import { Archive, AtSign, ListChecks, MessageSquare, PauseCircle } from "lucide-
 import { FlashToast, Toaster } from "@/components/action-form";
 import { TranslateToggle, Tr } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
+import { LiveUpdates } from "@/components/live-updates";
 import { CommentComposer } from "@/components/comment-composer";
 import { TaskChecklist, type StepComment } from "@/components/task-checklist";
 import { LiveBadges, StatusButtons, TaskLive } from "@/components/task-live";
@@ -226,6 +227,7 @@ export default async function GuestTaskPage({ params, searchParams }: { params: 
       </div>
       <FlashToast error={sp.error} message={sp.message} />
       {locked ? null : <AiWriteAssist />}
+      <LiveUpdates source={{ task: token }} />
       <Toaster />
     </TaskLive>
   );
