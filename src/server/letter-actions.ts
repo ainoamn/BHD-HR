@@ -6,86 +6,106 @@ import { can, getSessionUser, requireAdmin, requirePermission } from "@/lib/auth
 import { CHANNELS, sendPendingCopies, type Channel } from "@/lib/delivery";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import { generateLetter, issuerOf } from "@/lib/letter-docs";
-import { copyTarget, issueLetter } from "@/lib/letter-issue";
+import { composeLetters, issueComposed, muscatToday, OPEN_DRAFT, readDraftContent, readLetterForm, type DraftContent } from "@/lib/letter-drafts";
+import { copyTarget } from "@/lib/letter-issue";
 import { isLetterKind, LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
-import { packageGross } from "@/lib/salary";
-import { clip, parseDateInput, req, safeReturn, str } from "@/lib/utils";
+import { clip, formatDate, parseDateInput, req, safeReturn, str, toDateInput } from "@/lib/utils";
 
-function wantedChannels(formData: FormData) {
-  return CHANNELS.filter((channel) => formData.get(`send${channel}`) === "1");
+type SessionUser = Awaited<ReturnType<typeof requirePermission>>;
+
+function composeFor(user: SessionUser, form: { kind: string; employeeIds: string[]; content: DraftContent }) {
+  return composeLetters({ companyId: user.companyId, company: user.company, ...form, canSalary: can(user, "salaries.view") });
 }
 
+function issuedMessage(t: (ar: string, en: string) => string, ids: string[]) {
+  refreshAll();
+  if (ids.length === 1) go(`/letters/${ids[0]}`, { message: t("تم إصدار الخطاب موقّعاً إلكترونياً", "Letter issued and e-signed") });
+  go("/letters", { message: t(`تم إصدار ${ids.length} خطاب`, `Issued ${ids.length} letters`) });
+}
+
+/** Scheduled day from the form: a date after today (Muscat), else null. */
+function scheduleDay(formData: FormData) {
+  const day = parseDateInput(str(formData, "scheduleDate"));
+  return day && day > muscatToday() ? day : null;
+}
+
+/**
+ * The new-letter form. `intent`: issue (default) signs and issues now; preview and draft keep it in the drafts
+ * without a number (preview opens it); schedule keeps it to issue on `scheduleDate`. `draftId` = editing a draft.
+ */
 export async function createLetters(formData: FormData) {
   const user = await requirePermission("letters.create", "/letters");
   const { lang, t } = await getI18n();
   const requestId = str(formData, "requestId");
-  const back = requestId ? `/letters/new?requestId=${encodeURIComponent(requestId)}` : "/letters/new";
-  const kindInput = req(formData, "kind");
-  if (!isLetterKind(kindInput)) go(back, { error: t("اختر نوع الخطاب", "Choose the letter type") });
-  const kind = kindInput as LetterKind;
-  const meta = LETTER_KIND[kind];
-  if (meta.salary && !can(user, "salaries.view")) go(back, { error: t("هذا الخطاب يُظهر الراتب ويحتاج صلاحية عرض الرواتب", "This letter shows pay and needs the view-salaries permission") });
-  const ids = [...new Set(formData.getAll("employeeIds").map(String).filter(Boolean))].slice(0, 200);
-  if (!ids.length) go(back, { error: t("اختر موظفاً واحداً على الأقل", "Choose at least one employee") });
-  const employees = await prisma.employee.findMany({ where: { companyId: user.companyId, id: { in: ids } }, include: { employer: true } });
-  if (!employees.length) go(back, { error: t("الموظف غير موجود", "Employee not found") });
+  const draftId = str(formData, "draftId");
+  const intent = ["preview", "draft", "schedule"].includes(req(formData, "intent")) && !requestId ? req(formData, "intent") : "issue";
+  const back = requestId ? `/letters/new?requestId=${encodeURIComponent(requestId)}` : draftId ? `/letters/new?draftId=${encodeURIComponent(draftId)}` : "/letters/new";
+  const form = readLetterForm(formData);
+  const draft = draftId ? await prisma.letterDraft.findFirst({ where: { id: draftId, companyId: user.companyId, status: { in: OPEN_DRAFT } } }) : null;
+  if (draftId && !draft) go("/letters?view=drafts", { error: t("المسودة غير موجودة أو صدرت", "The draft is missing or already issued") });
+
+  if (intent !== "issue") {
+    if (!isLetterKind(form.kind)) go(back, { error: t("اختر نوع الخطاب", "Choose the letter type") });
+    if (LETTER_KIND[form.kind as LetterKind].salary && !can(user, "salaries.view")) go(back, { error: t("هذا الخطاب يُظهر الراتب ويحتاج صلاحية عرض الرواتب", "This letter shows pay and needs the view-salaries permission") });
+    if (!form.employeeIds.length) go(back, { error: t("اختر موظفاً واحداً على الأقل", "Choose at least one employee") });
+    let scheduledFor = intent === "schedule" ? scheduleDay(formData) : null;
+    let problem = "";
+    if (intent === "schedule") {
+      if (!scheduledFor) go(back, { error: t("اختر يوم الإصدار بعد اليوم", "Choose an issue day after today") });
+      const composed = await composeFor(user, form);
+      if ("error" in composed) {
+        scheduledFor = null;
+        problem = composed.error[lang];
+      }
+    }
+    const data = {
+      kind: form.kind,
+      employeeIds: form.employeeIds,
+      content: form.content,
+      status: scheduledFor ? "SCHEDULED" : "DRAFT",
+      scheduledFor,
+      error: null,
+      createdById: user.id,
+      createdByName: user.name,
+    };
+    const saved = draft
+      ? await prisma.letterDraft.update({ where: { id: draft.id }, data, select: { id: true } })
+      : await prisma.letterDraft.create({ data: { ...data, companyId: user.companyId }, select: { id: true } });
+    const label = LETTER_KIND[form.kind as LetterKind].label;
+    await writeAudit({
+      userId: user.id,
+      action: scheduledFor ? "LETTER_SCHEDULE" : "LETTER_DRAFT",
+      message: scheduledFor
+        ? `جدول «${label.ar}» للإصدار في ${toDateInput(scheduledFor)} / Scheduled “${label.en}” to issue on ${toDateInput(scheduledFor)}`
+        : `حفظ مسودة «${label.ar}» / Saved a “${label.en}” draft`,
+    });
+    refreshAll();
+    if (problem) go(`/letters/drafts/${saved.id}#preview`, { error: t(`حُفظ في المسودات ولم يُجدول: ${problem}`, `Saved to drafts but not scheduled: ${problem}`) });
+    if (intent === "draft") go("/letters?view=drafts#drafts", { message: t("حُفظ الخطاب في المسودات دون إصدار", "Saved to drafts without issuing") });
+    go(`/letters/drafts/${saved.id}#preview`, {
+      message: scheduledFor
+        ? t(`سيصدر الخطاب موقّعاً صباح ${formatDate(scheduledFor)}`, `The letter will be issued and signed on the morning of ${formatDate(scheduledFor)}`)
+        : t("معاينة الخطاب قبل الإصدار — محفوظ في المسودات", "Letter preview before issuing — kept in drafts"),
+    });
+  }
 
   const request = requestId
     ? await prisma.employeeRequest.findFirst({ where: { id: requestId, companyId: user.companyId, status: "PENDING", type: "LETTER" } })
     : null;
-  if (requestId && (!request || employees.length !== 1 || employees[0].id !== request.employeeId)) {
+  if (requestId && (!request || form.employeeIds.length !== 1 || form.employeeIds[0] !== request.employeeId)) {
     go("/approvals#requests", { error: t("الطلب غير موجود أو سبق البتّ فيه", "The request is missing or already decided") });
   }
-
-  const subject = clip(str(formData, "subject"), 200) || "";
-  const body = clip(str(formData, "body"), 8000) || "";
-  if (!meta.auto && (subject.length < 2 || body.length < 5)) go(back, { error: t("اكتب موضوع الخطاب ونصه", "Enter the letter subject and text") });
-  const issuedAt = parseDateInput(str(formData, "issuedAt")) || new Date();
-  const addressee = clip(str(formData, "addressee"), 160) || "";
-  const purpose = clip(str(formData, "purpose"), 400) || "";
-  const endDate = parseDateInput(str(formData, "endDate"));
-  const channels = wantedChannels(formData);
-  const openAssets =
-    kind === "CLEARANCE"
-      ? await prisma.asset.groupBy({ by: ["employeeId"], where: { companyId: user.companyId, employeeId: { in: employees.map((employee) => employee.id) }, status: "ASSIGNED" }, _count: true })
-      : [];
-
-  const drafts = employees.map((employee) => {
-    if (!meta.auto) return { employee, text: { subject, subjectEn: clip(str(formData, "subjectEn"), 200), body, bodyEn: clip(str(formData, "bodyEn"), 8000), addressee: null, addresseeEn: null } };
-    const result = generateLetter(kind, {
-      employee,
-      issuer: issuerOf(employee.employer, user.company),
-      addressee,
-      purpose,
-      endDate: endDate || (kind === "CLEARANCE" && employee.status === "TERMINATED" ? employee.contractEnd : null),
-      gross: packageGross(employee),
-      currency: user.company.currency,
-      lastDay: employee.contractEnd,
-      openAssets: openAssets.find((item) => item.employeeId === employee.id)?._count || 0,
-    });
-    if ("error" in result) go(back, { error: `${employee.fullName}: ${result.error[lang]}` });
-    return { employee, text: (result as Extract<typeof result, { letter: unknown }>).letter };
+  const composed = await composeFor(user, form);
+  if ("error" in composed) go(back, { error: composed.error[lang] });
+  const created = await issueComposed(composed as Exclude<typeof composed, { error: unknown }>, {
+    companyId: user.companyId,
+    issuedAt: parseDateInput(form.content.issuedAt) || new Date(),
+    content: form.content,
+    user,
+    requestId: request?.id,
   });
-
-  const created: string[] = [];
-  for (const { employee, text } of drafts) {
-    const letter = await issueLetter({
-      companyId: user.companyId,
-      employee,
-      kind,
-      issuedAt,
-      ...text,
-      signatoryName: str(formData, "signatoryName"),
-      signatoryTitle: str(formData, "signatoryTitle"),
-      user,
-      channels,
-      requestId: request?.id,
-    });
-    created.push(letter.id);
-  }
 
   if (request) {
     await prisma.employeeRequest.update({
@@ -93,10 +113,61 @@ export async function createLetters(formData: FormData) {
       data: { status: "APPROVED", decidedById: user.id, decidedByName: user.name, decidedAt: new Date(), decisionNote: clip(str(formData, "decisionNote"), 500) },
     });
   }
-  if (channels.length) await sendPendingCopies(user.companyId, await requestOrigin(), created);
+  if (draft) await prisma.letterDraft.update({ where: { id: draft.id }, data: { status: "ISSUED", issuedAt: new Date(), letterIds: created, error: null } });
+  if (form.content.channels.length) await sendPendingCopies(user.companyId, await requestOrigin(), created);
+  issuedMessage(t, created);
+}
+
+async function openDraft(formData: FormData) {
+  const user = await requirePermission("letters.create", "/letters");
+  const { lang, t } = await getI18n();
+  const draft = await prisma.letterDraft.findFirst({ where: { id: req(formData, "id"), companyId: user.companyId, status: { in: OPEN_DRAFT } } });
+  if (!draft) go("/letters?view=drafts", { error: t("المسودة غير موجودة أو صدرت", "The draft is missing or already issued") });
+  return { user, lang, t, draft: draft!, back: `/letters/drafts/${draft!.id}` };
+}
+
+/** Draft page: sign and issue now, dated today. */
+export async function issueLetterDraft(formData: FormData) {
+  const { user, lang, t, draft, back } = await openDraft(formData);
+  const content = readDraftContent(draft.content);
+  const composed = await composeFor(user, { kind: draft.kind, employeeIds: draft.employeeIds, content });
+  if ("error" in composed) go(back, { error: composed.error[lang] });
+  const claim = await prisma.letterDraft.updateMany({ where: { id: draft.id, status: draft.status, updatedAt: draft.updatedAt }, data: { status: "ISSUING" } });
+  if (!claim.count) go(back, { error: t("تغيّرت المسودة للتو، حدّث الصفحة", "The draft just changed; refresh the page") });
+  const created = await issueComposed(composed as Exclude<typeof composed, { error: unknown }>, { companyId: user.companyId, issuedAt: muscatToday(), content, user });
+  await prisma.letterDraft.update({ where: { id: draft.id }, data: { status: "ISSUED", issuedAt: new Date(), letterIds: created, error: null, scheduledFor: null } });
+  if (content.channels.length) await sendPendingCopies(user.companyId, await requestOrigin(), created);
+  issuedMessage(t, created);
+}
+
+/** Draft page: issue on a later day, or back to a plain draft when no day is sent. */
+export async function scheduleLetterDraft(formData: FormData) {
+  const { user, lang, t, draft, back } = await openDraft(formData);
+  if (formData.get("unschedule") === "1") {
+    await prisma.letterDraft.update({ where: { id: draft.id }, data: { status: "DRAFT", scheduledFor: null, error: null } });
+    refreshAll();
+    go(back, { message: t("أُلغيت الجدولة، والخطاب باقٍ في المسودات", "Schedule removed; the letter stays in drafts") });
+  }
+  const scheduledFor = scheduleDay(formData);
+  if (!scheduledFor) go(back, { error: t("اختر يوم الإصدار بعد اليوم", "Choose an issue day after today") });
+  const composed = await composeFor(user, { kind: draft.kind, employeeIds: draft.employeeIds, content: readDraftContent(draft.content) });
+  if ("error" in composed) go(back, { error: composed.error[lang] });
+  await prisma.letterDraft.update({ where: { id: draft.id }, data: { status: "SCHEDULED", scheduledFor, error: null, createdById: user.id, createdByName: user.name } });
+  const label = LETTER_KIND[draft.kind as LetterKind]?.label || LETTER_KIND.GENERAL.label;
+  await writeAudit({
+    userId: user.id,
+    action: "LETTER_SCHEDULE",
+    message: `جدول «${label.ar}» للإصدار في ${toDateInput(scheduledFor)} / Scheduled “${label.en}” to issue on ${toDateInput(scheduledFor)}`,
+  });
   refreshAll();
-  if (created.length === 1) go(`/letters/${created[0]}`, { message: t("تم إصدار الخطاب موقّعاً إلكترونياً", "Letter issued and e-signed") });
-  go("/letters", { message: t(`تم إصدار ${created.length} خطاب`, `Issued ${created.length} letters`) });
+  go(back, { message: t(`سيصدر الخطاب موقّعاً صباح ${formatDate(scheduledFor!)}`, `The letter will be issued and signed on the morning of ${formatDate(scheduledFor!)}`) });
+}
+
+export async function deleteLetterDraft(formData: FormData) {
+  const { t, draft } = await openDraft(formData);
+  await prisma.letterDraft.delete({ where: { id: draft.id } });
+  refreshAll();
+  go("/letters?view=drafts", { message: t("حُذفت المسودة", "Draft deleted") });
 }
 
 async function findLetter(companyId: string, id: string) {

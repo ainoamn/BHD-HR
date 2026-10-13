@@ -71,6 +71,7 @@ model Company {
   tasks                Task[]
   employeeNotes        EmployeeNote[]
   letters              Letter[]
+  letterDrafts         LetterDraft[]
   briefs               DailyBrief[]
   jobOpenings          JobOpening[]
   candidates           Candidate[]
@@ -806,6 +807,32 @@ model Letter {
   @@unique([companyId, refNo])
   @@unique([companyId, signatureNo])
   @@index([employeeId])
+}
+
+/// A letter written in /letters/new but not issued: kept in the drafts, or scheduled to issue on `scheduledFor`
+/// (src/lib/letter-drafts.ts). Takes no reference or e-signature number until it is issued.
+model LetterDraft {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind          String
+  employeeIds   String[]
+  /// The form: subject(En), body(En), addressee, purpose, endDate, signatoryName/Title, channels.
+  content       Json
+  /// DRAFT, SCHEDULED, ISSUING, ISSUED or FAILED.
+  status        String    @default("DRAFT")
+  /// Day to issue (UTC midnight of the Muscat date); issued by the morning job or the first visit to /letters that day.
+  scheduledFor  DateTime?
+  issuedAt      DateTime?
+  letterIds     String[]
+  error         String?
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([status, scheduledFor])
 }
 
 /// One copy of a letter to send by EMAIL or WHATSAPP. Stays PENDING until that channel is configured (src/lib/delivery.ts).

@@ -85,7 +85,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
   const thisMonth = now.getMonth() + 1;
   const { start, end } = monthRange(thisYear, thisMonth);
   const taskHorizon = new Date(Date.UTC(thisYear, now.getMonth(), now.getDate() + TASK_ALERT_DAYS + 1));
-  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles, employeeRequests, originals] = await Promise.all([
+  const [employees, leaveTypes, reminders, absences, generated, unpaidRows, tasks, leaveRequests, portalDocs, interviews, claimGroups, strandedAssets, dueCycles, employeeRequests, originals, failedLetters] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
@@ -170,6 +170,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
           take: 30,
         })
       : [],
+    can(user, "letters.create") ? prisma.letterDraft.count({ where: { companyId: company.id, status: "FAILED" } }) : 0,
   ]);
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const alerts: AlertItem[] = [];
@@ -352,6 +353,17 @@ export async function computeAlerts(company: Company, permissions: readonly stri
     });
   }
 
+  if (failedLetters) {
+    alerts.push({
+      id: "letters-failed",
+      severity: "danger",
+      title: t("خطابات مجدولة لم تصدر", "Scheduled letters not issued"),
+      message: t(`${failedLetters} خطاب لم يصدر في يومه — افتحه لترى السبب`, `${failedLetters} letter(s) didn't issue on their day — open to see why`),
+      href: "/letters?view=drafts",
+      days: -38,
+    });
+  }
+
   for (const candidate of interviews) {
     alerts.push({
       id: `interview-${candidate.id}`,
@@ -486,5 +498,6 @@ function alertPermission(id: string): Permission {
   if (id.startsWith("expenses-")) return "expenses.view";
   if (id.startsWith("asset-")) return "assets.view";
   if (id.startsWith("cycle-")) return "performance.view";
+  if (id === "letters-failed") return "letters.create";
   return "salaries.view";
 }

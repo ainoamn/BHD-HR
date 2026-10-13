@@ -17,6 +17,8 @@ export function SubmitButton({
   className,
   name,
   value,
+  formNoValidate,
+  disabled,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
@@ -27,6 +29,9 @@ export function SubmitButton({
   /** Sent with the form when this button submits it, so one form can have several outcomes. */
   name?: string;
   value?: string;
+  /** Submits without the browser's required-field checks (e.g. saving an unfinished draft). */
+  formNoValidate?: boolean;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   const { t } = useLang();
@@ -64,7 +69,8 @@ export function SubmitButton({
         type="submit"
         name={name}
         value={value}
-        disabled={pending}
+        formNoValidate={formNoValidate}
+        disabled={pending || disabled}
         aria-busy={pending || undefined}
         className={cn(base, className)}
         onClick={(event) => {

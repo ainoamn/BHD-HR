@@ -1,6 +1,7 @@
 import { isPlaceholderEmail } from "@/lib/accounts";
 import { getDailyBrief } from "@/lib/brief";
 import { channelReady, sendEmailMessage, sendPendingCopies } from "@/lib/delivery";
+import { issueDueLetterDrafts } from "@/lib/letter-drafts";
 import { permissionsFor } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { originOf } from "@/lib/request-origin";
@@ -10,13 +11,14 @@ export const maxDuration = 60;
 
 /**
  * Runs every morning (vercel.json "crons"). Vercel sends `Authorization: Bearer $CRON_SECRET`; without the
- * secret configured the job refuses to run. For each company: sends waiting letter copies, and emails the
+ * secret configured the job refuses to run. Issues the letters scheduled for today, then for each company: sends waiting letter copies, and emails the
  * daily brief to admins and managers once the email channel is configured.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
   const origin = originOf(request);
+  const scheduledLetters = await issueDueLetterDrafts(origin);
   const emailReady = channelReady("EMAIL");
   const companies = await prisma.company.findMany({ include: { memberships: { where: { acceptedAt: { not: null }, role: { in: ["ADMIN", "MANAGER"] } }, include: { user: true } } } });
   const results: { company: string; sent: number; failed: number; briefs: number; errors: number }[] = [];
@@ -44,5 +46,5 @@ export async function GET(request: Request) {
     }
     results.push({ company: company.id.slice(-6), sent: copies.sent, failed: copies.failed, briefs, errors });
   }
-  return Response.json({ ok: true, emailReady, results });
+  return Response.json({ ok: true, emailReady, scheduledLetters, results });
 }

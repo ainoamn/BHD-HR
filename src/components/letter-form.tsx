@@ -1,9 +1,10 @@
 "use client";
 
-import { BadgeCheck, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
+import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { fillTemplate, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
+import type { DraftContent } from "@/lib/letter-drafts";
 import { cn } from "@/lib/utils";
 import { draftLetter } from "@/server/letter-actions";
 import { EmployeeMultiSelect } from "./employee-multi-select";
@@ -24,6 +25,8 @@ export function LetterForm({
   channels,
   allowSalary,
   request,
+  savedDraft,
+  tomorrow,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employees: LetterEmployee[];
@@ -36,17 +39,23 @@ export function LetterForm({
   allowSalary: boolean;
   /** Writing the letter an employee asked for from the portal; issuing it approves the request. */
   request?: { id: string; subject: string; details: string; addressee: string } | null;
+  /** Editing a saved draft: its fields, and the day it is scheduled for ("" = not scheduled). */
+  savedDraft?: { id: string; content: DraftContent; scheduleDate: string } | null;
+  /** Earliest day a letter can be scheduled for (YYYY-MM-DD). */
+  tomorrow: string;
 }) {
   const { lang, t } = useLang();
+  const saved = savedDraft?.content;
   const [selected, setSelected] = useState<string[]>(defaultEmployeeIds);
   const [kind, setKind] = useState<LetterKind>(defaultKind);
   const [reason, setReason] = useState(request?.details || "");
-  const [subject, setSubject] = useState(request?.subject || LETTER_TEMPLATES[defaultKind].subject);
-  const [subjectEn, setSubjectEn] = useState(LETTER_TEMPLATES[defaultKind].subjectEn);
+  const [subject, setSubject] = useState(saved ? saved.subject : request?.subject || LETTER_TEMPLATES[defaultKind].subject);
+  const [subjectEn, setSubjectEn] = useState(saved ? saved.subjectEn : LETTER_TEMPLATES[defaultKind].subjectEn);
   const auto = Boolean(LETTER_KIND[kind].auto);
   const autoKinds = LETTER_KINDS.filter((option) => LETTER_KIND[option].auto);
-  const [body, setBody] = useState("");
-  const [bodyEn, setBodyEn] = useState("");
+  const [body, setBody] = useState(saved?.body || "");
+  const [bodyEn, setBodyEn] = useState(saved?.bodyEn || "");
+  const [scheduleDate, setScheduleDate] = useState(savedDraft?.scheduleDate || "");
   const [note, setNote] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [drafting, startDraft] = useTransition();
 
@@ -99,6 +108,7 @@ export function LetterForm({
   return (
     <form action={action} className="space-y-6">
       {request ? <input type="hidden" name="requestId" value={request.id} /> : null}
+      {savedDraft ? <input type="hidden" name="draftId" value={savedDraft.id} /> : null}
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-slate-800">{t("١. الموظف ونوع الخطاب", "1. Employee and letter type")}</h2>
         <div className="min-w-0 space-y-1.5">
@@ -158,7 +168,7 @@ export function LetterForm({
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("تاريخ الخطاب", "Letter date")}>
-            <input className={`${fieldClass} w-full`} type="date" name="issuedAt" defaultValue={today} required />
+            <input className={`${fieldClass} w-full`} type="date" name="issuedAt" defaultValue={saved?.issuedAt || today} required />
           </Field>
         </div>
       </section>
@@ -201,7 +211,7 @@ export function LetterForm({
                         : t("اتركه فارغاً لـ «إلى من يهمه الأمر».", "Leave empty for “To whom it may concern”.")
                 }
               >
-                <input className={`${fieldClass} w-full`} name="addressee" defaultValue={request?.addressee || ""} maxLength={160} />
+                <input className={`${fieldClass} w-full`} name="addressee" defaultValue={saved?.addressee || request?.addressee || ""} maxLength={160} />
               </Field>
             ) : null}
             {kind === "NOC" || kind === "EMBASSY" ? (
@@ -214,7 +224,7 @@ export function LetterForm({
                     : t("مثل: السفر خارج السلطنة، أو استخراج رخصة قيادة.", "e.g. travelling abroad, or getting a driving licence.")
                 }
               >
-                <input className={`${fieldClass} w-full`} name="purpose" defaultValue={request?.details || ""} maxLength={400} required />
+                <input className={`${fieldClass} w-full`} name="purpose" defaultValue={saved?.purpose || request?.details || ""} maxLength={400} required />
               </Field>
             ) : null}
             {kind === "CLEARANCE" ? (
@@ -227,7 +237,7 @@ export function LetterForm({
             ) : null}
             {kind === "EXPERIENCE_CERTIFICATE" ? (
               <Field label={t("تاريخ انتهاء العمل (اختياري)", "End of service (optional)")} hint={t("اتركه فارغاً إن كان الموظف لا يزال على رأس عمله.", "Leave empty if the employee still works here.")}>
-                <input className={`${fieldClass} w-full`} type="date" name="endDate" />
+                <input className={`${fieldClass} w-full`} type="date" name="endDate" defaultValue={saved?.endDate || ""} />
               </Field>
             ) : null}
           </div>
@@ -282,10 +292,10 @@ export function LetterForm({
         <h2 className="text-sm font-bold text-slate-800">{t("٣. التوقيع والإرسال", "3. Signature and delivery")}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("اسم الموقّع", "Signed by")}>
-            <input className={`${fieldClass} w-full`} name="signatoryName" defaultValue={signatoryName} maxLength={120} />
+            <input className={`${fieldClass} w-full`} name="signatoryName" defaultValue={saved?.signatoryName || signatoryName} maxLength={120} />
           </Field>
           <Field label={t("صفته", "Title")}>
-            <input className={`${fieldClass} w-full`} name="signatoryTitle" defaultValue={signatoryTitle} maxLength={120} />
+            <input className={`${fieldClass} w-full`} name="signatoryTitle" defaultValue={saved?.signatoryTitle || signatoryTitle} maxLength={120} />
           </Field>
         </div>
         <p className="flex items-start gap-2 text-xs leading-5 text-slate-500">
@@ -308,7 +318,7 @@ export function LetterForm({
             ] as const
           ).map(([channel, Icon, label, hint]) => (
             <label key={channel} className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface p-3 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 has-[:checked]:bg-teal-50/60 has-[:checked]:ring-teal-300">
-              <input type="checkbox" name={`send${channel}`} value="1" defaultChecked className="mt-1 accent-teal-700" />
+              <input type="checkbox" name={`send${channel}`} value="1" defaultChecked={saved ? saved.channels.includes(channel) : true} className="mt-1 accent-teal-700" />
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
                   <Icon size={16} className={channel === "WHATSAPP" ? "text-emerald-600" : "text-navy-500"} />
@@ -327,10 +337,44 @@ export function LetterForm({
         </p>
       </section>
 
-      <div className="border-t border-slate-100 pt-4">
-        <SubmitButton pendingLabel={t("جارٍ الإصدار...", "Issuing...")}>
-          {request ? t("اعتماد الطلب وإصدار الخطاب", "Approve the request and issue") : t("إصدار الخطاب موقّعاً", "Issue signed letter")}
-        </SubmitButton>
+      <div className="space-y-3 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap gap-2">
+          <SubmitButton name="intent" value="issue" pendingLabel={t("جارٍ العمل...", "Working...")}>
+            <BadgeCheck size={16} />
+            {request ? t("اعتماد الطلب وإصدار الخطاب", "Approve the request and issue") : t("إصدار الخطاب موقّعاً الآن", "Issue signed now")}
+          </SubmitButton>
+          {request ? null : (
+            <>
+              <SubmitButton variant="secondary" name="intent" value="preview" formNoValidate pendingLabel={t("جارٍ العمل...", "Working...")}>
+                <Eye size={16} />
+                {t("معاينة قبل الإصدار", "Preview before issuing")}
+              </SubmitButton>
+              <SubmitButton variant="secondary" name="intent" value="draft" formNoValidate pendingLabel={t("جارٍ العمل...", "Working...")}>
+                <Archive size={16} />
+                {t("حفظ في المسودات", "Save to drafts")}
+              </SubmitButton>
+            </>
+          )}
+        </div>
+        {request ? null : (
+          <div className="flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
+            <div className="min-w-0 flex-1 basis-56">
+              <Field
+                label={t("أو جدولة الإصدار في يوم", "Or schedule it for a day")}
+                hint={t(
+                  "يصدر الخطاب موقّعاً مؤرَّخاً بذلك اليوم صباحاً تلقائياً، ويُرسل للموظف إن اخترت الإرسال. يبقى حتى ذلك في «المسودات والمجدولة» وتستطيع تعديله أو إلغاء جدولته.",
+                  "The letter is issued signed and dated that day, automatically in the morning, and sent to the employee if chosen above. Until then it waits in “Drafts & scheduled”, where you can edit or unschedule it.",
+                )}
+              >
+                <input className={`${fieldClass} w-full`} type="date" name="scheduleDate" min={tomorrow} value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} />
+              </Field>
+            </div>
+            <SubmitButton variant="secondary" name="intent" value="schedule" disabled={!scheduleDate} pendingLabel={t("جارٍ العمل...", "Working...")}>
+              <CalendarClock size={16} />
+              {t("جدولة الإصدار", "Schedule")}
+            </SubmitButton>
+          </div>
+        )}
       </div>
     </form>
   );

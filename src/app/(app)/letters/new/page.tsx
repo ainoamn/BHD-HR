@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Inbox, ScrollText } from "lucide-react";
 import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
@@ -7,21 +8,24 @@ import { Card, PageHeader } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { channelReady } from "@/lib/delivery";
 import { getI18n } from "@/lib/lang";
+import { muscatToday, OPEN_DRAFT, readDraftContent } from "@/lib/letter-drafts";
 import { isLetterKind, LETTER_KIND, WARNING_KINDS, WARNING_LOOKBACK_DAYS, type LetterKind } from "@/lib/letters";
 import { normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime, todayInputValue } from "@/lib/utils";
+import { formatDateTime, toDateInput, todayInputValue } from "@/lib/utils";
 import { createLetters } from "@/server/letter-actions";
 
 export default async function NewLetterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ employeeId?: string; kind?: string; requestId?: string; error?: string; message?: string }>;
+  searchParams: Promise<{ employeeId?: string; kind?: string; requestId?: string; draftId?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("letters.create", "/letters");
   const { lang, t } = await getI18n();
   const since = new Date(Date.now() - WARNING_LOOKBACK_DAYS * 86400000);
+  const draft = sp.draftId && !sp.requestId ? await prisma.letterDraft.findFirst({ where: { id: sp.draftId, companyId: user.companyId, status: { in: OPEN_DRAFT } } }) : null;
+  if (sp.draftId && !draft) notFound();
   const request = sp.requestId
     ? await prisma.employeeRequest.findFirst({
         where: { id: sp.requestId, companyId: user.companyId, status: "PENDING", type: "LETTER" },
@@ -41,22 +45,22 @@ export default async function NewLetterPage({
     }),
   ]);
   const warningCount = new Map(warnings.map((row) => [row.employeeId, row._count._all]));
-  const wanted = request?.employeeId || sp.employeeId;
-  const preselected = wanted && employees.some((employee) => employee.id === wanted) ? [wanted] : [];
-  const back = request ? "/approvals#requests" : sp.employeeId ? `/employees/${sp.employeeId}?tab=letters` : "/letters";
+  const wanted = draft ? draft.employeeIds : [request?.employeeId || sp.employeeId];
+  const preselected = wanted.filter((id): id is string => Boolean(id) && employees.some((employee) => employee.id === id));
+  const back = draft ? `/letters/drafts/${draft.id}` : request ? "/approvals#requests" : sp.employeeId ? `/employees/${sp.employeeId}?tab=letters` : "/letters";
   const allowSalary = can(user, "salaries.view");
-  const requestedKind = request?.letterKind && isLetterKind(request.letterKind) ? request.letterKind : sp.kind;
+  const requestedKind = draft?.kind || (request?.letterKind && isLetterKind(request.letterKind) ? request.letterKind : sp.kind);
   const kind = isLetterKind(requestedKind || "") && (allowSalary || !LETTER_KIND[requestedKind as LetterKind].salary) ? (requestedKind as LetterKind) : "NOTICE";
 
   return (
     <div className="page-wide">
       <Link href={back} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-teal-700">
         {lang === "en" ? <ArrowLeft size={16} /> : <ArrowRight size={16} />}
-        {request ? t("طلبات الموظفين", "Employee requests") : sp.employeeId ? t("ملف الموظف", "Employee file") : t("كل الخطابات", "All letters")}
+        {draft ? t("معاينة المسودة", "Draft preview") : request ? t("طلبات الموظفين", "Employee requests") : sp.employeeId ? t("ملف الموظف", "Employee file") : t("كل الخطابات", "All letters")}
       </Link>
       <PageHeader
         icon={ScrollText}
-        title={request ? t("كتابة الخطاب المطلوب", "Write the requested letter") : t("خطاب أو إنذار جديد", "New letter or warning")}
+        title={draft ? t("تعديل المسودة", "Edit draft") : request ? t("كتابة الخطاب المطلوب", "Write the requested letter") : t("خطاب أو إنذار جديد", "New letter or warning")}
         description={t(
           "اختر الموظف ونوع الخطاب. الشهادات الجاهزة تُكتب تلقائياً من ملف الموظف، والخطابات الأخرى تصوغها بالذكاء الاصطناعي أو من القالب. كل خطاب يصدر موقّعاً إلكترونياً مع رمز تحقق.",
           "Choose the employee and letter type. Ready certificates are written from the employee's file; other letters are drafted by AI or from a template. Every letter is issued e-signed with a verification code.",
@@ -104,6 +108,8 @@ export default async function NewLetterPage({
           channels={{ EMAIL: channelReady("EMAIL"), WHATSAPP: channelReady("WHATSAPP") }}
           allowSalary={allowSalary}
           request={request ? { id: request.id, subject: request.subject || "", details: request.details || "", addressee: request.addressee || "" } : null}
+          savedDraft={draft ? { id: draft.id, content: readDraftContent(draft.content), scheduleDate: toDateInput(draft.scheduledFor) } : null}
+          tomorrow={toDateInput(new Date(muscatToday().getTime() + 86400000))}
         />
       </Card>
     </div>
