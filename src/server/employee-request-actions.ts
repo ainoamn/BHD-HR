@@ -21,7 +21,8 @@ async function portalFor(formData: FormData) {
   const employee = await portalEmployee(token);
   const { t } = await getI18n();
   if (!employee) go("/portal/invalid", { error: t("الرابط غير صالح أو أُوقف", "This link is invalid or was turned off") });
-  return { employee: employee!, back: `/portal/${token}#requests` };
+  const section = req(formData, "section") === "payslips" ? "payslips" : "requests";
+  return { employee: employee!, back: `/portal/${token}#${section}` };
 }
 
 function today() {

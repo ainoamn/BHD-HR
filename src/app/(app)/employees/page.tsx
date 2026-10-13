@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Pencil, Search, UserPlus, Users } from "lucide-react";
+import { KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
+import { SubmitButton } from "@/components/submit-button";
 import { GetForm } from "@/components/get-form";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { DeleteButton } from "@/components/row-forms";
@@ -17,6 +18,7 @@ import { normalizeSearchText } from "@/lib/search";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { money, text } from "@/lib/utils";
+import { openMissingEmployeeAccounts } from "@/server/account-actions";
 import { deleteEmployee } from "@/server/employee-actions";
 
 export default async function EmployeesPage({
@@ -76,6 +78,7 @@ export default async function EmployeesPage({
         employer: true,
         attendance: { select: { type: true, balanceKey: true } },
         leaveCredits: { select: { balanceKey: true, days: true } },
+        account: { select: { id: true } },
       },
       orderBy: { fullName: "asc" },
     }),
@@ -86,6 +89,10 @@ export default async function EmployeesPage({
     employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : "—";
 
   const filtered = Boolean(q || employerId || status !== "ALL");
+  const noAccount = (employee: { status: string; account: { id: string } | null }) => !employee.account && employee.status !== "TERMINATED";
+  const withoutAccount = allow.edit
+    ? await prisma.employee.count({ where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null } })
+    : 0;
 
   return (
     <div className="page-wide">
@@ -98,6 +105,29 @@ export default async function EmployeesPage({
         ) : null}
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
+      {withoutAccount ? (
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <KeyRound size={20} className="mt-0.5 shrink-0 text-amber-700" />
+            <div className="min-w-0">
+              <p className="font-bold text-amber-900">
+                {t(`${withoutAccount} موظف بلا حساب دخول`, `${withoutAccount} employee(s) without a sign-in account`)}
+              </p>
+              <p className="mt-0.5 text-sm leading-6 text-amber-800">
+                {t(
+                  "كل موظف جديد يحصل على اسم مستخدم وكلمة مرور مؤقتة تلقائياً. هؤلاء أُضيفوا قبل ذلك أو أُضيفوا بلا حساب؛ افتح حساباتهم ليدخلوا ويروا ملفاتهم ورواتبهم وإجازاتهم وخطاباتهم.",
+                  "Every new employee gets a username and temporary password automatically. These were added before that, or without an account; open their accounts so they can sign in to see their file, salaries, leave and letters.",
+                )}
+              </p>
+            </div>
+          </div>
+          <form action={openMissingEmployeeAccounts} className="shrink-0">
+            <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ فتح الحسابات...", "Opening accounts...")}>
+              {t("فتح حساباتهم الآن", "Open their accounts now")}
+            </SubmitButton>
+          </form>
+        </div>
+      ) : null}
       <Toolbar>
         <GetForm className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
           <div className="relative col-span-2 min-w-0 md:flex-1">
@@ -226,6 +256,11 @@ export default async function EmployeesPage({
                     <td className="px-4 py-3" data-label={t("الحالة", "Status")}>
                       <div className="flex flex-wrap items-center gap-1.5 sm:flex-col sm:items-start">
                         <ToneBadge tone={STATUS_TONE[employee.status] || "slate"}>{pick(STATUS_LABEL[employee.status], lang, employee.status)}</ToneBadge>
+                        {allow.edit && noAccount(employee) ? (
+                          <Link href={`/employees/${employee.id}#account`}>
+                            <ToneBadge tone="amber">{t("بلا حساب دخول", "No sign-in")}</ToneBadge>
+                          </Link>
+                        ) : null}
                         {allow.attendance && leave.length ? (
                           <Link href={`/employees/${employee.id}?tab=attendance`} title={leave.map((item) => leaveWarningText(item, lang)).join(" · ")}>
                             <ToneBadge tone="red">{leaveText}</ToneBadge>

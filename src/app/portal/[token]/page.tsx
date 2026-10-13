@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { CalendarCheck2, CircleHelp, Clock3, Contact, FileUp, FileUser, Files, FolderLock, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, Users, Wallet } from "lucide-react";
+import { Fragment } from "react";
+import { CalendarCheck2, CircleHelp, Clock3, Contact, FileUp, FileUser, Files, FolderLock, IdCard, Inbox, KeyRound, LayoutDashboard, LogOut, PenLine, Printer, ReceiptText, ScrollText, ShieldOff, Target, UserRound, Users, Wallet } from "lucide-react";
+import { bankName } from "@/lib/banks";
+import { nationalityName } from "@/lib/nationalities";
+import { packageGross } from "@/lib/salary";
 import { Tr, TranslateToggle } from "@/components/ai-translate";
 import { cvCompleteness, cvFor, hasCvContent, readCv } from "@/lib/cv";
 import { PortalRequests } from "@/components/portal-requests";
@@ -19,7 +23,7 @@ import { headerFor } from "@/components/salary-docs";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { muscatDay, muscatTime, workedLabel } from "@/lib/clock";
-import { DOC_LABEL, EXTRA_DOC_TYPES, monthName, termText } from "@/lib/constants";
+import { DOC_LABEL, EXTRA_DOC_TYPES, STATUS_LABEL, monthName, termText } from "@/lib/constants";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, EXPENSE_PAY_LABEL, EXPENSE_STATUS_LABEL, EXPENSE_STATUS_TONE } from "@/lib/expenses";
 import { describeExpiry } from "@/lib/expiry";
 import { getLeaveTypes } from "@/lib/hr-catalog";
@@ -67,7 +71,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const signedIn = session && session.employeeId === employee.id ? session : null;
   const headerPill = "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20";
   const today = muscatDay();
-  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests, heldDocuments, custodyForms] = await Promise.all([
+  const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests, heldDocuments, custodyForms, manager] = await Promise.all([
     getLeaveTypes(company.id),
     prisma.attendance.findMany({ where: { employeeId: employee.id }, select: { type: true, balanceKey: true } }),
     prisma.leaveCredit.findMany({ where: { employeeId: employee.id }, select: { balanceKey: true, days: true } }),
@@ -107,7 +111,9 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
+    employee.managerId ? prisma.employee.findFirst({ where: { id: employee.managerId, companyId: company.id }, select: { fullName: true, nameEn: true } }) : null,
   ]);
+  const autoKinds = readAutoKinds(company.letterAutoKinds);
   const pendingDocIds = new Set(employeeRequests.filter((request) => request.type === "DOCUMENTS" && request.status === "PENDING").flatMap((request) => request.documentIds));
   const requestableDocs = heldDocuments.filter((doc) => doc.status === "HELD" && !pendingDocIds.has(doc.id));
   const unacknowledged = custodyForms.filter((form) => form.direction === "OUT" && !form.acknowledgedAt).length;
@@ -136,6 +142,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const requestLabel = (choice: string) =>
     attendanceLabel({ type: choice === "UNPAID_LEAVE" ? "UNPAID_LEAVE" : "CUSTOM_LEAVE", balanceKey: choice === "UNPAID_LEAVE" ? null : choice.slice(6) }, leaveTypes, lang);
   const sections = [
+    { id: "profile", label: t("ملفي", "My file") },
     company.clockEnabled ? { id: "clock", label: t("الحضور", "Clock-in") } : null,
     { id: "leave", label: t("الإجازات", "Leave") },
     { id: "payslips", label: t("الرواتب", "Payslips") },
@@ -159,6 +166,36 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
       </div>
     </div>
   );
+  const fact = (label: string, value: string | null | undefined, ltr = false) =>
+    value ? (
+      <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-inset ring-slate-100">
+        <dt className="text-xs text-slate-500">{label}</dt>
+        <dd className="mt-0.5 break-words text-sm font-semibold text-slate-900" dir={ltr ? "ltr" : undefined}>
+          {value}
+        </dd>
+      </div>
+    ) : null;
+  const factGroup = (title: string, items: [label: string, value: string | null | undefined, ltr?: boolean][]) => {
+    const shown = items.filter(([, value]) => value);
+    return shown.length ? (
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-slate-800">{title}</h3>
+        <dl className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+          {shown.map(([label, value, ltr]) => (
+            <Fragment key={label}>{fact(label, value, ltr)}</Fragment>
+          ))}
+        </dl>
+      </div>
+    ) : null;
+  };
+  const pay = [
+    { label: t("الراتب الأساسي", "Basic salary"), value: employee.basicSalary },
+    { label: t("بدل السكن", "Housing allowance"), value: employee.housingAllowance },
+    { label: t("بدل النقل", "Transport allowance"), value: employee.transportAllowance },
+    { label: t("بدلات أخرى", "Other allowances"), value: employee.otherAllowance },
+  ].filter((item) => item.value > 0);
+  const salaryLetters: LetterKind[] = ["SALARY_CERTIFICATE", "SALARY_TRANSFER", "EMPLOYMENT_CERTIFICATE"];
+  const managerName = manager ? (lang === "en" && manager.nameEn ? manager.nameEn : manager.fullName) : null;
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -228,6 +265,59 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-5">
         <Flash error={sp.error} message={sp.message} />
+
+        <Card id="profile" className="scroll-mt-16">
+          {sectionTitle(UserRound, t("ملفي وبياناتي", "My file and details"), t("بياناتك كما هي مسجّلة لدى الموارد البشرية.", "Your details as HR has them on file."))}
+          <div className="space-y-4">
+            {factGroup(t("البيانات الشخصية", "Personal details"), [
+              [t("الاسم بالعربية", "Name in Arabic"), employee.fullName],
+              [t("الاسم بالإنجليزية", "Name in English"), employee.nameEn, true],
+              [t("الجنسية", "Nationality"), nationalityName(employee.nationality, lang)],
+              [t("تاريخ الميلاد", "Date of birth"), employee.dateOfBirth ? formatDate(employee.dateOfBirth) : null],
+              [t("الهاتف", "Phone"), employee.phone, true],
+              [t("البريد الإلكتروني", "Email"), employee.email, true],
+              [t("العنوان", "Address"), employee.address],
+            ])}
+            {factGroup(t("وظيفتي", "My job"), [
+              [t("الرقم الوظيفي", "Employee no."), employee.employeeNumber, true],
+              [t("المسمى الوظيفي", "Job title"), job],
+              [t("القسم", "Department"), termText(employee.department, employee.departmentEn, lang)],
+              [t("المدير المباشر", "Direct manager"), managerName],
+              [t("جهة العمل", "Employer"), issuer],
+              [t("تاريخ التعيين", "Joining date"), employee.joiningDate ? formatDate(employee.joiningDate) : null],
+              [t("نهاية العقد", "Contract end"), employee.contractEnd ? formatDate(employee.contractEnd) : null],
+              [t("الحالة", "Status"), pick(STATUS_LABEL[employee.status], lang, employee.status)],
+            ])}
+            {pay.length || employee.bankAccount ? (
+              <details className="group rounded-2xl border border-slate-200 p-3 sm:p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold text-teal-800">
+                  {t("راتبي وحسابي البنكي", "My salary and bank account")}
+                  <span className="text-xs font-medium text-slate-500 group-open:hidden">{t("اضغط للعرض", "Tap to show")}</span>
+                </summary>
+                <dl className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+                  {pay.map((item) => (
+                    <Fragment key={item.label}>{fact(item.label, money(item.value, company.currency))}</Fragment>
+                  ))}
+                  {pay.length ? fact(t("الإجمالي الشهري", "Monthly total"), money(packageGross(employee), company.currency)) : null}
+                  {fact(t("البنك", "Bank"), employee.bankBic ? bankName(employee.bankBic, lang) || employee.bankBic : null)}
+                  {fact(t("رقم الحساب", "Account number"), employee.bankAccount ? `•••• ${employee.bankAccount.slice(-4)}` : null, true)}
+                </dl>
+              </details>
+            ) : null}
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-slate-500">
+                {t("بيان غير صحيح؟ ", "Something wrong? ")}
+                <a href="#requests" className="font-semibold text-teal-800 underline underline-offset-2">
+                  {t("أرسل طلباً إلى الموارد البشرية لتصحيحه", "Send HR a request to correct it")}
+                </a>
+              </p>
+              <Link href={`${base}/profile`} className={`${secondaryBtn} w-full sm:w-auto`}>
+                <Printer size={16} />
+                {t("طباعة ملفي الكامل", "Print my profile")}
+              </Link>
+            </div>
+          </div>
+        </Card>
 
         {company.clockEnabled ? (
           <Card id="clock" className="scroll-mt-16">
@@ -354,16 +444,23 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
         </Card>
 
         <Card id="payslips" className="scroll-mt-16">
-          {sectionTitle(ReceiptText, t("الرواتب المصروفة", "Paid salaries"), t("آخر 12 شهراً. افتح القسيمة لطباعتها أو حفظها PDF.", "The last 12 months. Open a payslip to print or save it as PDF."))}
+          {sectionTitle(
+            ReceiptText,
+            t("رواتبي ورسائل الراتب", "My salaries and salary letters"),
+            t("آخر 12 شهراً: لكل شهر قسيمة الراتب وإيصال استلامه في ملف واحد للطباعة أو الحفظ PDF.", "The last 12 months: each month's payslip and salary receipt in one file to print or save as PDF."),
+          )}
           {salaries.length ? (
             <ul className="divide-y divide-slate-100">
               {salaries.map((salary) => (
                 <li key={salary.id}>
                   <Link href={`${base}/payslip/${salary.id}`} className="flex items-center justify-between gap-3 py-2.5 transition hover:text-teal-800">
-                    <span className="font-medium">
-                      {monthName(salary.month, lang)} {salary.year}
+                    <span className="min-w-0">
+                      <span className="block font-medium">
+                        {monthName(salary.month, lang)} {salary.year}
+                      </span>
+                      <span className="block text-xs text-slate-500">{t("القسيمة وإيصال الاستلام", "Payslip and receipt")}</span>
                     </span>
-                    <span className="tabular font-bold">{money(salary.netSalary, company.currency)}</span>
+                    <span className="tabular shrink-0 font-bold">{money(salary.netSalary, company.currency)}</span>
                   </Link>
                 </li>
               ))}
@@ -371,6 +468,44 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
           ) : (
             <p className="text-sm text-slate-500">{t("لا توجد رواتب مصروفة بعد.", "No paid salaries yet.")}</p>
           )}
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-bold text-slate-800">{t("رسائل الراتب والشهادات", "Salary letters and certificates")}</h3>
+            <p className="mt-0.5 text-xs leading-5 text-slate-500">
+              {t("موقّعة إلكترونياً برمز QR تقبلها البنوك والجهات. «إصدار الآن» تصدر فوراً؛ و«طلب» يصل إلى الإدارة.", "E-signed with a QR code that banks and offices accept. “Issue now” is instant; “Request” goes to HR.")}
+            </p>
+            <ul className="mt-3 space-y-2">
+              {salaryLetters.map((kind) => {
+                const latest = letters.find((letter) => letter.kind === kind);
+                const pending = employeeRequests.some((request) => request.type === "LETTER" && request.letterKind === kind && request.status === "PENDING");
+                const instant = autoKinds.includes(kind as (typeof autoKinds)[number]);
+                return (
+                  <li key={kind} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-sm">
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-slate-900">{pick(LETTER_KIND[kind].label, lang)}</span>
+                      {latest ? (
+                        <Link href={`/letter/${latest.token}`} className="text-xs font-semibold text-teal-800 underline underline-offset-2">
+                          {t(`تحميل آخر نسخة ${latest.refNo} (${formatDate(latest.issuedAt)})`, `Download latest ${latest.refNo} (${formatDate(latest.issuedAt)})`)}
+                        </Link>
+                      ) : null}
+                    </span>
+                    {pending ? (
+                      <ToneBadge tone="amber">{t("بانتظار الاعتماد", "Awaiting approval")}</ToneBadge>
+                    ) : (
+                      <form action={submitEmployeeRequest}>
+                        <input type="hidden" name="token" value={token} />
+                        <input type="hidden" name="type" value="LETTER" />
+                        <input type="hidden" name="letterKind" value={kind} />
+                        <input type="hidden" name="section" value="payslips" />
+                        <SubmitButton variant={instant ? "primary" : "secondary"} pendingLabel={t("جارٍ...", "Working...")}>
+                          {latest ? (instant ? t("نسخة جديدة الآن", "New copy now") : t("طلب نسخة جديدة", "Request a new copy")) : instant ? t("إصدار الآن", "Issue now") : t("طلب", "Request")}
+                        </SubmitButton>
+                      </form>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </Card>
 
         <Card id="documents" className="scroll-mt-16">
@@ -652,7 +787,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             t("الطلبات والخطابات", "Requests and letters"),
             t("اطلب شهادة راتب أو تعريف أو تحويل راتب أو أي خطاب، أو سلفة، أو قدّم استقالتك. تعتمدها الإدارة إلكترونياً وتظهر النتيجة هنا.", "Ask for a salary, employment or salary-transfer letter or any other letter, an advance, or submit your resignation. Management approves electronically and the result shows here."),
           )}
-          <PortalRequests token={token} requests={employeeRequests} currency={company.currency} lang={lang} t={t} autoKinds={readAutoKinds(company.letterAutoKinds)} />
+          <PortalRequests token={token} requests={employeeRequests} currency={company.currency} lang={lang} t={t} autoKinds={autoKinds} />
         </Card>
 
         {letters.length ? (

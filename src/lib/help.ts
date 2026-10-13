@@ -749,7 +749,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     steps: [
       b("الإعدادات ← «الأدوار والحسابات»: موظف، مدير فريق، صاحب عمل، مدير الموارد البشرية، مستخدم عرض فقط، مسؤول.", "Settings → “Roles & accounts”: employee, team manager, sponsor, HR manager, view-only user, admin."),
       b("«تعديل الصلاحيات» لأي دور قابل للتعديل، فيسري على كل من يحمله فوراً.", "“Edit permissions” on any editable role; it applies to everyone with it at once."),
-      b("«فتح الحسابات» يفتح حساباً لكل موظف أو صاحب عمل ليس له حساب.", "“Open accounts” opens an account for every employee or sponsor who has none."),
+      b("«فتح الحسابات» يفتح حساباً لكل موظف أو صاحب عمل ليس له حساب. وفي «الموظفون» شارة «بلا حساب دخول» وزر «فتح حساباتهم الآن».", "“Open accounts” opens an account for every employee or sponsor who has none. “Employees” also shows a “No sign-in account” badge and an “Open their accounts now” button."),
       b("«المستخدمون والصلاحيات» ← «دعوة مستخدم» بالبريد، واختر دوراً جاهزاً أو «مخصص».", "“Users & permissions” → “Invite user” by email, choosing a ready role or “Custom”."),
       b("من ملف الموظف ← «حساب الدخول»: اسم المستخدم وكلمة المرور المؤقتة وأزرار المشاركة وتغيير الدور.", "From the employee file → “Sign-in account”: username, temporary password, share buttons and role."),
     ],
@@ -767,8 +767,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     video: "portal",
     title: b("بوابة الموظف: نظرة عامة", "The employee portal at a glance"),
     summary: b(
-      "صفحة الموظف الشخصية على هاتفه: الحضور، الإجازات، القسائم، المستندات، المصروفات، الطلبات، الخطابات، التقييم، سيرته وبطاقته.",
-      "The employee's own page on their phone: clock-in, leave, payslips, documents, expenses, requests, letters, reviews, CV and ID card.",
+      "صفحة الموظف الشخصية على هاتفه: ملفه، الحضور، الإجازات، القسائم ورسائل الراتب، المستندات، المصروفات، الطلبات، الخطابات، التقييم، سيرته وبطاقته.",
+      "The employee's own page on their phone: their file, clock-in, leave, payslips and salary letters, documents, expenses, requests, letters, reviews, CV and ID card.",
     ),
     shots: [{ file: "portal", caption: b("البوابة على الهاتف بأقسامها", "The portal on a phone with its sections"), phone: true }],
     steps: [
@@ -777,8 +777,27 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("لا يرى الموظف شيئاً عن غيره، ولا ملاحظات الإدارة الداخلية.", "Employees never see anyone else's data or management's internal notes."),
       b("زر اللغة والمظهر أعلى الصفحة، وزر «شرح» يفتح هذا الدليل.", "Language and theme buttons sit at the top, and “Help” opens this guide."),
     ],
-    related: ["portal-leave", "portal-requests", "portal-originals", "portal-cv", "portal-more"],
+    related: ["portal-profile", "portal-leave", "portal-requests", "portal-originals", "portal-cv", "portal-more"],
     keywords: "بوابة الموظف صفحتي portal employee",
+  },
+  {
+    slug: "portal-profile",
+    group: "portal",
+    audience: ["staff", "employee", "team"],
+    portalHref: "#profile",
+    title: b("ملفي وبياناتي", "My file and details"),
+    summary: b(
+      "الموظف يرى ملفه كما تسجّله الإدارة: بياناته الشخصية ووظيفته ومديره وراتبه وحسابه البنكي، ويطلب تصحيح أي خطأ.",
+      "Employees see their file as HR keeps it: personal details, job, manager, pay and bank account, and ask for any mistake to be fixed.",
+    ),
+    steps: [
+      b("البوابة ← «ملفي»: البيانات الشخصية، ثم «وظيفتي» (الرقم، المسمى، القسم، المدير المباشر، جهة العمل، التعيين، نهاية العقد).", "Portal → “My file”: personal details, then “My job” (number, title, department, manager, employer, joining date, contract end)."),
+      b("«راتبي وحسابي البنكي» مطويّ لا يظهر إلا عند فتحه: بنود الراتب والإجمالي والبنك، ورقم الحساب مخفي إلا آخر أربعة أرقام.", "“My pay and bank account” stays folded until opened: pay items, the monthly total and the bank, with only the last four digits of the account."),
+      b("إن وجدت خطأ: «أرسل طلباً إلى الموارد البشرية لتصحيحه»؛ و«طباعة ملفي الكامل» للنسخة المطبوعة.", "Found a mistake? “Ask HR to correct it”; and “Print my full profile” for a printed copy."),
+    ],
+    tips: [b("لا يعدّل الموظف بياناته بنفسه؛ التصحيح عبر طلب تراجعه الإدارة.", "Employees don't edit their own record; corrections go through a request HR reviews.")],
+    related: ["portal-requests", "portal-cv", "portal"],
+    keywords: "ملفي بياناتي وظيفتي راتبي حسابي البنكي my file profile details bank",
   },
   {
     slug: "portal-leave",
@@ -865,7 +884,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     shots: [{ file: "portal-payslips", caption: b("القسائم والمستندات في البوابة", "Payslips and documents in the portal"), phone: true }],
     steps: [
       b("الحضور: زر «تسجيل الحضور» ثم «تسجيل الانصراف» (إن فعّلته الإدارة)؛ يُطلب الموقع للتحقق من مكان العمل.", "Clock-in: “Clock in” then “Clock out” (when HR turns it on); location is asked to check the work site."),
-      b("الرواتب: قسائم آخر 12 شهراً، وكل قسيمة تُفتح للطباعة أو الحفظ PDF.", "Payslips: the last 12 months, each one opens to print or save as PDF."),
+      b("«رواتبي ورسائل الراتب»: آخر 12 شهراً، وكل شهر «القسيمة وإيصال الاستلام» للطباعة أو الحفظ PDF.", "“My pay and salary letters”: the last 12 months, each with “Payslip and receipt” to print or save as PDF."),
+      b("تحتها شهادة الراتب ورسالة تحويل الراتب وشهادة بيانات الموظف: «إصدار الآن» إن كانت تصدر فوراً، وإلا «طلب»؛ ثم «تحميل آخر نسخة».", "Below them the salary certificate, salary transfer letter and employment certificate: “Issue now” when instant, otherwise “Ask”; then “Download the latest copy”."),
       b("المستندات: الوثائق بتواريخ انتهائها، و«إرسال مستند» لرفع نسخة محدّثة تراجعها الإدارة.", "Documents: papers with expiry dates, and “Send a document” to upload a renewed copy for HR to review."),
       b("المصروفات: «طلب تعويض جديد» بالمبلغ وصورة الإيصال، ومتابعة حالته حتى الصرف.", "Expenses: “New claim” with the amount and a receipt photo, then follow it until paid."),
       b("بطاقتي: رمز QR الخاص بالموظف ليعرضه عند الطلب.", "My ID card: the employee's QR code to show when asked."),

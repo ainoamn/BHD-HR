@@ -13,7 +13,7 @@ import {
   sendSummary,
 } from "@/lib/accounts";
 import { writeAudit } from "@/lib/audit";
-import { type SessionUser, STAFF_ROLES, can, homePath, isRole, isStaffRole, requireAdmin, requireUser } from "@/lib/auth";
+import { type SessionUser, STAFF_ROLES, can, homePath, isRole, isStaffRole, requireAdmin, requirePermission, requireUser } from "@/lib/auth";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -213,6 +213,43 @@ export async function openAccountsForAll(formData: FormData) {
     message: opened
       ? t(`فُتح ${opened} حساب، وأُرسلت البيانات تلقائياً لـ ${emailed}${more}`, `Opened ${opened} account(s); details sent automatically to ${emailed}${more}`)
       : t("لكل شخص حساب بالفعل", "Everyone already has an account"),
+  });
+}
+
+/** From the employees list: an account for every current employee still without one (those added before accounts were automatic). */
+export async function openMissingEmployeeAccounts() {
+  const user = await requirePermission("employees.edit");
+  const { t } = await getI18n();
+  const origin = await requestOrigin();
+  const employees = await prisma.employee.findMany({
+    where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null },
+    include: { _count: { select: { reports: { where: { status: { not: "TERMINATED" } } } } } },
+    orderBy: { createdAt: "asc" },
+    take: BATCH,
+  });
+  let sent = 0;
+  for (const employee of employees) {
+    const role = employee._count.reports > 0 ? "TEAM_MANAGER" : "EMPLOYEE";
+    const result = await openAndSend({
+      companyId: user.companyId,
+      role,
+      person: { name: employee.fullName, email: employee.email, phone: employee.phone },
+      employeeId: employee.id,
+      actorId: user.id,
+      companyName: companyName(user),
+      origin,
+      label: ROLE_NAME[role],
+    });
+    if (result.sent?.email === "sent" || result.sent?.whatsapp === "sent") sent += 1;
+  }
+  refreshAll();
+  if (!employees.length) go("/employees", { message: t("لكل موظف حساب دخول بالفعل", "Every employee already has a sign-in account") });
+  const more = employees.length >= BATCH ? t(" بقي آخرون، اضغط مرة أخرى.", " More remain; press again.") : "";
+  go("/employees", {
+    message: t(
+      `فُتح ${employees.length} حساب دخول، وأُرسلت البيانات تلقائياً لـ ${sent}. اسم المستخدم وكلمة المرور المؤقتة وأزرار المشاركة في بطاقة «حساب الدخول» بملف كل موظف.${more}`,
+      `Opened ${employees.length} sign-in account(s); details sent automatically to ${sent}. Each employee's username, temporary password and share buttons are on the “Sign-in account” card in their file.${more}`,
+    ),
   });
 }
 

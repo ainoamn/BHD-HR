@@ -5,10 +5,11 @@ export function go(path: string, flash?: { error?: string; message?: string }): 
   const params = new URLSearchParams();
   if (flash?.error) params.set("error", flash.error);
   if (flash?.message) params.set("message", flash.message);
-  const query = params.toString();
-  if (!query) redirect(path);
+  if (!params.toString()) redirect(path);
   const [base, hash] = path.split("#");
-  redirect(`${base}${base.includes("?") ? "&" : "?"}${query}${hash ? `#${hash}` : ""}`);
+  // Server-action redirects drop the #fragment, so <Flash> scrolls back using this param.
+  if (hash) params.set("at", hash);
+  redirect(`${base}${base.includes("?") ? "&" : "?"}${params.toString()}${hash ? `#${hash}` : ""}`);
 }
 
 export function refreshAll() {
