@@ -72,13 +72,15 @@ export async function AccountCard({
   }
 
   const manageable = isAdmin || (canEdit && !isStaffRole(member.role));
-  const generated = Boolean(member.user?.username) && (member.user?._count.memberships ?? 0) <= 1;
+  const viaBhd = Boolean(member.user?.bhdSub);
+  const generated = Boolean(member.user?.username) && !viaBhd && (member.user?._count.memberships ?? 0) <= 1;
   const password = manageable && generated ? openSecret(member.user?.tempPassword) : null;
   const origin = await requestOrigin();
   const message =
     password && member.user?.username
-      ? credentialsMessage({ name: person.name, company: companyName, username: member.user.username, password, url: loginUrl(origin) })
+      ? credentialsMessage({ name: person.name, company: companyName, username: member.user.username, password, url: loginUrl(origin), email: person.email })
       : null;
+  const fileEmail = person.email && !isPlaceholderEmail(person.email) ? person.email : null;
   const channelsOn = (person.email && channelReady("EMAIL")) || (person.phone && accountWhatsAppReady());
   const roleOptions =
     kind === "employee"
@@ -101,7 +103,21 @@ export async function AccountCard({
         <p className="text-sm text-slate-600">{t("هذا الحساب له صلاحيات في النظام؛ يديره المسؤول.", "This account has system access; an admin manages it.")}</p>
       ) : (
         <div className="space-y-4">
-          {member.user?.username ? (
+          {viaBhd ? (
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600 ring-1 ring-inset ring-slate-100">
+              {t("يدخل بحساب BHD الموحّد", "Signs in with their BHD account")}
+              {signInEmail ? (
+                <>
+                  {" "}
+                  <span className="font-semibold" dir="ltr">
+                    {signInEmail}
+                  </span>
+                </>
+              ) : null}
+              {". "}
+              {t("كلمة المرور تُدار في بوابة BHD لا هنا.", "The password is managed in the BHD portal, not here.")}
+            </p>
+          ) : member.user?.username ? (
             <>
               <AccountCredentials
                 username={member.user.username}
@@ -118,6 +134,21 @@ export async function AccountCard({
                     : t("هذا الحساب يستخدمه صاحبه في منشأة أخرى أيضاً.", "This account is also used at another company.")}
                 </p>
               ) : null}
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 ring-1 ring-inset ring-amber-100">
+                {t(
+                  "اسم المستخدم هذا يعمل من رابط الدخول أعلاه فقط، ولا تعرفه صفحة بوابة BHD (id.bhd-om.com).",
+                  "This username works only from the sign-in link above; the BHD portal page (id.bhd-om.com) does not know it.",
+                )}{" "}
+                {fileEmail
+                  ? t(
+                      `وإن أنشأ حساب BHD (أو دخل بجوجل) بالبريد ${fileEmail} ثم ضغط «الدخول بحساب BHD»، يُربط بهذا الحساب تلقائياً ويتوقف اسم المستخدم.`,
+                      `If they create a BHD account (or use Google) with ${fileEmail} and press “Sign in with BHD account”, it links to this account automatically and the username stops working.`,
+                    )
+                  : t(
+                      "سجّل بريده في ملفه ليُربط حساب BHD الذي ينشئه بنفس البريد تلقائياً.",
+                      "Record their email in the file so a BHD account with the same email links automatically.",
+                    )}
+              </p>
             </>
           ) : (
             <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-inset ring-slate-100">

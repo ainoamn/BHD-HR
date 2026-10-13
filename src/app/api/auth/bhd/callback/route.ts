@@ -10,9 +10,8 @@ import {
   verifyIdentity,
   type IdentityProfile,
 } from "@/lib/bhd/identity";
-import { prisma } from "@/lib/prisma";
 import { originOf } from "@/lib/request-origin";
-import { ensureWorkspace, linkInvitations } from "@/lib/workspace";
+import { signInBhdUser } from "@/lib/workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,46 +21,6 @@ function failure(origin: string, code: string) {
   const response = NextResponse.redirect(new URL(`/login?local=1&error=${encodeURIComponent(message)}`, origin));
   response.cookies.delete(OAUTH_STATE_COOKIE);
   return response;
-}
-
-/**
- * BHD-PRODUCT-SSO-ADMIN §3.3: bhd_sub → verified email (keep memberships/roles) → new account.
- * Then attach any invitations for that email, and give an account with no access its own company.
- */
-async function upsertUser(profile: IdentityProfile) {
-  const email = profile.email.toLowerCase();
-  const bySub = await prisma.user.findUnique({ where: { bhdSub: profile.sub } });
-  let user;
-  if (bySub) {
-    user = await prisma.user.update({
-      where: { id: bySub.id },
-      data: { name: profile.name, picture: profile.picture, lastLoginAt: new Date() },
-    });
-  } else {
-    const byEmail = await prisma.user.findUnique({ where: { email } });
-    if (byEmail) {
-      if (byEmail.bhdSub) throw new Error("email_linked");
-      user = await prisma.user.update({
-        where: { id: byEmail.id },
-        data: { bhdSub: profile.sub, picture: profile.picture, lastLoginAt: new Date() },
-      });
-    } else {
-      user = await prisma.user.create({
-        data: {
-          name: profile.name,
-          email,
-          password: "",
-          mustChangePassword: false,
-          bhdSub: profile.sub,
-          picture: profile.picture,
-          lastLoginAt: new Date(),
-        },
-      });
-    }
-  }
-  await linkInvitations(user);
-  await ensureWorkspace(user);
-  return user;
 }
 
 export async function GET(request: Request) {
@@ -87,7 +46,7 @@ export async function GET(request: Request) {
 
   let userId: string;
   try {
-    userId = (await upsertUser(profile)).id;
+    userId = (await signInBhdUser(profile)).id;
   } catch (error) {
     return failure(origin, error instanceof Error ? error.message.slice(0, 40) : "user");
   }

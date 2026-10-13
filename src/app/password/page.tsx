@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
-import { KeyRound } from "lucide-react";
+import { ExternalLink, KeyRound } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
 import { SubmitButton } from "@/components/submit-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Field, fieldClass } from "@/components/ui";
+import { Field, fieldClass, primaryBtn } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
+import { identityIssuer } from "@/lib/bhd/identity";
 import { getI18n } from "@/lib/lang";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/utils";
 import { changeOwnPassword } from "@/server/account-actions";
@@ -18,6 +19,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
   const user = await requireUser();
   const { t } = await getI18n();
   const first = user.mustChangePassword;
+  const viaBhd = Boolean(user.bhdSub && !user.password);
 
   return (
     <main className="flex min-h-dvh flex-col bg-sand-50">
@@ -34,13 +36,27 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
             <div className="min-w-0">
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">{first ? t(`أهلاً ${user.name}`, `Welcome, ${user.name}`) : t("تغيير كلمة المرور", "Change password")}</h1>
               <p className="mt-1 text-sm leading-6 text-slate-500">
-                {first
-                  ? t("هذه كلمة مرور مؤقتة. اختر كلمة مرور خاصة بك لتكمل الدخول.", "This is a temporary password. Choose your own to continue.")
-                  : t("اكتب كلمة المرور الحالية ثم الجديدة.", "Enter your current password, then the new one.")}
+                {viaBhd
+                  ? t("حسابك مربوط ببوابة الدخول الموحّد.", "Your account is linked to the unified sign-in.")
+                  : first
+                    ? t("هذه كلمة مرور مؤقتة. اختر كلمة مرور خاصة بك لتكمل الدخول.", "This is a temporary password. Choose your own to continue.")
+                    : t("اكتب كلمة المرور الحالية ثم الجديدة.", "Enter your current password, then the new one.")}
               </p>
             </div>
           </div>
           <Flash error={sp.error} />
+          {viaBhd ? (
+            <div className="space-y-3 rounded-3xl border border-slate-200/90 bg-surface p-6 text-sm leading-6 text-slate-600 shadow-raised sm:p-8">
+              <p>
+                {t("تدخل بحساب BHD الموحّد", "You sign in with your BHD account")} <strong dir="ltr">{user.email}</strong>.{" "}
+                {t("كلمة المرور تُغيَّر من صفحة حسابك في بوابة BHD، وتسري على كل برامج المجموعة.", "Change the password on your BHD account page; it applies to every BHD app.")}
+              </p>
+              <a href={`${identityIssuer()}/account`} className={`${primaryBtn} w-full`}>
+                <ExternalLink size={16} />
+                {t("فتح حساب BHD", "Open BHD account")}
+              </a>
+            </div>
+          ) : (
           <form action={changeOwnPassword} className="space-y-4 rounded-3xl border border-slate-200/90 bg-surface p-6 shadow-raised sm:p-8">
             {user.username ? (
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-inset ring-slate-100">
@@ -65,6 +81,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
               {t("حفظ والمتابعة", "Save and continue")}
             </SubmitButton>
           </form>
+          )}
           <form action={logout} className="mt-4 text-center">
             <button type="submit" className="text-sm font-semibold text-slate-500 underline-offset-4 hover:text-slate-800 hover:underline">
               {t("تسجيل الخروج", "Sign out")}

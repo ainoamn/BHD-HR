@@ -109,7 +109,7 @@ export async function openPersonAccount(formData: FormData) {
 /** A new temporary password; the old one stops working. Only for accounts this system opened in this company. */
 export async function resetAccountPassword(formData: FormData) {
   const { user, member, back, person, t } = await manageable(req(formData, "membershipId"));
-  if (!member.user?.username || member.user._count.memberships > 1) {
+  if (!member.user?.username || member.user.bhdSub || member.user._count.memberships > 1) {
     go(back, { error: t("هذا الشخص يدخل بحسابه الخاص؛ لا يمكن تغيير كلمة مروره من هنا.", "This person signs in with their own account; its password cannot be changed here.") });
   }
   const password = newPassword();
@@ -123,7 +123,7 @@ export async function resetAccountPassword(formData: FormData) {
 /** Sends the current temporary details again on the configured channels. */
 export async function resendAccountDetails(formData: FormData) {
   const { user, member, back, person, t } = await manageable(req(formData, "membershipId"));
-  const password = openSecret(member.user?.tempPassword);
+  const password = member.user?.bhdSub ? null : openSecret(member.user?.tempPassword);
   if (!member.user?.username || !password) go(back, { error: t("غيّر صاحب الحساب كلمة مروره؛ أنشئ كلمة مؤقتة جديدة إن نسيها.", "The person already set their own password; create a new temporary one if they forgot it.") });
   const sent = await sendCredentials({ ...person, company: companyName(user), username: member.user!.username!, password: password!, url: loginUrl(await requestOrigin()) });
   if (sent.email !== "sent" && sent.whatsapp !== "sent") {
@@ -277,6 +277,7 @@ export async function saveRolePermissions(formData: FormData) {
 export async function changeOwnPassword(formData: FormData) {
   const user = await requireUser();
   const { t } = await getI18n();
+  if (user.bhdSub && !user.password) go("/password", { error: t("كلمة مرورك تُدار في حساب BHD الموحّد.", "Your password is managed in your BHD account.") });
   const next = req(formData, "password");
   const confirm = req(formData, "confirm");
   const back = "/password";

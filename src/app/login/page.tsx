@@ -90,6 +90,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
                     <ShieldCheck size={18} />
                     {t("الدخول بحساب BHD", "Sign in with BHD account")}
                   </a>
+                  <p className="text-xs leading-5 text-slate-500">
+                    {t(
+                      "حساب BHD هو بريدك وكلمة مرور بوابة BHD (أو جوجل). ليس لديك حساب؟ أنشئه من البوابة بنفس البريد المسجّل في ملفك لدى المنشأة، فيُربط بحسابك هنا تلقائياً.",
+                      "Your BHD account is your email and BHD password (or Google). No account? Create one on the portal with the email in your company file, and it links here automatically.",
+                    )}
+                  </p>
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <span className="h-px flex-1 bg-slate-200" />
                     {t("أو باسم المستخدم الذي أرسلته لك المنشأة", "Or with the username your company sent you")}

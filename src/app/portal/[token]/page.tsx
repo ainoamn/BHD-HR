@@ -14,7 +14,8 @@ import { LETTER_KIND, readAutoKinds, type LetterKind } from "@/lib/letters";
 import { submitEmployeeRequest } from "@/server/employee-request-actions";
 import { getSessionUser, isStaffRole } from "@/lib/auth";
 import { isTeamRole } from "@/lib/permissions";
-import { logout } from "@/server/auth-actions";
+import { logout, switchCompany } from "@/server/auth-actions";
+import { CompanySwitcher } from "@/components/company-switcher";
 import { ClockButton } from "@/components/clock-button";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
@@ -202,8 +203,8 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     <div className="min-h-dvh bg-slate-50">
       <header className="relative overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 text-white">
         <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
-        <div className="relative mx-auto flex max-w-3xl items-start justify-between gap-3 px-4 pb-6 pt-5">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="relative mx-auto flex max-w-3xl flex-wrap items-start justify-between gap-3 px-4 pb-6 pt-5">
+          <div className="flex min-w-[12rem] flex-1 items-center gap-3">
             {photo ? (
               <img src={photo} alt="" className="size-14 shrink-0 rounded-2xl object-cover ring-2 ring-white/30" />
             ) : logo ? (
@@ -218,7 +219,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5">
             <TranslateToggle tone="dark" compact />
             <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
@@ -252,6 +253,17 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             ) : null}
           </div>
         </div>
+        {signedIn && signedIn.memberships.length > 1 ? (
+          <div className="relative mx-auto flex max-w-3xl flex-wrap items-center gap-2 px-4 pb-4">
+            <span className="text-xs text-white/70">{t("التبديل بين منشآتك:", "Switch company:")}</span>
+            <CompanySwitcher
+              action={switchCompany}
+              activeId={signedIn.companyId}
+              label={t("المنشأة", "Company")}
+              companies={signedIn.memberships.map((item) => ({ id: item.companyId, name: lang === "en" && item.company.nameEn ? item.company.nameEn : item.company.name }))}
+            />
+          </div>
+        ) : null}
       </header>
 
       <nav className="sticky top-0 z-10 border-b border-slate-200 bg-surface/90 backdrop-blur-md" aria-label={t("أقسام البوابة", "Portal sections")}>

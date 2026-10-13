@@ -63,7 +63,8 @@ export function loginUrl(origin: string) {
   return `${origin}/login?local=1`;
 }
 
-export function credentialsMessage(input: { name: string; company: string; username: string; password: string; url: string }) {
+export function credentialsMessage(input: { name: string; company: string; username: string; password: string; url: string; email?: string | null }) {
+  const email = realEmail(input.email);
   return [
     `مرحباً ${input.name}،`,
     `فُتح لك حساب في نظام الموارد البشرية لدى ${input.company}.`,
@@ -71,9 +72,14 @@ export function credentialsMessage(input: { name: string; company: string; usern
     `اسم المستخدم: ${input.username}`,
     `كلمة المرور المؤقتة: ${input.password}`,
     "ستختار كلمة مرور جديدة عند أول دخول. لا تشارك هذه البيانات مع أحد.",
+    "مهم: ادخل من الرابط أعلاه. اسم المستخدم هذا لا يعمل في صفحة «بوابة BHD» (id.bhd-om.com).",
+    ...(email
+      ? [`أو استخدم حساب BHD الموحّد: أنشئه (أو ادخل بجوجل) بالبريد ${email} نفسه، ثم اضغط «الدخول بحساب BHD» في صفحة الدخول، فيُربط حسابك تلقائياً.`]
+      : []),
     "",
     `Hello ${input.name}, an HR account was opened for you at ${input.company}.`,
     `Sign in: ${input.url} — username ${input.username}, temporary password ${input.password}. You will choose a new password on first sign-in.`,
+    `This username does not work on the BHD portal page (id.bhd-om.com).${email ? ` Or create a BHD account (or use Google) with ${email} and press “Sign in with BHD account”; it links automatically.` : ""}`,
   ].join("\n");
 }
 

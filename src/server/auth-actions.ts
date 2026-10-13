@@ -20,6 +20,14 @@ export async function login(formData: FormData) {
   const back = `/login?local=1${next === "/" ? "" : `&next=${encodeURIComponent(next)}`}`;
   const { t } = await getI18n();
   const user = login.includes("@") ? await prisma.user.findUnique({ where: { email: login } }) : await prisma.user.findUnique({ where: { username: login } });
+  if (user?.bhdSub && !user.password) {
+    go(back, {
+      error: t(
+        "هذا الحساب مربوط بحساب BHD الموحّد. اضغط «الدخول بحساب BHD» وادخل ببريدك وكلمة مرور حساب BHD.",
+        "This account is linked to a BHD account. Press “Sign in with BHD account” and use your BHD email and password.",
+      ),
+    });
+  }
   if (!user || !verifyPassword(password, user.password)) {
     const count = await prisma.user.count();
     if (count === 0) {
