@@ -37,8 +37,10 @@ import { SCORE_LABEL, criterionName, overallBand, overallTone, parseCriteria, pa
 import { LEAVE_REQUEST_LABEL, LEAVE_REQUEST_TONE, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
+import { lettersMissing, missingFields } from "@/lib/self-data";
+import { SelfDataFields } from "@/components/self-data-fields";
 import { THEME_COOKIE, daysLabel, formatDate, money, normalizeTheme, toDateInput, todayInputValue } from "@/lib/utils";
-import { cancelExpense, cancelLeaveRequest, requestLeave, submitExpense, submitPortalDocument } from "@/server/portal-actions";
+import { cancelExpense, cancelLeaveRequest, completeMyDetails, requestLeave, submitExpense, submitPortalDocument } from "@/server/portal-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +118,8 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
     employee.managerId ? prisma.employee.findFirst({ where: { id: employee.managerId, companyId: company.id }, select: { fullName: true, nameEn: true } }) : null,
   ]);
   const autoKinds = readAutoKinds(company.letterAutoKinds);
+  const selfMissing = missingFields(employee);
+  const letterMissing = lettersMissing(employee);
   const pendingDocIds = new Set(employeeRequests.filter((request) => request.type === "DOCUMENTS" && request.status === "PENDING").flatMap((request) => request.documentIds));
   const requestableDocs = heldDocuments.filter((doc) => doc.status === "HELD" && !pendingDocIds.has(doc.id));
   const unacknowledged = custodyForms.filter((form) => form.direction === "OUT" && !form.acknowledgedAt).length;
@@ -317,6 +321,30 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                 </dl>
               </details>
             ) : null}
+            {selfMissing.length ? (
+              <details id="complete" className="group scroll-mt-16 rounded-2xl border border-amber-200 p-3 sm:p-4" open={selfMissing.length >= 3}>
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-sm font-bold text-amber-900">
+                  {t(`أكمل بياناتك الناقصة (${selfMissing.length})`, `Complete your missing details (${selfMissing.length})`)}
+                  <span className="text-xs font-medium text-slate-500 group-open:hidden">{t("اضغط للإكمال", "Tap to complete")}</span>
+                </summary>
+                <form action={completeMyDetails} className="mt-3 space-y-3">
+                  <input type="hidden" name="token" value={token} />
+                  <SelfDataFields
+                    fields={selfMissing}
+                    lang={lang}
+                    t={t}
+                    required={false}
+                    intro={t(
+                      "هذه البيانات غير موجودة في ملفك، وبعض الخطابات والمستندات تعتمد عليها. أدخل ما ينطبق عليك (يمكن ترك ما لا ينطبق فارغاً).",
+                      "These details are missing from your file, and some letters and documents depend on them. Enter what applies to you (leave the rest empty).",
+                    )}
+                  />
+                  <SubmitButton className="w-full sm:w-auto" pendingLabel={t("جارٍ الحفظ...", "Saving...")}>
+                    {t("حفظ بياناتي", "Save my details")}
+                  </SubmitButton>
+                </form>
+              </details>
+            ) : null}
             <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs leading-5 text-slate-500">
                 {t("بيان غير صحيح؟ ", "Something wrong? ")}
@@ -503,6 +531,28 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
                     </span>
                     {pending ? (
                       <ToneBadge tone="amber">{t("بانتظار الاعتماد", "Awaiting approval")}</ToneBadge>
+                    ) : letterMissing[kind] ? (
+                      <details className="group w-full min-w-0">
+                        <summary className={`${instant ? primaryBtn : secondaryBtn} w-full cursor-pointer list-none sm:w-auto group-open:hidden`}>
+                          {instant ? t("إصدار الآن", "Issue now") : t("طلب", "Request")}
+                        </summary>
+                        <form action={submitEmployeeRequest} className="mt-1 space-y-3">
+                          <input type="hidden" name="token" value={token} />
+                          <input type="hidden" name="type" value="LETTER" />
+                          <input type="hidden" name="letterKind" value={kind} />
+                          <input type="hidden" name="section" value="payslips" />
+                          <SelfDataFields
+                            fields={letterMissing[kind]!}
+                            lang={lang}
+                            t={t}
+                            required
+                            intro={t(`هذا الخطاب يعتمد على بيانات غير موجودة في ملفك. أدخلها ليصدر بها.`, `This letter depends on details missing from your file. Enter them so it can be issued.`)}
+                          />
+                          <SubmitButton variant={instant ? "primary" : "secondary"} className="w-full sm:w-auto" pendingLabel={t("جارٍ...", "Working...")}>
+                            {instant ? t("حفظ البيانات وإصدار الخطاب", "Save details and issue the letter") : t("حفظ البيانات وإرسال الطلب", "Save details and send the request")}
+                          </SubmitButton>
+                        </form>
+                      </details>
                     ) : (
                       <form action={submitEmployeeRequest}>
                         <input type="hidden" name="token" value={token} />
@@ -807,6 +857,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
             lang={lang}
             t={t}
             autoKinds={autoKinds}
+            letterMissing={letterMissing}
             resignationContext={{
               name: employee.fullName,
               nameEn: employee.nameEn || employee.fullName,

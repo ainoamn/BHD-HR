@@ -190,6 +190,8 @@ model Employee {
   /// SWIFT/BIC of the employee's bank (src/lib/banks.ts) and the account salaries go to; used by the WPS file.
   bankBic            String?
   bankAccount        String?
+  /// File fields the employee filled in from the portal and declared correct, {field: {at, via}} (src/lib/self-data.ts); a mark goes when HR changes that value.
+  selfProvided       Json?
   /// Direct manager (an employee of the same company), for the org chart.
   managerId          String?
   manager            Employee?           @relation("ReportsTo", fields: [managerId], references: [id], onDelete: SetNull)

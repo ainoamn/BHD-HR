@@ -2,12 +2,15 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { BadgeCheck, DoorOpen, FilePlus2, FileSignature, FolderLock, HandCoins, MessageSquarePlus, ScrollText, Zap } from "lucide-react";
 import { Tr } from "./ai-translate";
+import { LetterNeedsSwitch } from "./letter-needs-switch";
 import { ResignationForm } from "./resignation-form";
+import { SelfDataFields } from "./self-data-fields";
 import type { ResignationContext } from "@/lib/resignation";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass } from "@/components/ui";
 import { pick, type Bi } from "@/lib/i18n";
-import { LETTER_KIND, REQUEST_LETTER_KINDS } from "@/lib/letters";
+import { LETTER_KIND, REQUEST_LETTER_KINDS, type LetterKind } from "@/lib/letters";
+import { SELF_FIELD_LABEL, type SelfField } from "@/lib/self-data";
 import { MAX_ADVANCE_INSTALLMENTS, REQUEST_STATUS, RESIGNATION_NOTICE_DAYS, requestTitle } from "@/lib/requests";
 import { formatDate, money, toDateInput } from "@/lib/utils";
 import { cancelEmployeeRequest, submitEmployeeRequest } from "@/server/employee-request-actions";
@@ -55,6 +58,7 @@ export function PortalRequests({
   lang,
   t,
   autoKinds = [],
+  letterMissing = {},
   resignationContext,
 }: {
   token: string;
@@ -64,6 +68,8 @@ export function PortalRequests({
   t: (ar: string, en: string) => string;
   /** Letter kinds the company issues at once, without waiting for approval. */
   autoKinds?: readonly string[];
+  /** File fields each letter kind needs that the employee's file lacks; asked for in the form (lettersMissing). */
+  letterMissing?: Partial<Record<string, SelfField[]>>;
   /** Who resigns from whom, for the ready resignation wordings. */
   resignationContext: Omit<ResignationContext, "lastDay">;
 }) {
@@ -108,11 +114,35 @@ export function PortalRequests({
                       ) : null}
                     </span>
                     {LETTER_HINT[kind] ? <span className="mt-0.5 block text-xs leading-5 text-slate-500">{pick(LETTER_HINT[kind]!, lang)}</span> : null}
+                    {letterMissing[kind] ? (
+                      <span className="mt-1 block text-xs font-semibold text-amber-800">
+                        {t("يحتاج بيانات ناقصة في ملفك: ", "Needs details missing from your file: ")}
+                        {letterMissing[kind]!.map((field) => pick(SELF_FIELD_LABEL[field], lang)).join(lang === "ar" ? "، " : ", ")}
+                      </span>
+                    ) : null}
                   </span>
                 </label>
               ))}
             </div>
           </fieldset>
+          <LetterNeedsSwitch
+            panels={Object.fromEntries(
+              Object.entries(letterMissing).map(([kind, fields]) => [
+                kind,
+                <SelfDataFields
+                  key={kind}
+                  fields={fields!}
+                  lang={lang}
+                  t={t}
+                  required
+                  intro={t(
+                    `«${pick(LETTER_KIND[kind as LetterKind].label, "ar")}» يعتمد على بيانات غير موجودة في ملفك. أدخلها ليصدر الخطاب بها.`,
+                    `“${pick(LETTER_KIND[kind as LetterKind].label, "en")}” depends on details missing from your file. Enter them so the letter can be issued.`,
+                  )}
+                />,
+              ]),
+            )}
+          />
           <label className="block space-y-1.5">
             {label(t("موجّه إلى (اختياري)", "Addressed to (optional)"))}
             <input className={`${fieldClass} w-full`} name="addressee" maxLength={160} placeholder={t("مثال: بنك مسقط، أو سفارة …", "e.g. Bank Muscat, or the … embassy")} />

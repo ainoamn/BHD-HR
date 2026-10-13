@@ -1,6 +1,6 @@
 "use server";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { ensureTeamManager, openAndSend, sendSummary } from "@/lib/accounts";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
@@ -14,6 +14,7 @@ import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { packageGross } from "@/lib/salary";
+import { keptSelfMarks, readSelfMarks } from "@/lib/self-data";
 import { newBadgeToken } from "@/lib/badge";
 import { mimeFor, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
@@ -217,12 +218,14 @@ export async function updateEmployee(formData: FormData) {
   const employerId = await resolveEmployer(formData, user, errorPath);
   const managerId = await resolveManager(formData, user.companyId, id, errorPath);
   const files = await readDocFiles(formData, existing!, user.companyId, errorPath);
+  const marks = keptSelfMarks(readSelfMarks(existing!.selfProvided), existing!, input);
   await prisma.$transaction(
     async (tx) => {
       await tx.employee.update({
         where: { id },
         data: {
           ...input,
+          selfProvided: Object.keys(marks).length ? marks : Prisma.DbNull,
           ...jobFields(formData, catalog),
           ...files.data,
           leaveDays: readLeaveDays(formData, catalog.leaveTypes),

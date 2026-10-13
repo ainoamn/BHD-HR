@@ -10,6 +10,7 @@ import { getI18n } from "@/lib/lang";
 import { attendanceLabel, eachUtcDate } from "@/lib/leave";
 import { MAX_PENDING_UPLOADS, MAX_REQUEST_DAYS, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
+import { VIA_PROFILE, missingFields, readSelfInput, saveSelfData } from "@/lib/self-data";
 import { removeUpload, saveUpload } from "@/lib/uploads";
 import { clip, daysLabel, formatDate, num, parseDateInput, req, round3, str } from "@/lib/utils";
 
@@ -64,6 +65,21 @@ export async function cancelLeaveRequest(formData: FormData) {
   if (!updated.count) go(`${base}#leave`, { error: t("لا يمكن إلغاء هذا الطلب", "This request cannot be cancelled") });
   refreshAll();
   go(`${base}#leave`, { message: t("أُلغي الطلب", "Request cancelled") });
+}
+
+/** «أكمل بياناتك»: the employee fills empty file fields and declares them correct; filled fields stay HR's to change. */
+export async function completeMyDetails(formData: FormData) {
+  const { employee, base } = await employeeFor(formData);
+  const { lang, t } = await getI18n();
+  const back = `${base}#profile`;
+  const read = readSelfInput(formData, missingFields(employee), false);
+  if ("error" in read) go(back, { error: read.error[lang] });
+  const values = (read as { values: Parameters<typeof saveSelfData>[1] }).values;
+  if (!Object.keys(values).length) go(back, { error: t("لم تُدخل أي بيان", "You did not enter anything") });
+  const saved = await saveSelfData(employee.id, values, VIA_PROFILE);
+  if (!saved.length) go(back, { error: t("هذه البيانات مسجّلة في ملفك مسبقاً", "These details are already on your file") });
+  refreshAll();
+  go(back, { message: t(`حُفظت ${saved.length} من بياناتك في ملفك مع إقرارك بصحتها. شكراً لك.`, `${saved.length} detail(s) saved to your file with your declaration. Thank you.`) });
 }
 
 export async function submitPortalDocument(formData: FormData) {

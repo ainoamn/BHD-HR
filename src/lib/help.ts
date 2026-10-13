@@ -811,11 +811,20 @@ export const HELP_TOPICS: HelpTopic[] = [
     steps: [
       b("البوابة ← «ملفي»: البيانات الشخصية، ثم «وظيفتي» (الرقم، المسمى، القسم، المدير المباشر، جهة العمل، التعيين، نهاية العقد).", "Portal → “My file”: personal details, then “My job” (number, title, department, manager, employer, joining date, contract end)."),
       b("«راتبي وحسابي البنكي» مطويّ لا يظهر إلا عند فتحه: بنود الراتب والإجمالي والبنك، ورقم الحساب مخفي إلا آخر أربعة أرقام.", "“My pay and bank account” stays folded until opened: pay items, the monthly total and the bank, with only the last four digits of the account."),
+      b(
+        "إن نقص من ملفك بيان (الهاتف، العنوان، الجنسية، الجنس، الميلاد، البطاقة، الجواز، البنك ورقم الحساب) يظهر «أكمل بياناتك الناقصة»: أدخل ما ينطبق عليك، وضع علامة الإقرار بصحته وتحمّل مسؤوليته، ثم «حفظ بياناتي».",
+        "If your file lacks something (phone, address, nationality, gender, birth date, ID, passport, bank and account), “Complete your missing details” appears: enter what applies, tick the declaration that it is correct and your responsibility, then “Save my details”.",
+      ),
       b("إن وجدت خطأ: «أرسل طلباً إلى الموارد البشرية لتصحيحه»؛ و«طباعة ملفي الكامل» للنسخة المطبوعة.", "Found a mistake? “Ask HR to correct it”; and “Print my full profile” for a printed copy."),
     ],
-    tips: [b("لا يعدّل الموظف بياناته بنفسه؛ التصحيح عبر طلب تراجعه الإدارة.", "Employees don't edit their own record; corrections go through a request HR reviews.")],
+    tips: [
+      b(
+        "تُكمل البيان الناقص فقط؛ ما سجّلته الإدارة لا يتغير إلا بطلب تصحيح تراجعه. ما تُدخله يُحفظ مع تاريخ إقرارك ويظهر للإدارة على أنه مُدخل منك.",
+        "You only fill in what is missing; what HR recorded changes only through a correction request. What you enter is saved with the date of your declaration and shown to HR as entered by you.",
+      ),
+    ],
     related: ["portal-requests", "portal-cv", "portal"],
-    keywords: "ملفي بياناتي وظيفتي راتبي حسابي البنكي my file profile details bank",
+    keywords: "ملفي بياناتي وظيفتي راتبي حسابي البنكي بيانات ناقصة أكمل إقرار my file profile details bank missing complete declaration",
   },
   {
     slug: "portal-leave",
@@ -849,12 +858,16 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("البوابة ← «الطلبات» ← اختر: خطاب أو شهادة، سلفة، طلب آخر، أو الاستقالة.", "Portal → “Requests” → choose: letter or certificate, advance, other request, or resignation."),
       b("للخطاب اختر نوعه (شهادة راتب، خبرة، تحويل راتب، فتح حساب بنكي، سفارة، عدم ممانعة، إخلاء طرف…) والجهة المرسل إليها.", "For a letter choose its type (salary, experience, salary transfer, bank account, embassy, no-objection, clearance…) and who it is for."),
       b("الأنواع المعلّمة «يصدر فوراً» تصدر موقّعة لحظة الطلب؛ والبقية بعد اعتماد الإدارة.", "Types marked “Instant” are issued signed the moment you ask; the rest after HR approves."),
+      b(
+        "إن كان الخطاب يعتمد على بيان غير موجود في ملفك (البنك ورقم الحساب لتحويل الراتب، العنوان لفتح حساب، الجنسية والجواز للسفارة) تظهر خاناته في النموذج: أدخله وضع علامة الإقرار بصحته وتحمّل مسؤوليته، فيُحفظ في ملفك ويصدر الخطاب به.",
+        "If the letter depends on something missing from your file (bank and account for a salary transfer, address for a bank account, nationality and passport for an embassy), its boxes appear in the form: fill them in and tick the declaration that they are correct and your responsibility; they are saved to your file and the letter uses them.",
+      ),
       b("«طلباتي» تعرض الحالة وملاحظة الإدارة، وبعد الاعتماد رابط «فتح الخطاب الموقّع وتحميله».", "“My requests” shows the status and HR's note, and after approval a link to open and download the signed letter."),
       b("الاستقالة الإلكترونية: حدّد آخر يوم عمل، اختر صيغة الاستقالة (رسمية مختصرة، مع الشكر والامتنان، فرصة عمل أخرى، ظروف شخصية أو عائلية، التفرغ للدراسة، انتقال الإقامة، أو «أكتبها بنفسي») وعدّلها، اكتب اسمك، ارسم توقيعك بإصبعك أو بالفأرة، ثم «توقيع الاستقالة وإرسالها».", "Electronic resignation: set your last working day, choose a wording style (formal, grateful, new opportunity, personal, study, relocation, or your own) and edit it, type your name, draw your signature with a finger or mouse, then “Sign and send”."),
       b("تحصل على رقم مرجعي (مثل RS-2026-0001) ونسخة رسمية تطبعها أو تحفظها PDF، ويمكنك سحبها قبل قرار الإدارة. عند القبول يصلك خطاب القبول موقّعاً.", "You get a reference (e.g. RS-2026-0001) and an official copy to print or save as PDF, and you can withdraw it before management decides. Once accepted, you receive the signed acceptance letter."),
     ],
     related: ["approvals", "letters", "portal-originals"],
-    keywords: "طلب خطاب شهادة سلفة استقالة توقيع إلكتروني بوابة request letter certificate advance resignation e-signature sign",
+    keywords: "طلب خطاب شهادة سلفة استقالة توقيع إلكتروني بوابة بيانات ناقصة إقرار request letter certificate advance resignation e-signature sign missing details declaration",
   },
   {
     slug: "portal-originals",

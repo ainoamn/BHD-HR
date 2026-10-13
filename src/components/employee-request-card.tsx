@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Check, FileSignature, PenLine, X } from "lucide-react";
+import { Check, FileSignature, PenLine, ShieldCheck, X } from "lucide-react";
 import { Tr } from "./ai-translate";
 import { SubmitButton } from "@/components/submit-button";
 import { ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
 import { pick } from "@/lib/i18n";
 import { heldDocLabel } from "@/lib/custody";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
+import { LETTER_NEEDS, SELF_FIELD_LABEL, readSelfMarks } from "@/lib/self-data";
 import { PERMISSION_TEXT, REQUEST_TYPE, canDecideRequest, requestPermissions, requestTitle, type RequestType } from "@/lib/requests";
 import { formatDate, formatDateTime, money, toDateInput } from "@/lib/utils";
 import { decideEmployeeRequest } from "@/server/employee-request-actions";
@@ -37,6 +38,7 @@ export type PendingEmployeeRequest = {
     bankAccount: string | null;
     address?: string | null;
     passportNumber?: string | null;
+    selfProvided?: unknown;
     heldDocuments?: { id: string; type: string; title: string | null; documentNo: string | null; status: string }[];
   };
 };
@@ -80,6 +82,8 @@ export function EmployeeRequestCard({
         : request.letterKind === "EMBASSY" && !request.employee.passportNumber
           ? t("لا يوجد رقم جواز في ملف الموظف، وخطاب السفارة يتطلبه؛ أضفه أولاً ثم اعتمد.", "The employee's file has no passport number, which the embassy letter needs; add it first, then approve.")
           : null;
+  const marks = readSelfMarks(request.employee.selfProvided);
+  const declared = (LETTER_NEEDS[request.letterKind as LetterKind] || []).filter((field) => marks[field]);
   const requested = type === "DOCUMENTS" ? (request.employee.heldDocuments || []).filter((doc) => request.documentIds?.includes(doc.id)) : [];
   const label = (text: string) => <span>{text}</span>;
   const approveLabel =
@@ -218,6 +222,15 @@ export function EmployeeRequestCard({
             {label(t("ملاحظة للموظف (اختياري)", "Note to the employee (optional)"))}
             <input className={`${fieldClass} w-full`} name="decisionNote" maxLength={500} />
           </label>
+          {declared.length ? (
+            <p className="flex items-start gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-800 ring-1 ring-inset ring-sky-200 sm:col-span-2">
+              <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+              <span>
+                {t("أدخل الموظف بنفسه من بوابته وأقرّ بصحتها وتحمّل مسؤوليتها: ", "Entered by the employee in their portal, declared correct and their responsibility: ")}
+                {declared.map((field) => `${pick(SELF_FIELD_LABEL[field], lang)} (${formatDate(new Date(marks[field]!.at))})`).join(lang === "ar" ? "، " : ", ")}
+              </span>
+            </p>
+          ) : null}
           {missing ? (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-inset ring-amber-200 sm:col-span-2">
               {missing}{" "}

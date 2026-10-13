@@ -6,6 +6,7 @@ import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
+import { SELF_FIELD_LABEL, readSelfMarks, type SelfField } from "@/lib/self-data";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,6 +27,7 @@ import {
   ReceiptText,
   RefreshCw,
   ScrollText,
+  ShieldCheck,
   Sparkles,
   Wallet,
 } from "lucide-react";
@@ -107,6 +109,7 @@ export default async function EmployeePage({
     },
   });
   if (!employee) notFound();
+  const selfMarks = Object.entries(readSelfMarks(employee.selfProvided)) as [SelfField, { at: string }][];
   const leaveTypes = await getLeaveTypes(user.companyId);
   const allow = {
     edit: can(user, "employees.edit"),
@@ -558,6 +561,16 @@ export default async function EmployeePage({
                   <Info label={t("البريد الإلكتروني", "Email")} value={text(employee.email)} dir="ltr" />
                   <Info label={t("العنوان", "Address")} value={text(employee.address)} wide />
                 </dl>
+                {selfMarks.length ? (
+                  <div className="mt-4 flex items-start gap-2 rounded-xl bg-sky-50 px-3 py-2.5 text-sm leading-6 text-sky-800 ring-1 ring-inset ring-sky-200">
+                    <ShieldCheck size={16} className="mt-1 shrink-0" />
+                    <p className="min-w-0">
+                      <span className="font-semibold">{t("أدخلها الموظف بنفسه من بوابته وأقرّ بصحتها وتحمّل مسؤوليتها:", "Entered by the employee in their portal, declared correct and their responsibility:")}</span>{" "}
+                      {selfMarks.map(([field, mark]) => `${pick(SELF_FIELD_LABEL[field], lang)} (${formatDate(new Date(mark.at))})`).join(lang === "ar" ? "، " : ", ")}.{" "}
+                      <span className="text-xs text-slate-500">{t("تزول العلامة عن أي بيان تعدّله أنت.", "The mark goes from any detail you change.")}</span>
+                    </p>
+                  </div>
+                ) : null}
               </Card>
               <Card>
                 <SectionTitle>{t("العمل والعقد", "Employment & contract")}</SectionTitle>

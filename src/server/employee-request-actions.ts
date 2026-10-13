@@ -6,13 +6,14 @@ import { requireUser } from "@/lib/auth";
 import { createCustodyForm } from "@/lib/custody";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import { PURPOSE_KINDS, REQUEST_LETTER_KINDS } from "@/lib/letters";
+import { PURPOSE_KINDS, REQUEST_LETTER_KINDS, type LetterKind } from "@/lib/letters";
 import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { portalEmployee } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { AUTO_ACTOR_NAME, issueRequestedLetter, issuesOnItsOwn } from "@/lib/request-letters";
 import { requestOrigin } from "@/lib/request-origin";
 import { RESIGNATION_TEXT_MAX, RESIGNATION_TEXT_MIN } from "@/lib/resignation";
+import { LETTER_NEEDS, missingFields, readSelfInput, saveSelfData, viaLetter } from "@/lib/self-data";
 import { createSignedResignation, readSignature } from "@/lib/resignation-seal";
 import { MAX_ADVANCE_INSTALLMENTS, MAX_DOCUMENT_DAYS, MAX_OPEN_REQUESTS, canDecideRequest, isRequestType, requestTitle } from "@/lib/requests";
 import { clip, formatDate, intValue, money, num, parseDateInput, req, round3, safeReturn, str, todayInputValue } from "@/lib/utils";
@@ -56,6 +57,7 @@ export async function submitEmployeeRequest(formData: FormData) {
     documentIds?: string[];
     dueBack?: Date;
   } = { type, details };
+  let selfSaved: string[] = [];
 
   if (type === "LETTER") {
     const letterKind = req(formData, "letterKind");
@@ -71,6 +73,17 @@ export async function submitEmployeeRequest(formData: FormData) {
     data.letterKind = letterKind;
     data.subject = letterKind === "GENERAL" ? subject : null;
     data.addressee = clip(str(formData, "addressee"), 160);
+    if (letterKind === "BANK_ACCOUNT" && !data.addressee && !employee.bankBic) {
+      fail("اكتب في «موجّه إلى» اسم البنك الذي تريد فتح الحساب لديه", "Write the bank where you want to open the account in “Addressed to”");
+    }
+    const needed = missingFields(employee, LETTER_NEEDS[letterKind as LetterKind] || []);
+    if (needed.length) {
+      const read = readSelfInput(formData, needed, true);
+      if ("error" in read) fail(read.error.ar, read.error.en);
+      const values = (read as { values: Parameters<typeof saveSelfData>[1] }).values;
+      selfSaved = await saveSelfData(employee.id, values, viaLetter(letterKind as LetterKind));
+      Object.assign(employee, values);
+    }
   } else if (type === "RESIGNATION") {
     if (req(formData, "confirm") !== "1") fail("أكّد رغبتك في تقديم الاستقالة", "Confirm that you want to resign");
     const lastDay = parseDateInput(str(formData, "lastDay"));
@@ -156,7 +169,12 @@ export async function submitEmployeeRequest(formData: FormData) {
     });
     refreshAll();
     if ("letter" in issued) {
-      go(back, { message: t(`صدر الخطاب ${issued.letter.refNo} إلكترونياً وموقّعاً، وتجده في «خطاباتي».`, `Letter ${issued.letter.refNo} was issued and e-signed at once; find it under “My letters”.`) });
+      go(back, {
+        message: t(
+          `صدر الخطاب ${issued.letter.refNo} إلكترونياً وموقّعاً${selfSaved.length ? " بالبيانات التي أدخلتها وأقررت بصحتها (حُفظت في ملفك)" : ""}، وتجده في «خطاباتي».`,
+          `Letter ${issued.letter.refNo} was issued and e-signed at once${selfSaved.length ? " with the details you entered and declared (saved to your file)" : ""}; find it under “My letters”.`,
+        ),
+      });
     }
     if ("error" in issued) {
       go(back, {
@@ -169,7 +187,11 @@ export async function submitEmployeeRequest(formData: FormData) {
   }
 
   refreshAll();
-  go(back, { message: t("أُرسل الطلب إلى الإدارة، وسيظهر هنا قرار الاعتماد.", "Request sent to management. The decision will appear here.") });
+  go(back, {
+    message: selfSaved.length
+      ? t("حُفظت بياناتك في ملفك وأُرسل الطلب إلى الإدارة، وسيظهر هنا قرار الاعتماد.", "Your details were saved to your file and the request was sent to management. The decision will appear here.")
+      : t("أُرسل الطلب إلى الإدارة، وسيظهر هنا قرار الاعتماد.", "Request sent to management. The decision will appear here."),
+  });
 }
 
 export async function cancelEmployeeRequest(formData: FormData) {
