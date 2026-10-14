@@ -5,7 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { can, getSessionUser } from "@/lib/auth";
 import { profileGaps, type GapKey } from "@/lib/employee-gaps";
 import { checkRow, type ExistingEmployee, type ImportValues } from "@/lib/employee-import";
-import { findExistingEmployees, intakeContext, saveIntake } from "@/lib/employee-intake";
+import { attachLabourFile, findExistingEmployees, intakeContext, saveIntake } from "@/lib/employee-intake";
 import { refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
@@ -90,7 +90,8 @@ export async function readLabourFile(formData: FormData): Promise<LabourFileRead
 }
 
 export type LabourSaveResult = {
-  saved?: { index: number; id: string; name: string; created: boolean; gaps: GapKey[] }[];
+  /** `attached`: on record and not updated — only the file was added to their documents. */
+  saved?: { index: number; id: string; name: string; created: boolean; attached: boolean; gaps: GapKey[] }[];
   /** Per worker index, why it was not saved. */
   failed?: Record<number, string>;
   sponsors?: string[];
@@ -98,8 +99,8 @@ export type LabourSaveResult = {
 };
 
 /**
- * Saves the workers read from one file: `workers` is [{values, update}], `update` = also when the employee is on
- * record (else such a worker is skipped with a warning). The file is stored once and kept on every saved employee.
+ * Saves the workers read from one file: `workers` is [{values, update}], `update` = also overwrite the data of an
+ * employee on record. The file is stored once and kept on every worker as "Ministry of Labour data attachment".
  */
 export async function saveLabourFile(formData: FormData): Promise<LabourSaveResult> {
   const session = await intakeUser();
@@ -122,12 +123,16 @@ export async function saveLabourFile(formData: FormData): Promise<LabourSaveResu
     rows.map((row) => row.values),
   );
   const mayUpdate = can(user, "employees.edit");
+  const mayAttach = mayUpdate || can(user, "documents.create");
   const failed: Record<number, string> = {};
+  /** On record and not updated: the file still goes into their file, the data stays as it is. */
+  const attachOnly = new Set<number>();
   rows.forEach((row, index) => {
-    if (row.errors.length) failed[index] = row.errors.join(" — ");
-    else if (existing[index] && !(list[index].update && mayUpdate)) {
-      failed[index] = t(`موجود مسبقاً: ${existing[index]!.fullName} (${existing[index]!.employeeNumber})`, `Already on record: ${existing[index]!.fullName} (${existing[index]!.employeeNumber})`);
-    }
+    const found = existing[index];
+    if (found && !(list[index].update && mayUpdate)) {
+      if (mayAttach) attachOnly.add(index);
+      else failed[index] = t(`موجود مسبقاً: ${found.fullName} (${found.employeeNumber})`, `Already on record: ${found.fullName} (${found.employeeNumber})`);
+    } else if (row.errors.length) failed[index] = row.errors.join(" — ");
   });
   const fresh = rows.filter((_, index) => !failed[index] && !existing[index]).length;
   if (fresh) {
@@ -145,19 +150,28 @@ export async function saveLabourFile(formData: FormData): Promise<LabourSaveResu
   const sponsors = new Set<string>();
   for (const [index, row] of rows.entries()) {
     if (failed[index]) continue;
+    if (attachOnly.has(index)) {
+      const employee = await prisma.employee.findFirstOrThrow({ where: { id: existing[index]!.id, companyId: user.companyId } });
+      if (url) await attachLabourFile(employee.id, { url, note });
+      const permits = await prisma.employeeDocument.count({ where: { employeeId: employee.id, type: "WORK_PERMIT" } });
+      saved.push({ index, id: employee.id, name: employee.fullName, created: false, attached: true, gaps: profileGaps({ ...employee, hasWorkPermit: permits > 0 }) });
+      continue;
+    }
     const result = await saveIntake(ctx, row.values, existing[index]?.id ?? null, url ? { url, note } : undefined);
     if (result.sponsor?.created) sponsors.add(result.sponsor.name);
     const employee = result.employee;
     const permits = await prisma.employeeDocument.count({ where: { employeeId: employee.id, type: "WORK_PERMIT" } });
-    saved.push({ index, id: employee.id, name: employee.fullName, created: result.created, gaps: profileGaps({ ...employee, hasWorkPermit: permits > 0 }) });
+    saved.push({ index, id: employee.id, name: employee.fullName, created: result.created, attached: false, gaps: profileGaps({ ...employee, hasWorkPermit: permits > 0 }) });
   }
   const created = saved.filter((item) => item.created).length;
+  const attached = saved.filter((item) => item.attached).length;
+  const updated = saved.length - created - attached;
   await writeAudit({
     userId: user.id,
     action: "EMPLOYEE_IMPORT",
     message: t(
-      `أضاف ${created} موظفاً${saved.length - created ? ` وحدّث ${saved.length - created}` : ""} من ملف وزارة العمل${sponsors.size ? `، وفتح ${sponsors.size} كفيلاً` : ""}`,
-      `Added ${created} employee(s)${saved.length - created ? `, updated ${saved.length - created}` : ""} from a Ministry of Labour file${sponsors.size ? `, opened ${sponsors.size} sponsor(s)` : ""}`,
+      `أضاف ${created} موظفاً${updated ? ` وحدّث ${updated}` : ""}${attached ? ` وأرفق الملف لـ ${attached} موجود` : ""} من ملف وزارة العمل (مرفق بيانات وزارة العمل)${sponsors.size ? `، وفتح ${sponsors.size} كفيلاً` : ""}`,
+      `Added ${created} employee(s)${updated ? `, updated ${updated}` : ""}${attached ? `, attached the file to ${attached} on record` : ""} from a Ministry of Labour file${sponsors.size ? `, opened ${sponsors.size} sponsor(s)` : ""}`,
     ),
   });
   refreshAll();

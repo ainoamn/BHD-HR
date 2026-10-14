@@ -189,15 +189,18 @@ export async function saveIntake(ctx: IntakeContext, values: ImportValues, exist
     const docs = await prisma.employeeDocument.findMany({ where: { employeeId: employee.id, type: "WORK_PERMIT" }, orderBy: { createdAt: "desc" } });
     const same = docs.find((doc) => (permitNo ? upper(doc.documentNo ?? "") === upper(permitNo) : !doc.documentNo)) ?? (permitNo ? undefined : docs[0]);
     if (same) {
-      await prisma.employeeDocument.update({
-        where: { id: same.id },
-        data: { ...(permitExpiry ? { expiryDate: permitExpiry } : {}), ...(file ? { fileUrl: file.url, notes: same.notes || file.note } : {}) },
-      });
+      if (permitExpiry) await prisma.employeeDocument.update({ where: { id: same.id }, data: { expiryDate: permitExpiry } });
     } else {
-      await prisma.employeeDocument.create({ data: { employeeId: employee.id, type: "WORK_PERMIT", documentNo: permitNo, expiryDate: permitExpiry, fileUrl: file?.url ?? null, notes: file?.note ?? null } });
+      await prisma.employeeDocument.create({ data: { employeeId: employee.id, type: "WORK_PERMIT", documentNo: permitNo, expiryDate: permitExpiry } });
     }
-  } else if (file) {
-    await prisma.employeeDocument.create({ data: { employeeId: employee.id, type: "OTHER", fileUrl: file.url, notes: file.note } });
   }
+  if (file) await attachLabourFile(employee.id, file);
   return { employee, created, sponsor: sponsor.employer ? { name: sponsor.employer.name, created: sponsor.created } : null };
+}
+
+/** Keeps the uploaded Ministry of Labour PDF in the employee's file; uploading the same file again does not duplicate it. */
+export async function attachLabourFile(employeeId: string, file: { url: string; note: string }) {
+  const already = await prisma.employeeDocument.findFirst({ where: { employeeId, type: "MOL_FILE", fileUrl: file.url }, select: { id: true } });
+  if (already) return;
+  await prisma.employeeDocument.create({ data: { employeeId, type: "MOL_FILE", fileUrl: file.url, notes: file.note } });
 }

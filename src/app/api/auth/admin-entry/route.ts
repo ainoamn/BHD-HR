@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isSsoConfigured } from "@/lib/bhd/identity";
-import { originOf } from "@/lib/request-origin";
+import { signInOrigin } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
@@ -18,7 +18,7 @@ function adminReturnTo(request: Request): string {
  * Forwards to the site's BHD start so the same identity session opens the admin console.
  */
 export async function GET(request: Request) {
-  const origin = originOf(request);
+  const origin = signInOrigin(request);
   const returnTo = adminReturnTo(request);
   if (!isSsoConfigured()) {
     return NextResponse.redirect(new URL(`/login?local=1&next=${encodeURIComponent(returnTo)}`, origin));

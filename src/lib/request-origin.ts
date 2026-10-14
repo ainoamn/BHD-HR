@@ -12,8 +12,25 @@ export async function requestOrigin() {
 export function originOf(request: Request) {
   const configured = process.env.APP_ORIGIN?.trim();
   if (configured) return configured.replace(/\/$/, "");
+  return hostOrigin(request);
+}
+
+function hostOrigin(request: Request) {
   const url = new URL(request.url);
   const host = request.headers.get("x-forwarded-host") ?? url.host;
   const proto = request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
   return `${proto}://${host}`;
+}
+
+/** Hosts the BHD identity server accepts as sign-in callbacks, besides APP_ORIGIN. */
+const SIGN_IN_ORIGINS = ["https://hr.bhd-om.com", "https://bhd-hr.vercel.app"];
+
+/**
+ * Sign-in has to finish on the host it started from: the OAuth state cookie and the
+ * session cookie both belong to that host.
+ */
+export function signInOrigin(request: Request) {
+  const own = hostOrigin(request);
+  const extra = (process.env.SIGN_IN_ORIGINS ?? "").split(",").map((value) => value.trim().replace(/\/$/, "")).filter(Boolean);
+  return [...SIGN_IN_ORIGINS, ...extra].includes(own) ? own : originOf(request);
 }

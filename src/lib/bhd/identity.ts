@@ -34,11 +34,13 @@ export function isSsoConfigured() {
 }
 
 export function identityConfig(requestOrigin: string): IdentityConfig {
+  const configured = process.env.BHD_OAUTH_REDIRECT_URI?.trim();
+  const own = `${requestOrigin}/api/auth/bhd/callback`;
   return {
     issuer: identityIssuer(),
     clientId: process.env.BHD_OAUTH_CLIENT_ID?.trim() ?? "",
     clientSecret: process.env.BHD_OAUTH_CLIENT_SECRET?.trim() ?? "",
-    redirectUri: process.env.BHD_OAUTH_REDIRECT_URI?.trim() || `${requestOrigin}/api/auth/bhd/callback`,
+    redirectUri: configured?.startsWith(`${requestOrigin}/`) ? configured : own,
   };
 }
 

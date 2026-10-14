@@ -9,13 +9,13 @@ import {
   randomUrlToken,
   safeReturnPath,
 } from "@/lib/bhd/identity";
-import { originOf } from "@/lib/request-origin";
+import { signInOrigin } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const origin = originOf(request);
+  const origin = signInOrigin(request);
   const url = new URL(request.url);
   const returnTo = safeReturnPath(url.searchParams.get("returnTo") ?? url.searchParams.get("next"));
   if (!isSsoConfigured()) {

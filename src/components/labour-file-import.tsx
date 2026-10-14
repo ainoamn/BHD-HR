@@ -197,7 +197,18 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
                 <div key={index} className="space-y-2 rounded-xl bg-emerald-50 px-3 py-3 text-sm ring-1 ring-inset ring-emerald-200">
                   <p className="flex flex-wrap items-center gap-2 font-semibold text-emerald-800">
                     <CircleCheck size={16} />
-                    {saved.created ? t(`أُضيف: ${saved.name}`, `Added: ${saved.name}`) : t(`حُدّثت بيانات: ${saved.name}`, `Updated: ${saved.name}`)}
+                    {saved.created
+                      ? t(`أُضيف: ${saved.name}`, `Added: ${saved.name}`)
+                      : saved.attached
+                        ? t(`أُرفق الملف بملف: ${saved.name}`, `File attached to: ${saved.name}`)
+                        : t(`حُدّثت بيانات: ${saved.name}`, `Updated: ${saved.name}`)}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-emerald-800">
+                    <FileText size={14} className="shrink-0" />
+                    {t("حُفظ الملف في مستندات الموظف باسم «مرفق بيانات وزارة العمل».", "The file is kept in the employee's documents as “Ministry of Labour data attachment”.")}
+                    <Link href={`/employees/${saved.id}?tab=docs`} className="font-semibold underline">
+                      {t("عرض المستندات", "View documents")}
+                    </Link>
                   </p>
                   {saved.gaps.length ? (
                     <div className="space-y-2">
@@ -241,10 +252,16 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
                         </Link>
                       </span>
                     </p>
+                    <p className="text-xs">
+                      {t(
+                        "عند الحفظ يُرفق الملف بملفه باسم «مرفق بيانات وزارة العمل» دون تغيير بياناته.",
+                        "On save the file is attached to their record as “Ministry of Labour data attachment” without changing their data.",
+                      )}
+                    </p>
                     {canUpdate ? (
                       <label className="flex items-start gap-2 font-medium">
                         <input type="checkbox" checked={worker.update} onChange={(event) => setFlag(item, index, "update", event.target.checked)} className="mt-1 size-4 accent-teal-700" />
-                        {t("حدّث بياناته بما قُرئ من الملف وأرفق الملف بملفه", "Update the record with what was read and attach the file")}
+                        {t("حدّث بياناته أيضاً بما قُرئ من الملف", "Also update their data with what was read")}
                       </label>
                     ) : null}
                   </div>
@@ -323,7 +340,7 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
                 <Save size={16} />
                 {item.workers.length > 1 ? t(`حفظ ${pending(item)} موظفين`, `Save ${pending(item)} employees`) : t("حفظ الموظف", "Save employee")}
               </button>
-              <span className="text-xs text-slate-500">{t("يُحفظ الملف نفسه ضمن وثائق الموظف.", "The file itself is kept in the employee's documents.")}</span>
+              <span className="text-xs text-slate-500">{t("يُحفظ الملف نفسه في مستندات كل موظف باسم «مرفق بيانات وزارة العمل».", "The file itself is kept in each employee's documents as “Ministry of Labour data attachment”.")}</span>
             </div>
           ) : null}
         </section>

@@ -26,6 +26,8 @@ test("public pages fit a 360px screen", async ({ page }) => {
 test("the platform admin area is closed to visitors", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/login/);
+  const csv = await page.request.get("/admin/companies/export", { maxRedirects: 0 });
+  expect([302, 303, 307]).toContain(csv.status());
 });
 
 test.describe("platform admin and plans", () => {
@@ -45,6 +47,7 @@ test.describe("platform admin and plans", () => {
       ["/admin/users", "e2e@bhd.local"],
       ["/admin/settings", "إعدادات المنصة"],
       ["/admin/log", "سجل الإدارة"],
+      ["/admin/search?q=e2e", "e2e@bhd.local"],
       ["/billing", "الاشتراك والباقة"],
     ];
     for (const [path, text] of pages) {
@@ -56,6 +59,23 @@ test.describe("platform admin and plans", () => {
       await page.goto(path);
       await noOverflow(page, path);
     }
+  });
+
+  test("the admin console searches, filters and exports companies", async ({ page }) => {
+    await page.goto(`/admin/search?q=${encodeURIComponent("الاختبار")}`);
+    await expect(page.getByRole("link", { name: "شركة الاختبار" }).first()).toBeVisible();
+    await page.goto("/admin/companies?sort=name");
+    await expect(page.getByRole("link", { name: "شركة الاختبار" }).first()).toBeVisible();
+    await page.goto("/admin/companies?state=SUSPENDED");
+    await expect(page.getByText("لا توجد نتائج")).toBeVisible();
+    const csv = await page.request.get("/admin/companies/export");
+    expect(csv.status()).toBe(200);
+    expect(csv.headers()["content-type"]).toContain("text/csv");
+    expect(await csv.text()).toContain("شركة الاختبار");
+    await page.goto("/admin/users?kind=admins");
+    await expect(page.getByText("e2e@bhd.local").first()).toBeVisible();
+    await page.goto("/admin/log?group=subscription");
+    await expect(page.getByText("سجل الإدارة").first()).toBeVisible();
   });
 
   test("a plan's employee limit stops new employees", async ({ page }) => {

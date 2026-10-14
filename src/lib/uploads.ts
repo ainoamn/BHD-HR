@@ -32,6 +32,12 @@ export async function removeUpload(url?: string | null) {
   await prisma.storedFile.deleteMany({ where: { name: path.basename(url) } });
 }
 
+/** One Ministry of Labour file can list several workers, so each gets a document pointing at the same upload. */
+export async function removeDocumentFileIfUnused(url?: string | null) {
+  if (!url) return;
+  if ((await prisma.employeeDocument.count({ where: { fileUrl: url } })) === 0) await removeUpload(url);
+}
+
 export async function removeLogoIfUnused(url?: string | null) {
   if (!url) return;
   const [companies, employers] = await Promise.all([

@@ -11,7 +11,7 @@ import {
   type IdentityProfile,
 } from "@/lib/bhd/identity";
 import { requestMeta } from "@/lib/login-events";
-import { originOf } from "@/lib/request-origin";
+import { signInOrigin } from "@/lib/request-origin";
 import { signInBhdUser } from "@/lib/workspace";
 
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ function failure(origin: string, code: string) {
 }
 
 export async function GET(request: Request) {
-  const origin = originOf(request);
+  const origin = signInOrigin(request);
   if (!isSsoConfigured()) return failure(origin, "not_configured");
   const url = new URL(request.url);
   const jar = await cookies();

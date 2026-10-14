@@ -301,13 +301,13 @@ export const HELP_TOPICS: HelpTopic[] = [
     steps: [
       b("الموظفون ← «إضافة دفعة (Excel / PDF)».", "Employees → “Bulk add (Excel / PDF)”."),
       b("ملفات وزارة العمل: اختر ملفاً أو أكثر (PDF أو صور). يقرأ الذكاء الاصطناعي كل عامل: الاسم، الجنسية، الرقم المدني، الجواز، المهنة، تصريح العمل، الكفيل.", "Ministry of Labour files: choose one or more (PDF or images). AI reads each worker: name, nationality, civil number, passport, occupation, work permit, sponsor."),
-      b("راجع البطاقة وعدّل ما يلزم. إن كان العامل مسجلاً يظهر تنبيه برابط ملفه، ويمكنك اختيار تحديث بياناته. ثم «حفظ الموظف» أو «حفظ الكل».", "Check each card and edit as needed. A worker already on record shows a warning with a link to their file, and you can choose to update it. Then “Save employee” or “Save all”."),
+      b("راجع البطاقة وعدّل ما يلزم. إن كان العامل مسجلاً يظهر تنبيه برابط ملفه: يُرفق الملف به دون تغيير بياناته، ويمكنك اختيار «حدّث بياناته أيضاً». ثم «حفظ الموظف» أو «حفظ الكل».", "Check each card and edit as needed. A worker already on record shows a warning with a link to their file: the file is attached without changing their data, or tick “Also update their data”. Then “Save employee” or “Save all”."),
       b("Excel: نزّل القالب أو ارفع قائمة العمال المصدّرة من بوابة الوزارة كما هي، ثم «فحص الملف». الصفوف المسجلة مسبقاً تظهر بلون مميز مع خيار «تحديث بيانات الموظفين الموجودين».", "Excel: download the template, or upload the worker list exported from the ministry portal as it is, then “Check file”. Rows already on record are highlighted, with the option “Update existing employees”."),
       b("بعد الحفظ تظهر البيانات الناقصة لكل موظف مع زر «أكمل».", "After saving, each employee's missing details are listed with a “Complete” button."),
     ],
     tips: [
       b("الكفيل غير المسجل يُفتح تلقائياً باسمه ورقم سجله أو رقمه المدني، والموظف يُربط به. وتصريح العمل يُحفظ في وثائق الموظف مع تاريخ انتهائه.", "A sponsor not on record is opened automatically with its name and CR or civil number, and the employee is linked. The work permit is kept in the employee's documents with its expiry."),
-      b("ملف وزارة العمل نفسه يُحفظ ضمن وثائق الموظف. قراءة PDF تحتاج باقة تشمل الذكاء الاصطناعي.", "The ministry file itself is kept in the employee's documents. Reading PDFs needs a plan with AI."),
+      b("ملف وزارة العمل نفسه يُحفظ تلقائياً في مستندات الموظف باسم «مرفق بيانات وزارة العمل» (تبويب المستندات في ملفه). الملف الذي فيه عدة عمال يُرفق بكل واحد منهم. قراءة PDF تحتاج باقة تشمل الذكاء الاصطناعي.", "The ministry file itself is kept automatically in the employee's documents as “Ministry of Labour data attachment” (Documents tab of their file). A file listing several workers is attached to each of them. Reading PDFs needs a plan with AI."),
       b("التواريخ تُقبل بصيغة 2026-10-14 أو 14/10/2026 أو تاريخ Excel. حتى 500 صف في ملف Excel و20 ملف PDF في المرة.", "Dates may be 2026-10-14, 14/10/2026 or an Excel date. Up to 500 rows per Excel file and 20 PDFs at a time."),
     ],
     related: ["add-employee", "bulk-actions"],

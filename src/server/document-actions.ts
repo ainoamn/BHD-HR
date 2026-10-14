@@ -7,7 +7,7 @@ import { go, refreshAll } from "@/lib/http";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
-import { removeUpload, saveUpload } from "@/lib/uploads";
+import { removeDocumentFileIfUnused, saveUpload } from "@/lib/uploads";
 import { clip, parseDateInput, req, safeReturn, str } from "@/lib/utils";
 
 export async function addDocument(formData: FormData) {
@@ -78,7 +78,7 @@ export async function updateDocument(formData: FormData) {
       fileUrl,
     },
   });
-  if (fileUrl !== row!.fileUrl) await removeUpload(row!.fileUrl);
+  if (fileUrl !== row!.fileUrl) await removeDocumentFileIfUnused(row!.fileUrl);
   await writeAudit({
     userId: user.id,
     employeeId: row!.employeeId,
@@ -99,8 +99,8 @@ export async function deleteDocument(formData: FormData) {
   });
   const returnTo = safeReturn(formData.get("returnTo"), row ? `/employees/${row.employeeId}?tab=docs` : "/documents");
   if (!row) go(returnTo, { error: t("المستند غير موجود", "Document not found") });
-  await removeUpload(row!.fileUrl);
   await prisma.employeeDocument.delete({ where: { id: row!.id } });
+  await removeDocumentFileIfUnused(row!.fileUrl);
   await writeAudit({
     userId: user.id,
     employeeId: row!.employeeId,

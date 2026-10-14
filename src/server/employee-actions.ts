@@ -19,7 +19,7 @@ import { packageGross } from "@/lib/salary";
 import { keptSelfMarks, readSelfMarks } from "@/lib/self-data";
 import { fitsLimit, limitMessage } from "@/lib/subscription";
 import { newBadgeToken } from "@/lib/badge";
-import { mimeFor, removeUpload, saveUpload } from "@/lib/uploads";
+import { mimeFor, removeDocumentFileIfUnused, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
 import { clip, money, req, safeReturn, str } from "@/lib/utils";
 
@@ -321,7 +321,7 @@ export async function deleteEmployee(formData: FormData) {
     prisma.auditLog.updateMany({ where: { employeeId: id, companyId: user.companyId }, data: { employeeId: null } }),
     prisma.employee.delete({ where: { id } }),
   ]);
-  for (const document of employee!.documents) await removeUpload(document.fileUrl);
+  for (const document of employee!.documents) await removeDocumentFileIfUnused(document.fileUrl);
   for (const url of [employee!.idFileUrl, employee!.passportFileUrl, employee!.residenceFileUrl, employee!.photoUrl]) await removeUpload(url);
   await writeAudit({
     userId: user.id,

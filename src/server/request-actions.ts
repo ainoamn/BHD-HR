@@ -15,7 +15,7 @@ import { notifyEmployee } from "@/lib/notify";
 import { newPortalToken } from "@/lib/portal";
 import { requestOrigin } from "@/lib/request-origin";
 import { prisma } from "@/lib/prisma";
-import { removeUpload } from "@/lib/uploads";
+import { removeDocumentFileIfUnused } from "@/lib/uploads";
 import { clip, daysLabel, formatDate, num, req, safeReturn, str } from "@/lib/utils";
 
 /** Approving records the period in attendance exactly like HR would; rejecting keeps the request with the reason. */
@@ -169,7 +169,7 @@ export async function reviewPortalDocument(formData: FormData) {
     go(back, { message: t("أُضيف المستند إلى ملف الموظف", "Document added to the employee's file") });
   }
   await prisma.employeeDocument.delete({ where: { id: document!.id } });
-  await removeUpload(document!.fileUrl);
+  await removeDocumentFileIfUnused(document!.fileUrl);
   await writeAudit({ userId: user.id, employeeId: document!.employee.id, action: "PORTAL_DOCUMENT_REJECT", message: `رفض ${label} المرسل من ${document!.employee.fullName} وحذفه` });
   refreshAll();
   go(back, { message: t("رُفض المستند وحُذف", "Document rejected and deleted") });
