@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { SESSION_COOKIE, readSession } from "./auth";
+import { SESSION_COOKIE, parseSession, readSession, sessionValid } from "./auth";
 import { isPlatformAdmin } from "./platform-admin";
 import { DEFAULT_PLANS } from "./plans";
 import { prisma } from "./prisma";
@@ -11,10 +11,10 @@ const CONFIG_ID = "platform";
 
 /** The signed-in platform admin, read straight from the session (a platform admin needs no company). */
 export const getPlatformAdmin = cache(async () => {
-  const userId = readSession((await cookies()).get(SESSION_COOKIE)?.value);
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, picture: true, isPlatformAdmin: true, disabledAt: true } });
-  return isPlatformAdmin(user) ? user : null;
+  const session = parseSession((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!session) return null;
+  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, name: true, email: true, picture: true, isPlatformAdmin: true, disabledAt: true, bhdSub: true } });
+  return user && sessionValid(session, user) && isPlatformAdmin(user) ? user : null;
 });
 
 export async function requirePlatformAdmin() {

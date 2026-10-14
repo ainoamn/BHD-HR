@@ -45,9 +45,9 @@ export async function GET(request: Request) {
     return failure(origin, error instanceof Error ? error.message.slice(0, 40) : "token");
   }
 
-  let userId: string;
+  let user: { id: string; bhdSub: string | null };
   try {
-    userId = (await signInBhdUser(profile, requestMeta(request))).id;
+    user = await signInBhdUser(profile, requestMeta(request));
   } catch (error) {
     return failure(origin, error instanceof Error ? error.message.slice(0, 40) : "user");
   }
@@ -55,6 +55,6 @@ export async function GET(request: Request) {
   const response = NextResponse.redirect(new URL(oauth.returnTo, origin));
   response.cookies.delete(OAUTH_STATE_COOKIE);
   response.cookies.delete(COMPANY_COOKIE);
-  response.cookies.set(SESSION_COOKIE, signSession(userId), sessionCookieOptions());
+  response.cookies.set(SESSION_COOKIE, signSession(user), sessionCookieOptions());
   return response;
 }

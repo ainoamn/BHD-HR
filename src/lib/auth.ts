@@ -54,22 +54,52 @@ export function authSecret() {
   return "bhd-hr-dev-secret";
 }
 
-export function signSession(userId: string) {
-  const mac = crypto.createHmac("sha256", authSecret()).update(userId).digest("base64url");
-  return `${userId}.${mac}`;
+function sessionMac(body: string) {
+  return crypto.createHmac("sha256", authSecret()).update(body).digest("base64url");
 }
 
-export function readSession(token?: string | null) {
+/** Which sign-in link a session was issued under; linking a BHD identity to an account changes it. */
+function sessionStamp(bhdSub: string | null | undefined) {
+  return bhdSub ? crypto.createHash("sha256").update(bhdSub).digest("base64url").slice(0, 12) : "l";
+}
+
+export function signSession(user: { id: string; bhdSub: string | null }) {
+  const body = `${user.id}.${sessionStamp(user.bhdSub)}`;
+  return `${body}.${sessionMac(body)}`;
+}
+
+/** Signature check only. Tokens from before the stamp (`id.mac`) count as issued to a local, unlinked account. */
+export function parseSession(token?: string | null) {
   if (!token) return null;
   const index = token.lastIndexOf(".");
   if (index <= 0) return null;
-  const userId = token.slice(0, index);
-  const mac = token.slice(index + 1);
-  const expected = crypto.createHmac("sha256", authSecret()).update(userId).digest("base64url");
-  const left = Buffer.from(mac);
-  const right = Buffer.from(expected);
+  const body = token.slice(0, index);
+  const left = Buffer.from(token.slice(index + 1));
+  const right = Buffer.from(sessionMac(body));
   if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
-  return userId;
+  const dot = body.indexOf(".");
+  return dot < 0 ? { userId: body, stamp: "l" } : { userId: body.slice(0, dot), stamp: body.slice(dot + 1) };
+}
+
+/**
+ * A session stays valid only while the account is linked as it was when the session was issued, so a cookie
+ * kept from a system-opened account stops working once its owner's BHD identity takes the account over.
+ */
+export function sessionValid(session: { stamp: string }, user: { bhdSub: string | null }) {
+  return session.stamp === sessionStamp(user.bhdSub);
+}
+
+/** The user id a cookie names (signature only): for attribution, never for access. */
+export function readSession(token?: string | null) {
+  return parseSession(token)?.userId ?? null;
+}
+
+/** The user id of a session that still grants access. */
+export async function sessionUserId(token?: string | null) {
+  const session = parseSession(token);
+  if (!session) return null;
+  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { bhdSub: true, disabledAt: true } });
+  return user && !user.disabledAt && sessionValid(session, user) ? session.userId : null;
 }
 
 /**
@@ -79,13 +109,13 @@ export function readSession(token?: string | null) {
  */
 export const getSessionUser = cache(async () => {
   const jar = await cookies();
-  const userId = readSession(jar.get(SESSION_COOKIE)?.value);
-  if (!userId) return null;
+  const session = parseSession(jar.get(SESSION_COOKIE)?.value);
+  if (!session) return null;
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { id: session.userId },
     include: { memberships: { include: { company: { include: { subscription: { include: { plan: true } } } } }, orderBy: { createdAt: "asc" } } },
   });
-  if (!user || user.disabledAt) return null;
+  if (!user || user.disabledAt || !sessionValid(session, user)) return null;
   const memberships = user.memberships.filter((item) => isRole(item.role));
   const wanted = jar.get(COMPANY_COOKIE)?.value;
   const active = memberships.find((item) => item.companyId === wanted) ?? memberships[0];

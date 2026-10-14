@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { COMPANY_COOKIE, SESSION_COOKIE, readSession } from "@/lib/auth";
+import { COMPANY_COOKIE, SESSION_COOKIE, sessionUserId } from "@/lib/auth";
 import { liveVersion } from "@/lib/live";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +21,7 @@ async function scopesFor(url: URL): Promise<string[] | null> {
     return invite && !invite.revokedAt ? [`t:${invite.taskId}`] : null;
   }
   const jar = await cookies();
-  const userId = readSession(jar.get(SESSION_COOKIE)?.value);
+  const userId = await sessionUserId(jar.get(SESSION_COOKIE)?.value);
   if (!userId) return null;
   const wanted = jar.get(COMPANY_COOKIE)?.value;
   const member =

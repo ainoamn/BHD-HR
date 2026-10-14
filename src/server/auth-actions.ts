@@ -59,7 +59,7 @@ export async function login(formData: FormData) {
     await recordLogin(user!.id, "LOCAL", meta);
     const jar = await cookies();
     jar.delete(COMPANY_COOKIE);
-    jar.set(SESSION_COOKIE, signSession(user!.id), sessionCookieOptions());
+    jar.set(SESSION_COOKIE, signSession(user!), sessionCookieOptions());
     redirect(user!.mustChangePassword ? "/password" : next);
   }
   if (process.env.NODE_ENV === "production" && user!.mustChangePassword) {
@@ -74,7 +74,7 @@ export async function login(formData: FormData) {
   await recordLogin(user!.id, "LOCAL", meta);
   const jar = await cookies();
   jar.delete(COMPANY_COOKIE);
-  jar.set(SESSION_COOKIE, signSession(user!.id), sessionCookieOptions());
+  jar.set(SESSION_COOKIE, signSession(user!), sessionCookieOptions());
   redirect(next);
 }
 
