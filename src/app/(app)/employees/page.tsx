@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookUser, KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
+import { BookUser, FileUp, KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { GetForm } from "@/components/get-form";
@@ -79,6 +79,12 @@ export default async function EmployeesPage({
           >
             <BookUser size={17} />
             {t("ملصقات الجوازات", "Passport stickers")}
+          </Link>
+        ) : null}
+        {allow.create ? (
+          <Link href="/employees/import" className={secondaryBtn}>
+            <FileUp size={17} />
+            {t("استيراد من Excel", "Import from Excel")}
           </Link>
         ) : null}
         {allow.create ? (

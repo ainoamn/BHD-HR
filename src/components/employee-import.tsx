@@ -1,0 +1,121 @@
+"use client";
+
+import { useActionState, useMemo } from "react";
+import { CircleAlert, CircleCheck, FileSpreadsheet, Upload } from "lucide-react";
+import { useLang } from "@/components/lang-provider";
+import { SubmitButton } from "@/components/submit-button";
+import { fieldClass } from "@/components/ui";
+import { importEmployees, previewEmployeeImport, type ImportPreview } from "@/server/import-actions";
+
+const SHOWN = ["fullName", "nationality", "idNumber", "passportNumber", "jobTitle", "joiningDate", "basicSalary"] as const;
+
+/** Upload → check every row → import the rows without problems. Nothing is saved before the second step. */
+export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
+  const { t } = useLang();
+  const [preview, upload, pending] = useActionState<ImportPreview | null, FormData>(previewEmployeeImport, null);
+  const valid = useMemo(() => preview?.rows.filter((row) => !row.errors.length) ?? [], [preview]);
+  const invalid = (preview?.rows.length ?? 0) - valid.length;
+
+  return (
+    <div className="space-y-5">
+      <form action={upload} className="flex flex-wrap items-end gap-3">
+        <label className="block min-w-0 flex-1 basis-64 space-y-1.5">
+          <span className="block text-sm font-medium text-slate-700">{t("ملف Excel ‏(‎.xlsx) أو CSV", "Excel (.xlsx) or CSV file")}</span>
+          <input type="file" name="file" required accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className={`${fieldClass} w-full`} />
+        </label>
+        <SubmitButton pendingLabel={t("جارٍ الفحص...", "Checking...")}>
+          <Upload size={16} />
+          {t("فحص الملف", "Check file")}
+        </SubmitButton>
+      </form>
+
+      {preview?.error ? (
+        <p className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-inset ring-red-200" role="alert">
+          <CircleAlert size={17} className="mt-0.5 shrink-0" />
+          {preview.error}
+        </p>
+      ) : null}
+
+      {preview && !preview.error && !pending ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+              <FileSpreadsheet size={16} className="text-teal-700" />
+              {preview.fileName}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-emerald-700">
+              <CircleCheck size={16} />
+              {t(`${valid.length} صف جاهز`, `${valid.length} ready`)}
+            </span>
+            {invalid ? (
+              <span className="inline-flex items-center gap-1.5 text-red-700">
+                <CircleAlert size={16} />
+                {t(`${invalid} صف فيه أخطاء ولن يُستورد`, `${invalid} with errors will be skipped`)}
+              </span>
+            ) : null}
+          </div>
+          {preview.ignored.length ? (
+            <p className="text-xs text-slate-500">
+              {t("أعمدة لم تُعرف وتُركت: ", "Columns not recognised and left out: ")}
+              {preview.ignored.join("، ")}
+            </p>
+          ) : null}
+          {preview.tooMany ? <p className="text-xs text-amber-700">{t("الملف فيه أكثر من 500 صف؛ عُرض أول 500 فقط.", "The file has more than 500 rows; only the first 500 are shown.")}</p> : null}
+
+          <div className="max-h-[60vh] overflow-auto rounded-xl ring-1 ring-inset ring-slate-200">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 text-start font-semibold">{t("السطر", "Line")}</th>
+                  {SHOWN.map((key) => (
+                    <th key={key} className="px-3 py-2 text-start font-semibold">
+                      {labels[key]}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 text-start font-semibold">{t("الحالة", "Status")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {preview.rows.map((row) => (
+                  <tr key={row.line} className={row.errors.length ? "bg-red-50" : undefined}>
+                    <td className="px-3 py-2 text-slate-500" dir="ltr">
+                      {row.line}
+                    </td>
+                    {SHOWN.map((key) => (
+                      <td key={key} className="max-w-[14rem] truncate px-3 py-2 text-slate-800">
+                        {row.values[key] || <span className="text-slate-300">—</span>}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2">
+                      {row.errors.length ? (
+                        <ul className="space-y-0.5 text-xs text-red-700">
+                          {row.errors.map((error) => (
+                            <li key={error}>{error}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <CircleCheck size={16} className="text-emerald-700" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {valid.length ? (
+            <form action={importEmployees}>
+              <input type="hidden" name="payload" value={JSON.stringify(valid.map((row) => row.values))} />
+              <SubmitButton
+                pendingLabel={t("جارٍ الاستيراد...", "Importing...")}
+                confirm={t(`إضافة ${valid.length} موظفاً إلى النظام؟`, `Add ${valid.length} employee(s) to the system?`)}
+              >
+                {t(`استيراد ${valid.length} موظفاً`, `Import ${valid.length} employee(s)`)}
+              </SubmitButton>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
