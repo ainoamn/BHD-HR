@@ -16,6 +16,8 @@ prisma/*.db-journal
 prisma/*.db-wal
 prisma/*.db-shm
 *.backup*.db
+backups/
+*.bhdb
 storage/uploads/*
 !storage/uploads/.gitkeep
 

@@ -1173,3 +1173,21 @@ model LiveSignal {
   scope String   @id
   at    DateTime @default(now())
 }
+
+/// One run of the daily encrypted backup (neon/backup, written with plain SQL); shown in Settings › System health.
+model BackupRun {
+  id         String    @id @default(cuid())
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean   @default(false)
+  /// Object key in the private "backups" bucket, e.g. daily/2026-10-14T22-00-00Z.bhdb.
+  objectKey  String?
+  bytes      Int       @default(0)
+  tables     Int       @default(0)
+  rows       Int       @default(0)
+  /// Files past the 30-day window deleted by this run.
+  removed    Int       @default(0)
+  error      String?
+
+  @@index([startedAt])
+}
