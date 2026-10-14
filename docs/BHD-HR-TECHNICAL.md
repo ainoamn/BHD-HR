@@ -621,7 +621,7 @@ sequenceDiagram
 
 **إدارة المنصة** `/admin` (`lib/platform.ts` → `requirePlatformAdmin`): من له `User.isPlatformAdmin` أو بريده في `PLATFORM_ADMIN_EMAILS`، ولا يحتاج عضوية. الصفحات: نظرة عامة، المنشآت وتفاصيلها، المدفوعات، الباقات، المستخدمون، سجل الإدارة، إعدادات المنصة. كل إجراء (`server/admin-actions.ts`) يفحص الصلاحية بنفسه ويكتب في `PlatformLog` مع IP. الحساب الموقوف (`disabledAt`) يُرفض في `getSessionUser` وفي الدخول المحلي والموحّد.
 
-**الصفحة العامة:** `middleware.ts` (المطابق `/` فقط) يعيد كتابة `/` إلى `/welcome` لمن لا يحمل كوكي `hr_session`، دون أي `Set-Cookie`. `/welcome` و`/pricing` تقرأ الباقات من القاعدة (`publicInfo`، مع الرجوع إلى `DEFAULT_PLANS` إن تعذّرت القاعدة).
+**الصفحة العامة:** `middleware.ts` يعيد كتابة `/` إلى `/welcome` لمن لا يحمل كوكي `hr_session`، دون أي `Set-Cookie`. ويحوّل (308) العنوان المكتوب بأحرف كبيرة (`/ADMIN`) إلى صفحته بأحرف صغيرة بدل 404، إلا المسارات التي تحمل رموزاً أو أسماء ملفات حساسة لحالة الأحرف (`portal`، `invite`، `files`، `verify`، `apply`، `task`، `letter`، `id`، `api`)؛ المطابق لا يستدعيه إلا لـ `/` وللمسارات التي فيها حرف كبير. `/welcome` و`/pricing` تقرأ الباقات من القاعدة (`publicInfo`، مع الرجوع إلى `DEFAULT_PLANS` إن تعذّرت القاعدة).
 
 ### الصلاحيات (لكل منشأة على حدة)
 
