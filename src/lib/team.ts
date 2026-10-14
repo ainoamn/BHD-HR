@@ -19,5 +19,6 @@ export async function requireTeam() {
   if (!user) redirect("/login?local=1&next=/team");
   if (user.username && user.mustChangePassword) redirect("/password");
   if (!isTeamRole(user.role)) redirect(homePath(user));
+  if (!user.access.active) redirect("/billing");
   return { user, scope: await teamScope(user) };
 }

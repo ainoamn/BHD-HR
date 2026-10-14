@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { cache } from "react";
 import { isPlaceholderEmail } from "./accounts";
 import { channelReady, sendEmailMessage } from "./delivery";
 import { prisma } from "./prisma";
@@ -48,18 +47,18 @@ export async function companyFromCookieHeader(header: string | string[] | undefi
   return memberships.find((member) => member.companyId === jar[COMPANY_COOKIE])?.companyId ?? memberships[0]?.companyId ?? null;
 }
 
-/** The oldest company runs the platform: its admins see errors that belong to no company, and the backups. */
-export const platformCompanyId = cache(async () => {
-  const company = await prisma.company.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
-  return company?.id ?? null;
-});
-
+/** A company's errors go to its admins; errors that belong to no company go to the platform admins. */
 async function notifyAdmins(companyId: string | null, subject: string, text: string) {
   if (!channelReady("EMAIL")) return;
-  const target = companyId ?? (await platformCompanyId());
-  if (!target) return;
-  const admins = await prisma.membership.findMany({ where: { companyId: target, role: "ADMIN", acceptedAt: { not: null } }, include: { user: { select: { email: true } } } });
-  const emails = [...new Set(admins.map((admin) => admin.user?.email || admin.email).filter((email) => email && !isPlaceholderEmail(email)))];
+  const emails = companyId
+    ? [
+        ...new Set(
+          (await prisma.membership.findMany({ where: { companyId, role: "ADMIN", acceptedAt: { not: null } }, include: { user: { select: { email: true } } } }))
+            .map((admin) => admin.user?.email || admin.email)
+            .filter((email) => email && !isPlaceholderEmail(email)),
+        ),
+      ]
+    : (await prisma.user.findMany({ where: { isPlatformAdmin: true, disabledAt: null }, select: { email: true } })).map((user) => user.email);
   for (const to of emails) {
     try {
       await sendEmailMessage({ to, subject, text, dir: "ltr" });
@@ -111,7 +110,6 @@ export async function backupStatus(now = new Date()) {
 }
 
 /** Open error groups this admin should see: their company's, plus the platform's when they run the platform. */
-export async function visibleErrorScope(companyId: string) {
-  const platform = (await platformCompanyId()) === companyId;
+export function visibleErrorScope(companyId: string, platform: boolean) {
   return { platform, where: platform ? { OR: [{ companyId }, { companyId: null }] } : { companyId } };
 }

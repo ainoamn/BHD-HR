@@ -6,6 +6,7 @@ import { attendanceChoices, leaveApplies, type LeaveTypeInfo, LEAVE_CHOICE } fro
 import { deviceTrusted } from "./portal-device";
 import { prisma } from "./prisma";
 import { lookupByToken } from "./rate-limit";
+import { companyAccess } from "./subscription";
 
 export function newPortalToken() {
   return randomBytes(24).toString("base64url");
@@ -27,9 +28,13 @@ export const findPortalEmployee = cache((token: string) =>
   }),
 );
 
-/** The employee behind a portal link for pages and actions: a browser that has not passed the new-device check is sent to it. */
+/**
+ * The employee behind a portal link for pages and actions: a browser that has not passed the new-device check is
+ * sent to it, and every portal pauses while the company's subscription is closed.
+ */
 export async function portalEmployee(token: string) {
   const employee = await findPortalEmployee(token);
+  if (employee && !(await companyAccess(employee.companyId)).active) redirect("/paused");
   if (employee && !(await deviceTrusted(employee))) redirect(`/portal/${token}/verify`);
   return employee;
 }

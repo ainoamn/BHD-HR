@@ -13,7 +13,7 @@ const BACK = "/settings/system";
 export async function resolveErrors(formData: FormData) {
   const user = await requireAdmin(BACK);
   const { t } = await getI18n();
-  const { where } = await visibleErrorScope(user.companyId);
+  const { where } = visibleErrorScope(user.companyId, user.platformAdmin);
   const id = req(formData, "id");
   const { count } = await prisma.errorEvent.updateMany({ where: { ...where, resolvedAt: null, ...(id ? { id } : {}) }, data: { resolvedAt: new Date() } });
   go(BACK, { message: t(`عُلّم ${count} خطأ كمحلول`, `${count} error(s) marked solved`) });

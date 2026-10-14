@@ -4,6 +4,7 @@ import { aiDailyBrief } from "./ai";
 import { type AlertItem, computeAlerts } from "./alerts";
 import { type Lang, makeT } from "./i18n";
 import { prisma } from "./prisma";
+import { aiOpen } from "./subscription";
 
 /** The model reads at most this many alerts; the rest are counted in the opening sentence. */
 const FACT_LIMIT = 40;
@@ -55,6 +56,7 @@ export async function getDailyBrief(company: Company, permissions: readonly stri
   }
   const { alerts, facts } = await briefFacts(company, permissions, lang);
   if (!facts.length) return { text: fallbackBrief([], lang), ai: false, alertCount: 0, createdAt: new Date() };
+  if (!(await aiOpen(company.id))) return { text: fallbackBrief(alerts, lang), ai: false, alertCount: alerts.length, createdAt: new Date() };
   let text: string | null = null;
   try {
     text = await aiDailyBrief({ lang, companyName: lang === "en" && company.nameEn ? company.nameEn : company.name, today: key.day, facts });

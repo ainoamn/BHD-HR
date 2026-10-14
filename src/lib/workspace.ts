@@ -1,6 +1,8 @@
 import { isPlaceholderEmail } from "./accounts";
 import { writeAudit } from "./audit";
 import type { IdentityProfile } from "./bhd/identity";
+import { type LoginMeta, recordLogin } from "./login-events";
+import { startTrial } from "./platform";
 import { prisma } from "./prisma";
 
 /** A system-opened account that now signs in through BHD: its own username and password stop working. */
@@ -64,9 +66,10 @@ export async function mergeLocalAccounts(user: { id: string; email: string; name
  * through BHD from then on. Then the person's other such accounts merge in, invitations for the email attach,
  * and an account with no access anywhere gets its own company.
  */
-export async function signInBhdUser(profile: IdentityProfile) {
+export async function signInBhdUser(profile: IdentityProfile, meta: LoginMeta = {}) {
   const email = profile.email.toLowerCase();
   const bySub = await prisma.user.findUnique({ where: { bhdSub: profile.sub } });
+  if (bySub?.disabledAt) throw new Error("account_disabled");
   let user;
   if (bySub) {
     user = await prisma.user.update({
@@ -78,6 +81,7 @@ export async function signInBhdUser(profile: IdentityProfile) {
     const [local] = byEmail ? [] : await localAccountsFor(email);
     if (byEmail) {
       if (byEmail.bhdSub) throw new Error("email_linked");
+      if (byEmail.disabledAt) throw new Error("account_disabled");
       user = await prisma.user.update({
         where: { id: byEmail.id },
         data: { bhdSub: profile.sub, picture: profile.picture, lastLoginAt: new Date(), ...(byEmail.username ? BHD_ONLY : {}) },
@@ -97,7 +101,8 @@ export async function signInBhdUser(profile: IdentityProfile) {
   }
   await mergeLocalAccounts(user);
   await linkInvitations(user);
-  await ensureWorkspace(user);
+  await ensureWorkspace(user, meta.ip);
+  await recordLogin(user.id, "BHD", meta);
   return user;
 }
 
@@ -121,15 +126,16 @@ export async function linkInvitations(user: { id: string; email: string }) {
 
 /**
  * BHD-UNIFIED-LOGIN-AND-APPS §0.7: an account with no access anywhere gets its own company as ADMIN
- * of that company only — never a seat in someone else's data.
+ * of that company only — never a seat in someone else's data. The company starts on the free trial.
  */
-export async function ensureWorkspace(user: { id: string; email: string; name: string }) {
+export async function ensureWorkspace(user: { id: string; email: string; name: string }, ip?: string | null) {
   const count = await prisma.membership.count({ where: { userId: user.id } });
   if (count > 0) return null;
-  const company = await prisma.company.create({ data: { name: user.name || user.email } });
+  const company = await prisma.company.create({ data: { name: user.name || user.email, signupIp: ip && ip !== "local" ? ip.slice(0, 64) : null } });
   await prisma.membership.create({
-    data: { companyId: company.id, userId: user.id, email: user.email.toLowerCase(), role: "ADMIN" },
+    data: { companyId: company.id, userId: user.id, email: user.email.toLowerCase(), role: "ADMIN", acceptedAt: new Date() },
   });
+  await startTrial(company.id);
   await writeAudit({
     companyId: company.id,
     userId: user.id,

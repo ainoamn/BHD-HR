@@ -918,6 +918,38 @@ export const HELP_TOPICS: HelpTopic[] = [
     related: ["settings", "roles"],
     keywords: "صحة النظام أخطاء نسخ احتياطي حماية تخمين محاولات system health errors backup rate limit security",
   },
+  {
+    slug: "subscription",
+    group: "admin",
+    audience: ["staff"],
+    href: "/billing",
+    title: b("الاشتراك والباقة والدفع", "Subscription, plan and payment"),
+    summary: b(
+      "تجربة مجانية بكل المزايا، ثم باقة حسب عدد موظفيك ومستخدميك، تدفعها بالبطاقة أو بالتحويل وتتفعّل فوراً.",
+      "A free trial with every feature, then a plan sized to your employees and users, paid by card or transfer and active at once.",
+    ),
+    steps: [
+      b("القائمة ← «الاشتراك والباقة» (لمسؤول المنشأة): حالة الاشتراك وتاريخ الانتهاء، وعدد الموظفين والمستخدمين مقابل حد الباقة، والمزايا المشمولة.", "Menu → “Subscription” (company admins): status and end date, employees and users against the plan limit, and the included features."),
+      b("اختر «شهري» أو «سنوي» (السنوي أوفر)، ثم الباقة.", "Choose “Monthly” or “Yearly” (yearly saves more), then the plan."),
+      b("«ادفع بالبطاقة»: صفحة ثواني الآمنة، وتعود إلى النظام والباقة مفعّلة والإيصال في بريدك.", "“Pay by card”: Thawani's secure page, then back to the system with the plan active and the receipt in your email."),
+      b("«ادفع بالتحويل»: حوّل إلى الحساب المعروض، واكتب رقم العملية وأرسل الطلب؛ تتفعّل الباقة عند تأكيد وصول المبلغ.", "“Pay by transfer”: transfer to the account shown, enter the transaction number and send; the plan starts once the money is confirmed."),
+      b("«سجل المدفوعات»: كل دفعة وحالتها وإيصالها للطباعة.", "“Payment history”: every payment, its status and a printable receipt."),
+    ],
+    sections: [
+      {
+        title: b("ما يجب معرفته", "Good to know"),
+        items: [
+          b("الأساسيات (الموظفون، الرواتب وWPS والحماية الاجتماعية، الحضور والإجازات، المستندات، البوابة، الطلبات) في كل باقة؛ الوحدات المتقدمة والذكاء الاصطناعي حسب الباقة.", "The essentials (employees, payroll with WPS and social protection, attendance and leave, documents, portal, requests) are in every plan; advanced modules and AI depend on the plan."),
+          b("الموظفون المحتسبون من لم تنتهِ خدمتهم؛ المستخدمون هم أعضاء النظام فقط، لا حسابات البوابة.", "Counted employees are those still in service; users are system members only, not portal accounts."),
+          b("التجديد بنفس الباقة يبدأ من نهاية الحالية؛ تغيير الباقة يبدأ فوراً وتُحتسب أيامك المدفوعة المتبقية.", "Renewing the same plan continues from the current end; switching starts now and credits your unused paid days."),
+          b("تذكير بالبريد قبل الانتهاء بـ 7 و3 أيام ويوم، ومهلة 3 أيام بعده. بعدها يتوقف الدخول والبوابة حتى الدفع، والبيانات محفوظة.", "Email reminders 7, 3 and 1 day before the end, and 3 days' grace after. Then access and the portal pause until payment; your data is kept."),
+        ],
+      },
+    ],
+    tips: [b("عند بلوغ حد الموظفين أو المستخدمين يرفض النظام الإضافة برسالة؛ رقِّ الباقة من هذه الصفحة.", "When the employee or user limit is reached the system refuses with a message; upgrade from this page.")],
+    related: ["settings", "roles"],
+    keywords: "اشتراك باقة دفع فاتورة إيصال تجديد ترقية ثواني تحويل subscription plan billing payment receipt renew upgrade thawani",
+  },
 
   // ───────────── Employee portal
   {

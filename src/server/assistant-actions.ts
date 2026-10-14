@@ -6,6 +6,7 @@ import { can, getSessionUser, isStaffRole } from "@/lib/auth";
 import { refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { NOTE_KINDS, TASK_PRIORITIES, type TaskPriority } from "@/lib/tasks";
 import { parseDateInput } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export async function askAssistant(history: AssistantTurn[]): Promise<AssistantR
   const user = await getSessionUser();
   if (!user) return { error: t("انتهت الجلسة. سجّل الدخول من جديد.", "Your session ended. Sign in again.") };
   if (!isStaffRole(user.role)) return { error: t("المساعد متاح لفريق الموارد البشرية فقط.", "The assistant is for the HR team only.") };
+  if (!(await aiOpen(user.companyId))) return { error: aiLockedMessage(t) };
   const turns = (Array.isArray(history) ? history : [])
     .filter((turn) => turn && (turn.role === "user" || turn.role === "assistant") && typeof turn.text === "string" && turn.text.trim())
     .slice(-MAX_TURNS)

@@ -8,6 +8,7 @@ import { go, refreshAll } from "@/lib/http";
 import type { Lang } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { requestOrigin } from "@/lib/request-origin";
 import { isEmail, newTaskInviteToken, sendTaskInvite } from "@/lib/task-invites";
 import { mentionedIn, notifyTask, taskMembers } from "@/lib/task-members";
@@ -583,6 +584,7 @@ export async function suggestTaskItems(formData: FormData): Promise<ActionResult
   const { t } = await getI18n();
   return inPage(async () => {
     const task = await liveTask(user.companyId, req(formData, "taskId"), t);
+    if (!(await aiOpen(user.companyId))) fail(aiLockedMessage(t));
     let steps: string[] = [];
     try {
       steps = await aiTaskChecklist(task.title, task.description);

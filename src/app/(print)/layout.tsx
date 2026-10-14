@@ -6,5 +6,6 @@ export const dynamic = "force-dynamic";
 export default async function PrintLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   if (!isStaffRole(user.role)) redirect(homePath(user));
+  if (!user.access.active) redirect("/billing");
   return <div className="min-h-screen bg-slate-100 print:bg-white">{children}</div>;
 }

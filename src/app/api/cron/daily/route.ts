@@ -1,13 +1,16 @@
 import { isPlaceholderEmail } from "@/lib/accounts";
+import { remindSubscriptions, settleStalePayments } from "@/lib/billing";
 import { getDailyBrief } from "@/lib/brief";
 import { channelReady, sendEmailMessage, sendPendingCopies } from "@/lib/delivery";
 import { BACKUP_GRACE_HOURS, backupStatus, recordError } from "@/lib/errors";
 import { issueDueLetterDrafts } from "@/lib/letter-drafts";
+import { purgeOldLogins } from "@/lib/login-events";
 import { remindExpiringDocuments } from "@/lib/notify";
 import { permissionsFor } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { purgeExpiredLimits } from "@/lib/rate-limit";
 import { originOf } from "@/lib/request-origin";
+import { companyAccess } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,6 +39,7 @@ async function runDaily(origin: string) {
   const companies = await prisma.company.findMany({ include: { memberships: { where: { acceptedAt: { not: null }, role: { in: ["ADMIN", "MANAGER"] } }, include: { user: true } } } });
   const results: { company: string; sent: number; failed: number; briefs: number; errors: number }[] = [];
   for (const { memberships, ...company } of companies) {
+    if (!(await companyAccess(company.id)).active) continue;
     const copies = await sendPendingCopies(company.id, origin);
     let briefs = 0;
     let errors = 0;
@@ -65,5 +69,8 @@ async function runDaily(origin: string) {
   }
   const limitsCleared = await purgeExpiredLimits();
   const expiryReminders = await remindExpiringDocuments(origin);
-  return { ok: true, emailReady, scheduledLetters, results, backupOverdue: backup.overdue, limitsCleared, expiryReminders };
+  const paymentsSettled = await settleStalePayments();
+  const subscriptionReminders = await remindSubscriptions(origin);
+  const loginsPurged = await purgeOldLogins();
+  return { ok: true, emailReady, scheduledLetters, results, backupOverdue: backup.overdue, limitsCleared, expiryReminders, paymentsSettled, subscriptionReminders, loginsPurged };
 }

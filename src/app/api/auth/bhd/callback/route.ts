@@ -10,6 +10,7 @@ import {
   verifyIdentity,
   type IdentityProfile,
 } from "@/lib/bhd/identity";
+import { requestMeta } from "@/lib/login-events";
 import { originOf } from "@/lib/request-origin";
 import { signInBhdUser } from "@/lib/workspace";
 
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
 
   let userId: string;
   try {
-    userId = (await signInBhdUser(profile)).id;
+    userId = (await signInBhdUser(profile, requestMeta(request))).id;
   } catch (error) {
     return failure(origin, error instanceof Error ? error.message.slice(0, 40) : "user");
   }

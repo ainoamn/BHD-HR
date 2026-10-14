@@ -14,6 +14,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   CircleHelp,
+  CreditCard,
   Files,
   HandCoins,
   History,
@@ -88,11 +89,12 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
     items: [
       { href: "/activity", ar: "سجل العمليات", en: "Activity log", icon: History },
       { href: "/settings", ar: "الإعدادات", en: "Settings", icon: Settings },
+      { href: "/billing", ar: "الاشتراك والباقة", en: "Subscription", icon: CreditCard, short: { ar: "الاشتراك", en: "Subscription" } },
     ],
   },
 ];
 
-const ALWAYS = ["/", "/notifications", "/assistant", "/settings", "/help"];
+const ALWAYS = ["/", "/notifications", "/settings", "/help"];
 /** Bottom bar on phones: the first four of these the user may open, then "More". */
 const BOTTOM_PREFERENCE = ["/", "/assistant", "/employees", "/tasks", "/salaries", "/attendance", "/documents", "/pay-items", "/reports", "/employers", "/calendar", "/letters"];
 

@@ -4,20 +4,26 @@ import { aiTranslateTexts, aiWrite, isRateLimited, type WriteMode } from "@/lib/
 import { getSessionUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { portalEmployee } from "@/lib/portal";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { inviteByToken } from "@/lib/task-invites";
 
 const MAX_TEXTS = 60;
 const MAX_TEXT = 2000;
 const MAX_TOTAL = 16000;
 
-/** Signed-in users, or someone on a page opened by a valid link (task invite, employee portal). */
-async function allowed(path: string) {
-  if (await getSessionUser()) return true;
+/** The company of a signed-in user, or of a page opened by a valid link (task invite, employee portal). */
+async function callerCompany(path: string) {
+  const user = await getSessionUser();
+  if (user) return user.companyId;
   const [, area, token] = String(path || "").split("/");
-  if (!token) return false;
-  if (area === "task") return Boolean(await inviteByToken(token));
-  if (area === "portal") return Boolean(await portalEmployee(token));
-  return false;
+  if (!token) return null;
+  if (area === "task") return (await inviteByToken(token))?.task.companyId ?? null;
+  if (area === "portal") return (await portalEmployee(token))?.companyId ?? null;
+  return null;
+}
+
+async function allowed(path: string) {
+  return Boolean(await callerCompany(path));
 }
 
 async function failure(error: unknown) {
@@ -49,7 +55,9 @@ export type WriteHelp = { text?: string; suggestions?: string[]; error?: string 
 /** Translate, polish or suggest text for the field being typed in. Nothing is saved; the user decides. */
 export async function writeHelp(input: { mode: WriteMode; text: string; label: string; context: string; multiline: boolean; maxLength: number }, path: string): Promise<WriteHelp> {
   const { lang, t } = await getI18n();
-  if (!(await allowed(path))) return { error: t("سجّل الدخول أولاً", "Sign in first") };
+  const companyId = await callerCompany(path);
+  if (!companyId) return { error: t("سجّل الدخول أولاً", "Sign in first") };
+  if (!(await aiOpen(companyId))) return { error: aiLockedMessage(t) };
   const mode: WriteMode = input.mode === "translate" || input.mode === "improve" ? input.mode : "suggest";
   const text = String(input.text || "").trim().slice(0, 3000);
   if (mode !== "suggest" && !text) return { error: t("اكتب النص أولاً", "Type the text first") };

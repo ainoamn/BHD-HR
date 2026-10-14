@@ -1,17 +1,18 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { COMPANY_COOKIE, SESSION_COOKIE, readSession, requireUser, sessionCookieOptions, signSession } from "@/lib/auth";
 import { endSessionUrl, isSsoConfigured, safeReturnPath } from "@/lib/bhd/identity";
 import { requestOrigin } from "@/lib/request-origin";
 import { go } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
+import { recordLogin } from "@/lib/login-events";
 import { verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { LIMITS, clearLimit, clientIp, hitLimit, isLimited, limitKey, waitText } from "@/lib/rate-limit";
 import { req, str } from "@/lib/utils";
-import { ensureWorkspace, linkInvitations } from "@/lib/workspace";
+import { ensureWorkspace } from "@/lib/workspace";
 
 /** Email or the username of an account opened for an employee or sponsor. */
 export async function login(formData: FormData) {
@@ -49,11 +50,13 @@ export async function login(formData: FormData) {
     go(back, { error: t("اسم المستخدم أو كلمة المرور غير صحيحة", "Wrong username or password") });
   }
   await clearLimit(accountKey);
+  if (user!.disabledAt) go(back, { error: t("هذا الحساب موقوف من إدارة المنصة.", "This account was suspended by the platform administration.") });
+  const meta = { ip: await clientIp(), userAgent: (await headers()).get("user-agent") };
   if (user!.username) {
     if (!(await prisma.membership.count({ where: { userId: user!.id } }))) {
       go(back, { error: t("هذا الحساب موقوف. تواصل مع الموارد البشرية.", "This account is closed. Contact HR.") });
     }
-    await prisma.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date() } });
+    await recordLogin(user!.id, "LOCAL", meta);
     const jar = await cookies();
     jar.delete(COMPANY_COOKIE);
     jar.set(SESSION_COOKIE, signSession(user!.id), sessionCookieOptions());
@@ -67,9 +70,8 @@ export async function login(formData: FormData) {
       ),
     });
   }
-  await prisma.user.update({ where: { id: user!.id }, data: { lastLoginAt: new Date() } });
-  await linkInvitations(user!);
-  await ensureWorkspace(user!);
+  await ensureWorkspace(user!, meta.ip);
+  await recordLogin(user!.id, "LOCAL", meta);
   const jar = await cookies();
   jar.delete(COMPANY_COOKIE);
   jar.set(SESSION_COOKIE, signSession(user!.id), sessionCookieOptions());

@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { packageGross } from "@/lib/salary";
 import { keptSelfMarks, readSelfMarks } from "@/lib/self-data";
+import { fitsLimit, limitMessage } from "@/lib/subscription";
 import { newBadgeToken } from "@/lib/badge";
 import { mimeFor, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
@@ -155,6 +156,10 @@ export async function createEmployee(formData: FormData) {
   const salaryAccess = can(user, "salaries.edit");
   if (!salaryAccess) Object.assign(input, { basicSalary: 0, housingAllowance: 0, transportAllowance: 0, otherAllowance: 0, bankBic: null, bankAccount: null });
   if (input.fullName.length < 2) go("/employees/new", { error: t("الاسم الكامل مطلوب", "Full name is required") });
+  if (input.status !== "TERMINATED") {
+    const room = await fitsLimit(user.companyId, "employees");
+    if (!room.ok) go("/employees/new", { error: limitMessage("employees", room, t) });
+  }
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : [];
   const employerId = await resolveEmployer(formData, user, "/employees/new");
   const managerId = await resolveManager(formData, user.companyId, null, "/employees/new");
@@ -227,6 +232,10 @@ export async function updateEmployee(formData: FormData) {
   }
   const errorPath = `/employees/${id}/edit`;
   if (input.fullName.length < 2) go(errorPath, { error: t("الاسم الكامل مطلوب", "Full name is required") });
+  if (existing!.status === "TERMINATED" && input.status !== "TERMINATED") {
+    const room = await fitsLimit(user.companyId, "employees");
+    if (!room.ok) go(errorPath, { error: limitMessage("employees", room, t) });
+  }
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : null;
   const employerId = await resolveEmployer(formData, user, errorPath);
   const managerId = await resolveManager(formData, user.companyId, id, errorPath);
@@ -346,6 +355,8 @@ export async function bulkEmployees(formData: FormData) {
     if (!STATUS_LABEL[status]) go(back, { error: t("اختر الحالة", "Choose the status") });
     const ending = employees.filter((employee) => status === "TERMINATED" && employee.status !== "TERMINATED").map((employee) => employee.id);
     const returning = employees.filter((employee) => status !== "TERMINATED" && employee.status === "TERMINATED").map((employee) => employee.id);
+    const room = await fitsLimit(user.companyId, "employees", returning.length);
+    if (!room.ok) go(back, { error: limitMessage("employees", room, t) });
     await prisma.$transaction([
       prisma.employee.updateMany({ where: { companyId: user.companyId, id: { in: employees.map((employee) => employee.id) } }, data: { status } }),
       prisma.employee.updateMany({ where: { id: { in: ending } }, data: { terminatedAt: new Date() } }),

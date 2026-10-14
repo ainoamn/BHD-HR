@@ -9,6 +9,7 @@ import { LiveUpdates } from "@/components/live-updates";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { hasFeature } from "@/lib/subscription";
 import { ACCOUNT_ROLE_LABEL, requireTeam } from "@/lib/team";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/utils";
 import { logout, switchCompany } from "@/server/auth-actions";
@@ -79,7 +80,7 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
         </div>
       </nav>
       <main className="page-wide px-4 py-5 sm:px-6">{children}</main>
-      <AiWriteAssist />
+      {hasFeature(user.access, "ai") ? <AiWriteAssist /> : null}
       <LiveUpdates />
     </div>
   );

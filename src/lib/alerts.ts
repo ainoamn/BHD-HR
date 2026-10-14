@@ -43,15 +43,15 @@ export const getAlerts = cache(async () => {
   const [personal, shared, system] = await Promise.all([
     taskNotices(user.id, user.companyId, lang),
     computeAlerts(user.company, user.permissions, lang),
-    user.role === "ADMIN" ? systemAlerts(user.companyId, lang) : [],
+    user.role === "ADMIN" ? systemAlerts(user.companyId, user.platformAdmin, lang) : [],
   ]);
   return [...personal, ...system, ...shared];
 });
 
 /** For admins: open errors their company (or, for the platform company, the whole system) ran into, and a missed backup. */
-async function systemAlerts(companyId: string, lang: Lang): Promise<AlertItem[]> {
+async function systemAlerts(companyId: string, platformAdmin: boolean, lang: Lang): Promise<AlertItem[]> {
   const t = makeT(lang);
-  const { platform, where } = await visibleErrorScope(companyId);
+  const { platform, where } = visibleErrorScope(companyId, platformAdmin);
   const [open, backups] = await Promise.all([
     prisma.errorEvent.aggregate({ where: { ...where, resolvedAt: null }, _count: true, _max: { lastAt: true } }),
     platform ? backupStatus() : null,

@@ -8,6 +8,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { DEFAULT_CRITERIA, type Criterion, overallOf, parseCriteria, parseScores, reviewFacts } from "@/lib/performance";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { clip, formatDate, parseDateInput, req, str } from "@/lib/utils";
 
 const LIST = "/performance";
@@ -158,6 +159,7 @@ export async function draftReview(formData: FormData) {
   if (!review) go(LIST, { error: t("التقييم غير موجود", "Review not found") });
   const back = `${LIST}/reviews/${review!.id}`;
   if (review!.cycle.status === "CLOSED" || review!.status === "DONE") go(back, { error: t("أعد التقييم إلى المسودة أولاً", "Move the review back to draft first") });
+  if (!(await aiOpen(user.companyId))) go(back, { error: aiLockedMessage(t) });
   const criteria = parseCriteria(review!.cycle.criteria);
   const facts = await reviewFacts(review!.employeeId, user.companyId, review!.cycle.periodStart, review!.cycle.periodEnd, lang);
   const scores = parseScores(review!.scores);

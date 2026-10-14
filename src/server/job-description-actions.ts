@@ -8,6 +8,7 @@ import { go, refreshAll } from "@/lib/http";
 import { JD_LISTS, readJobDescription, sanitizeJobDescription } from "@/lib/job-description";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { req } from "@/lib/utils";
 
 async function load(formData: FormData) {
@@ -27,6 +28,7 @@ async function load(formData: FormData) {
 /** Drafts the bilingual description for the employee's job title; it is shared by everyone with that title. */
 export async function generateJobDescription(formData: FormData) {
   const { user, employee, jobTitle, back, t } = await load(formData);
+  if (!(await aiOpen(user.companyId))) go(back, { error: aiLockedMessage(t) });
   let draft: ReturnType<typeof readJobDescription> = null;
   try {
     const result = await aiJobDescription({

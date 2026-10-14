@@ -4,6 +4,7 @@ import { aiOwnerInsights, isRateLimited } from "@/lib/ai";
 import { analyticsFacts, loadAnalytics } from "@/lib/analytics";
 import { can, getSessionUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 
 export type InsightsResult = { text?: string; error?: string };
 
@@ -12,6 +13,7 @@ export async function ownerInsights(): Promise<InsightsResult> {
   const { lang, t } = await getI18n();
   const user = await getSessionUser();
   if (!user || !can(user, "reports.view")) return { error: t("ليست لديك صلاحية", "You do not have permission") };
+  if (!(await aiOpen(user.companyId))) return { error: aiLockedMessage(t) };
   const withMoney = can(user, "salaries.view");
   try {
     const data = await loadAnalytics(user.companyId, { money: withMoney });

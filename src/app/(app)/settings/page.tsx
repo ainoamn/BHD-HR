@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { Activity, BellRing, Building2, CalendarClock, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
+import { Activity, BellRing, Building2, CalendarClock, ChevronLeft, ChevronRight, CreditCard, Crown, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
 import { WorkSitePicker } from "@/components/work-site-picker";
 import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
@@ -24,6 +24,7 @@ import { isPlaceholderEmail } from "@/lib/accounts";
 import { openAccountsForAll, saveRolePermissions } from "@/server/account-actions";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
+import { ACCESS_LABEL, ACCESS_TONE } from "@/lib/subscription";
 import { formatDate } from "@/lib/utils";
 import { sendPendingLetterCopies } from "@/server/letter-actions";
 import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateLetterIssuing, updateMemberAccess, updateProfile, updateSignatureSettings } from "@/server/settings-actions";
@@ -148,7 +149,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       : []),
   ];
   const Chevron = lang === "en" ? ChevronRight : ChevronLeft;
-  const errorScope = isAdmin ? await visibleErrorScope(user.companyId) : null;
+  const errorScope = isAdmin ? visibleErrorScope(user.companyId, user.platformAdmin) : null;
   const platformAdmin = Boolean(errorScope?.platform);
   const [openErrors, backupOverdue] = errorScope
     ? await Promise.all([prisma.errorEvent.count({ where: { ...errorScope.where, resolvedAt: null } }), platformAdmin ? backupStatus().then((status) => status.overdue) : false])
@@ -235,6 +236,52 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 {backupOverdue ? <ToneBadge tone="red">{t("النسخ الاحتياطي متأخر", "Backup overdue")}</ToneBadge> : null}
                 <Chevron size={18} className="text-slate-400 transition group-hover:text-teal-700" />
               </span>
+            </Link>
+          ) : null}
+
+          {isAdmin ? (
+            <Link
+              href="/billing"
+              className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal-200"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+                  <CreditCard size={19} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-slate-900">{t("الاشتراك والباقة", "Subscription & plan")}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                    {t("الباقة الحالية وحدودها، الدفع والتجديد، وسجل الإيصالات.", "Your plan and its limits, payment and renewal, and receipts.")}
+                  </span>
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <ToneBadge tone={ACCESS_TONE[user.access.state]}>
+                  {user.access.planName ? `${user.access.planName[lang]} · ` : ""}
+                  {ACCESS_LABEL[user.access.state][lang]}
+                </ToneBadge>
+                <Chevron size={18} className="text-slate-400 transition group-hover:text-teal-700" />
+              </span>
+            </Link>
+          ) : null}
+
+          {user.platformAdmin ? (
+            <Link
+              href="/admin"
+              className="group flex items-center justify-between gap-4 rounded-2xl border border-gold-200 bg-gold-50 p-4 shadow-card transition hover:-translate-y-0.5"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface text-gold-700 ring-1 ring-inset ring-gold-200">
+                  <Crown size={19} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-slate-900">{t("إدارة المنصة", "Platform admin")}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-600">
+                    {t("كل الشركات، الباقات، المدفوعات والمستخدمين.", "All companies, plans, payments and users.")}
+                  </span>
+                </span>
+              </span>
+              <Chevron size={18} className="shrink-0 text-gold-700" />
             </Link>
           ) : null}
 
@@ -496,6 +543,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               {user.bhdSub ? (
                 <Field label={t("البريد", "Email")} hint={t("مرتبط بحساب BHD الموحّد.", "Linked to your unified BHD account.")}>
                   <input className={`${fieldClass} w-full`} dir="ltr" value={user.email} readOnly />
+                </Field>
+              ) : user.username ? (
+                <Field
+                  label={t("اسم المستخدم", "Username")}
+                  hint={t("بريدك يُدار من سجلك لدى الموارد البشرية، ويُربط حسابك بحساب BHD الذي يحمل البريد نفسه.", "Your email is managed on your HR record; your account links to the BHD account with that same email.")}
+                >
+                  <input className={`${fieldClass} w-full`} dir="ltr" value={user.username} readOnly />
                 </Field>
               ) : (
                 <Field
@@ -805,6 +859,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   </form>
                 </Modal>
               </SectionHead>
+
+              <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                <ToneBadge tone={user.access.maxUsers !== null && members.length >= user.access.maxUsers ? "amber" : "teal"}>
+                  {user.access.maxUsers === null
+                    ? t(`${members.length} مستخدم`, `${members.length} user(s)`)
+                    : t(`${members.length} من ${user.access.maxUsers} مستخدم في باقتك`, `${members.length} of ${user.access.maxUsers} users in your plan`)}
+                </ToneBadge>
+                {user.access.maxUsers !== null ? (
+                  <Link href="/billing" className="font-semibold text-teal-700 hover:underline">
+                    {t("ترقية الباقة", "Upgrade plan")}
+                  </Link>
+                ) : null}
+              </p>
 
               {justInvited?.inviteToken ? (
                 <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50/60 p-4">

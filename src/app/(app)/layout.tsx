@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { KeyRound } from "lucide-react";
+import { CreditCard, KeyRound, Megaphone } from "lucide-react";
 import { TranslateToggle } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
 import { AppFrame } from "@/components/app-frame";
@@ -15,7 +15,9 @@ import { redirect } from "next/navigation";
 import { can, homePath, isStaffRole, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { MODULES, MODULE_HREF } from "@/lib/permissions";
+import { platformConfig } from "@/lib/platform";
 import { decidableTypes } from "@/lib/requests";
+import { hasFeature } from "@/lib/subscription";
 import { SIDEBAR_COOKIE, THEME_COOKIE, formatLongDate, normalizeTheme } from "@/lib/utils";
 import { logout, switchCompany } from "@/server/auth-actions";
 
@@ -25,8 +27,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   if (user.username && user.mustChangePassword) redirect("/password");
   if (!isStaffRole(user.role)) redirect(homePath(user));
+  if (!user.access.active) redirect("/billing");
   const { lang, t } = await getI18n();
-  const alerts = await getAlerts();
+  const [alerts, config] = await Promise.all([getAlerts(), platformConfig()]);
   const jar = await cookies();
   const sidebarCollapsed = jar.get(SIDEBAR_COOKIE)?.value === "collapsed";
   const theme = normalizeTheme(jar.get(THEME_COOKIE)?.value);
@@ -44,7 +47,53 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(user, "employees.view")) allowed.push("/org");
   if (can(user, "attendance.view") || can(user, "documents.view") || can(user, "expenses.view") || decidableTypes(user).length) allowed.push("/approvals");
   if (can(user, "reports.view")) allowed.push("/analytics");
+  if (user.role === "ADMIN") allowed.push("/billing");
+  if (hasFeature(user.access, "ai")) allowed.push("/assistant");
   const companyName = (company: { name: string; nameEn: string | null }) => (lang === "en" && company.nameEn ? company.nameEn : company.name);
+  const { access } = user;
+  const billingLink =
+    user.role === "ADMIN" ? (
+      <Link href="/billing" className="font-bold underline underline-offset-4">
+        {access.state === "TRIAL" ? t("اختر باقتك", "Choose your plan") : t("جدّد الاشتراك", "Renew now")}
+      </Link>
+    ) : null;
+  const subscriptionNote =
+    access.state === "TRIAL"
+      ? t(`تجربتك المجانية تنتهي خلال ${access.daysLeft} يوم.`, `Your free trial ends in ${access.daysLeft} day(s).`)
+      : access.state === "GRACE"
+        ? t(`انتهت مدة اشتراكك. لديك ${access.daysLeft} يوم لتجديده قبل إيقاف الحساب.`, `Your subscription period has ended. You have ${access.daysLeft} day(s) to renew before the account stops.`)
+        : access.state === "ACTIVE" && access.daysLeft !== null && access.daysLeft <= 7
+          ? t(`ينتهي اشتراكك خلال ${access.daysLeft} يوم.`, `Your subscription ends in ${access.daysLeft} day(s).`)
+          : null;
+  const banners = [
+    config.announcement ? (
+      <div key="announcement" className="no-print flex items-center justify-center gap-2 bg-navy-50 px-4 py-2 text-center text-sm text-navy-700 ring-1 ring-inset ring-navy-100">
+        <Megaphone size={15} className="shrink-0" />
+        <span className="min-w-0 break-words">{config.announcement}</span>
+      </div>
+    ) : null,
+    subscriptionNote ? (
+      <div
+        key="subscription"
+        className={`no-print flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2 text-center text-sm ring-1 ring-inset ${access.state === "TRIAL" ? "bg-teal-50 text-teal-800 ring-teal-100" : "bg-amber-50 text-amber-800 ring-amber-200/70"}`}
+      >
+        <CreditCard size={15} className="shrink-0" />
+        <span>{subscriptionNote}</span>
+        {billingLink}
+      </div>
+    ) : null,
+    user.mustChangePassword ? (
+      <div key="password" className="no-print flex items-center justify-center gap-2 bg-gold-50 px-4 py-2 text-center text-sm text-gold-700 ring-1 ring-inset ring-gold-100">
+        <KeyRound size={15} className="shrink-0" />
+        <span>
+          {t("كلمة المرور ما زالت الافتراضية.", "You are still using the default password.")}{" "}
+          <Link href="/settings" className="font-bold underline underline-offset-4">
+            {t("غيّرها من الإعدادات", "Change it in Settings")}
+          </Link>
+        </span>
+      </div>
+    ) : null,
+  ].filter(Boolean);
 
   return (
     <AppFrame
@@ -56,19 +105,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       urgentCount={urgent}
       allowed={allowed}
       sidebarCollapsed={sidebarCollapsed}
-      banner={
-        user.mustChangePassword ? (
-          <div className="no-print flex items-center justify-center gap-2 bg-gold-50 px-4 py-2 text-center text-sm text-gold-700 ring-1 ring-inset ring-gold-100">
-            <KeyRound size={15} className="shrink-0" />
-            <span>
-              {t("كلمة المرور ما زالت الافتراضية.", "You are still using the default password.")}{" "}
-              <Link href="/settings" className="font-bold underline underline-offset-4">
-                {t("غيّرها من الإعدادات", "Change it in Settings")}
-              </Link>
-            </span>
-          </div>
-        ) : null
-      }
+      banner={banners.length ? <>{banners}</> : null}
       headerTools={
         <>
           {user.memberships.length > 1 ? (
@@ -84,7 +121,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <TranslateToggle compact />
           <ThemeToggle initial={theme} />
           <LangToggle />
-          <BhdAppSwitcher user={{ name: user.name, email: user.email, picture: user.picture }} onSignOut={logout} locale={lang} />
+          <BhdAppSwitcher user={{ name: user.name, email: user.email, picture: user.picture }} onSignOut={logout} platformAdmin={user.platformAdmin} locale={lang} />
         </>
       }
       footer={<SiteFooter locale={lang} />}
@@ -100,7 +137,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       ) : null}
       {children}
-      <AiWriteAssist />
+      {hasFeature(user.access, "ai") ? <AiWriteAssist /> : null}
       <LiveUpdates />
     </AppFrame>
   );

@@ -10,6 +10,7 @@ import type { Lang } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { portalEmployee } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { req, safeReturn, str } from "@/lib/utils";
 
 type Owner = { token?: string; employeeId?: string };
@@ -69,6 +70,7 @@ export async function polishCv(input: Owner & { lang: string; mode: "polish" | "
   const found = await cvEmployee({ token: input.token, employeeId: input.employeeId });
   if (!found) return { error: t("الرابط غير صالح أو لا تملك الصلاحية", "Invalid link or not allowed") };
   const { employee } = found;
+  if (!(await aiOpen(employee.companyId))) return { error: aiLockedMessage(t) };
   const lang = langOf(input.lang);
   const source = input.mode === "translate" ? readCv(employee.cv)[lang === "ar" ? "en" : "ar"] : sanitizeCv(input.content);
   if (!hasCvContent(source)) {

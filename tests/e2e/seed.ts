@@ -4,6 +4,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../../src/lib/password";
+import { DEFAULT_PLANS } from "../../src/lib/plans";
 import { E2E } from "./fixtures";
 
 const url = process.env.DATABASE_URL || "";
@@ -19,6 +20,9 @@ async function main() {
     console.log("E2E data already present.");
     return;
   }
+  for (const plan of DEFAULT_PLANS) {
+    await prisma.plan.upsert({ where: { code: plan.code }, create: plan, update: {} });
+  }
   const company = await prisma.company.create({
     data: { name: "شركة الاختبار", nameEn: "Test Co", phone: "+968 2400 0000", workStart: "07:30" },
   });
@@ -28,6 +32,7 @@ async function main() {
       email: E2E.email,
       password: hashPassword(E2E.password),
       mustChangePassword: false,
+      isPlatformAdmin: true,
       memberships: { create: { companyId: company.id, email: E2E.email, role: "ADMIN", acceptedAt: new Date() } },
     },
   });

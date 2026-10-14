@@ -124,8 +124,11 @@ export async function resetAccountPassword(formData: FormData) {
 /** Sends the current temporary details again on the configured channels. */
 export async function resendAccountDetails(formData: FormData) {
   const { user, member, back, person, t } = await manageable(req(formData, "membershipId"));
-  const password = member.user?.bhdSub ? null : openSecret(member.user?.tempPassword);
-  if (!member.user?.username || !password) go(back, { error: t("غيّر صاحب الحساب كلمة مروره؛ أنشئ كلمة مؤقتة جديدة إن نسيها.", "The person already set their own password; create a new temporary one if they forgot it.") });
+  if (!member.user?.username || member.user.bhdSub || member.user._count.memberships > 1) {
+    go(back, { error: t("هذا الشخص يدخل بحسابه الخاص؛ لا يمكن إرسال كلمة مروره من هنا.", "This person signs in with their own account; its password cannot be sent from here.") });
+  }
+  const password = openSecret(member.user!.tempPassword);
+  if (!password) go(back, { error: t("غيّر صاحب الحساب كلمة مروره؛ أنشئ كلمة مؤقتة جديدة إن نسيها.", "The person already set their own password; create a new temporary one if they forgot it.") });
   const sent = await sendCredentials({ ...person, company: companyName(user), username: member.user!.username!, password: password!, url: loginUrl(await requestOrigin()) });
   if (sent.email !== "sent" && sent.whatsapp !== "sent") {
     go(back, { error: t("لا توجد قناة إرسال مفعّلة لهذا الشخص. استخدم أزرار المشاركة اليدوية.", "No active sending channel for this person. Use the manual share buttons.") });

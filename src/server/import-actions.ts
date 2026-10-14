@@ -10,6 +10,7 @@ import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { fitsLimit, limitMessage } from "@/lib/subscription";
 import { parseDateInput } from "@/lib/utils";
 
 const MAX_FILE = 5 * 1024 * 1024;
@@ -103,6 +104,12 @@ export async function importEmployees(formData: FormData) {
   await markExisting(user.companyId, rows);
   const valid = rows.filter((row) => !row.errors.length);
   if (!valid.length) go("/employees/import", { error: t("لا توجد صفوف صالحة للاستيراد", "No valid rows to import") });
+  const room = await fitsLimit(user.companyId, "employees", valid.length);
+  if (!room.ok) {
+    go("/employees/import", {
+      error: `${limitMessage("employees", room, t)} ${t(`المتاح الآن: ${Math.max(0, room.limit - room.used)}.`, `Room left: ${Math.max(0, room.limit - room.used)}.`)}`,
+    });
+  }
   const salaryAccess = can(user, "salaries.edit");
   const catalog = await getHrCatalog(user.companyId);
   const jobs = [...catalog.jobTitles];

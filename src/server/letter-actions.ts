@@ -10,6 +10,7 @@ import { composeLetters, issueComposed, muscatToday, OPEN_DRAFT, readDraftConten
 import { copyTarget } from "@/lib/letter-issue";
 import { isLetterKind, LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { lookupByToken } from "@/lib/rate-limit";
 import { requestOrigin } from "@/lib/request-origin";
 import { clip, formatDate, parseDateInput, req, safeReturn, str, toDateInput } from "@/lib/utils";
@@ -241,6 +242,7 @@ export async function draftLetter(input: { kind: string; reason: string; employe
   const { t } = await getI18n();
   const user = await getSessionUser();
   if (!user || !can(user, "letters.create")) return { error: t("ليست لديك صلاحية إصدار الخطابات", "You cannot issue letters") };
+  if (!(await aiOpen(user.companyId))) return { error: aiLockedMessage(t) };
   const kind = isLetterKind(input.kind) ? input.kind : "GENERAL";
   const reason = String(input.reason || "").trim().slice(0, 1500);
   if (reason.length < 3) return { error: t("اكتب سبب الخطاب أو تفاصيله أولاً", "Describe the reason or details first") };

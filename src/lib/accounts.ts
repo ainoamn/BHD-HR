@@ -147,8 +147,9 @@ type Person = { name: string; email: string | null; phone: string | null };
 export type OpenedAccount = { membershipId: string; username: string | null; password: string | null; existingUser: boolean };
 
 /**
- * Gives an employee or sponsor access to this company. Someone already registered with the same email keeps
+ * Gives an employee or sponsor access to this company. Someone whose BHD account carries the same (verified) email keeps
  * signing in their usual way; everyone else gets a username and a temporary password to replace on first sign-in.
+ * The recorded email is never trusted as a sign-in identity: the new account's own email is a placeholder.
  */
 export async function openAccount(input: {
   companyId: string;
@@ -168,8 +169,8 @@ export async function openAccount(input: {
       await prisma.membership.update({ where: { id: member.id }, data: link });
       return { membershipId: member.id, username: null, password: null, existingUser: true };
     }
-    const existing = member ? null : await prisma.user.findUnique({ where: { email }, select: { id: true } });
-    if (existing) {
+    const existing = member ? null : await prisma.user.findUnique({ where: { email }, select: { id: true, bhdSub: true } });
+    if (existing?.bhdSub) {
       const created = await prisma.membership.create({
         data: { companyId: input.companyId, userId: existing.id, email, role: input.role, ...link, invitedById: input.actorId, invitedAt: new Date(), acceptedAt: new Date() },
       });
@@ -178,12 +179,13 @@ export async function openAccount(input: {
   }
   const username = await newUsername();
   const password = newPassword();
-  const userEmail = email && !(await prisma.membership.findUnique({ where: { companyId_email: { companyId: input.companyId, email } } })) ? email : `${username}@${PLACEHOLDER_DOMAIN}`;
+  const placeholder = `${username}@${PLACEHOLDER_DOMAIN}`;
+  const memberEmail = email && !(await prisma.membership.findUnique({ where: { companyId_email: { companyId: input.companyId, email } } })) ? email : placeholder;
   const membership = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: {
         name: input.person.name,
-        email: userEmail,
+        email: placeholder,
         username,
         password: hashPassword(password),
         tempPassword: sealSecret(password),
@@ -191,7 +193,7 @@ export async function openAccount(input: {
       },
     });
     return tx.membership.create({
-      data: { companyId: input.companyId, userId: user.id, email: userEmail, role: input.role, ...link, invitedById: input.actorId, invitedAt: new Date() },
+      data: { companyId: input.companyId, userId: user.id, email: memberEmail, role: input.role, ...link, invitedById: input.actorId, invitedAt: new Date() },
     });
   });
   return { membershipId: membership.id, username, password, existingUser: false };

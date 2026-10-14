@@ -200,7 +200,7 @@
   :root[data-theme="dark"] .text-fuchsia-800 {
     color: #ecaaf2;
   }
-  :root[data-theme="dark"] :is(.text-sky-800, .text-navy-500) {
+  :root[data-theme="dark"] :is(.text-sky-800, .text-navy-500, .text-navy-700) {
     color: #9cc3ea;
   }
   :root[data-theme="dark"] :is(.text-gold-500, .text-gold-600, .text-gold-700) {

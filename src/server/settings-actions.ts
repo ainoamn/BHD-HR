@@ -13,6 +13,9 @@ import { sealImageInUse } from "@/lib/letter-issue";
 import { AUTO_ISSUE_KINDS, LETTER_KIND } from "@/lib/letters";
 import { removeLogoIfUnused, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
+import { channelReady, sendEmailMessage } from "@/lib/delivery";
+import { requestOrigin } from "@/lib/request-origin";
+import { fitsLimit, limitMessage } from "@/lib/subscription";
 import { clip, intValue, req, str } from "@/lib/utils";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -133,7 +136,7 @@ export async function updateProfile(formData: FormData) {
   const user = await requireUser();
   const { t } = await getI18n();
   const newName = req(formData, "userName");
-  const newEmail = user.bhdSub ? user.email : req(formData, "userEmail").toLowerCase() || user.email;
+  const newEmail = user.bhdSub || user.username ? user.email : req(formData, "userEmail").toLowerCase() || user.email;
   if (!EMAIL.test(newEmail) || newEmail.length > 120) go("/settings", { error: t("البريد غير صالح", "Invalid email") });
   if (newEmail !== user.email && (await prisma.user.findUnique({ where: { email: newEmail } }))) {
     go("/settings", { error: t("هذا البريد مستخدم لمستخدم آخر", "This email belongs to another user") });
@@ -181,7 +184,7 @@ function accessLabel(role: string, permissions: string[] | null) {
 }
 
 /**
- * Creates the membership with a one-time link. Anyone already registered with that email gets access at once;
+ * Creates the membership with a one-time link. A BHD account with that (verified) email gets access at once;
  * otherwise it attaches on their first BHD sign-in or when they open the link.
  */
 export async function inviteMember(formData: FormData) {
@@ -193,14 +196,17 @@ export async function inviteMember(formData: FormData) {
   if (await prisma.membership.findUnique({ where: { companyId_email: { companyId: user.companyId, email } } })) {
     go(MEMBERS, { error: t("هذا البريد عضو في المنشأة مسبقاً", "This email is already a member") });
   }
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const room = await fitsLimit(user.companyId, "users");
+  if (!room.ok) go(MEMBERS, { error: limitMessage("users", room, t) });
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true, disabledAt: true, bhdSub: true } });
+  if (existing?.disabledAt) go(MEMBERS, { error: t("هذا الحساب موقوف من إدارة المنصة", "This account is suspended by the platform") });
   const member = await prisma.membership.create({
     data: {
       companyId: user.companyId,
       email,
       role,
       permissions: permissions ?? Prisma.DbNull,
-      userId: existing?.id ?? null,
+      userId: existing?.bhdSub ? existing.id : null,
       inviteToken: newInviteToken(),
       invitedById: user.id,
       invitedAt: new Date(),
@@ -211,9 +217,25 @@ export async function inviteMember(formData: FormData) {
     action: "MEMBER_INVITE",
     message: t(`دعا ${email} بصلاحية ${accessLabel(role, permissions)}`, `Invited ${email} as ${accessLabel(role, permissions)}`),
   });
+  let emailed = false;
+  if (channelReady("EMAIL")) {
+    const link = `${await requestOrigin()}/invite/${member.inviteToken}`;
+    try {
+      await sendEmailMessage({
+        to: email,
+        subject: `دعوة للانضمام إلى ${user.company.name} — BHD HR`,
+        text: `دعاك ${user.name} للانضمام إلى «${user.company.name}» في نظام الموظفين والرواتب.\nافتح الرابط وادخل بحساب BHD بهذا البريد نفسه (${email}):\n${link}\n\n${user.name} invited you to join ${user.company.nameEn || user.company.name} on BHD HR. Open the link and sign in with this email:\n${link}`,
+      });
+      emailed = true;
+    } catch (error) {
+      console.error("invite email", error);
+    }
+  }
   refreshAll();
   go(`/settings?invite=${member.id}#members`, {
-    message: t("تم إنشاء الدعوة. انسخ الرابط وأرسله للمستخدم.", "Invitation created. Copy the link and send it to the user."),
+    message: emailed
+      ? t("تم إنشاء الدعوة وإرسالها إلى بريد المستخدم. يمكنك أيضاً نسخ الرابط.", "Invitation created and emailed to the user. You can also copy the link.")
+      : t("تم إنشاء الدعوة. انسخ الرابط وأرسله للمستخدم.", "Invitation created. Copy the link and send it to the user."),
   });
 }
 

@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { channelReady, sendEmailMessage } from "./delivery";
 import { prisma } from "./prisma";
 import { lookupByToken } from "./rate-limit";
+import { companyAccess, hasFeature } from "./subscription";
 import { TASK_PRIORITY, isTaskPriority } from "./tasks";
 import { formatDate } from "./utils";
 
@@ -92,5 +93,7 @@ export async function inviteByToken(token: string) {
     prisma.taskInvite.findUnique({ where: { token: key }, include: { task: { include: { company: { select: { id: true, name: true, nameEn: true } } } } } }),
   );
   if (!invite || invite.revokedAt) return null;
+  const access = await companyAccess(invite.task.companyId);
+  if (!access.active || !hasFeature(access, "tasks")) return null;
   return invite;
 }

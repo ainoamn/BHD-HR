@@ -1,9 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password";
+import { DEFAULT_PLANS } from "../src/lib/plans";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  for (const plan of DEFAULT_PLANS) {
+    await prisma.plan.upsert({ where: { code: plan.code }, create: plan, update: {} });
+  }
   const email = "admin@bhd.local";
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -29,6 +33,7 @@ async function main() {
       email,
       password: hashPassword("admin123"),
       mustChangePassword: true,
+      isPlatformAdmin: true,
       memberships: { create: { companyId: company.id, email, role: "ADMIN" } },
     },
   });

@@ -37,6 +37,7 @@ const HELP_FOR_PATH: [string, string][] = [
   ["/settings/hr", "hr-catalog"],
   ["/settings/work", "work-schedules"],
   ["/settings/system", "system-health"],
+  ["/billing", "subscription"],
   ["/settings", "settings"],
 ];
 

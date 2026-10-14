@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { type Permission, type TeamPermission, isTeamRole, permissionsFor, teamPermissionsFor } from "./permissions";
+import { isPlatformAdmin } from "./platform-admin";
 import { prisma } from "./prisma";
+import { computeAccess, planPermissions, planTeamPermissions } from "./subscription";
 
 export const SESSION_COOKIE = "hr_session";
 /** The company (workspace) the user is working in when they belong to more than one. */
@@ -72,7 +74,8 @@ export function readSession(token?: string | null) {
 
 /**
  * The signed-in user scoped to one company. Every query must filter by `companyId` from here;
- * a user only reaches a company through a Membership row.
+ * a user only reaches a company through a Membership row. The role's permissions are narrowed to what the
+ * company's plan opens, and emptied while the company's subscription is closed (expired or suspended).
  */
 export const getSessionUser = cache(async () => {
   const jar = await cookies();
@@ -80,14 +83,15 @@ export const getSessionUser = cache(async () => {
   if (!userId) return null;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { memberships: { include: { company: true }, orderBy: { createdAt: "asc" } } },
+    include: { memberships: { include: { company: { include: { subscription: { include: { plan: true } } } } }, orderBy: { createdAt: "asc" } } },
   });
-  if (!user) return null;
+  if (!user || user.disabledAt) return null;
   const memberships = user.memberships.filter((item) => isRole(item.role));
   const wanted = jar.get(COMPANY_COOKIE)?.value;
   const active = memberships.find((item) => item.companyId === wanted) ?? memberships[0];
   if (!active) return null;
   const role = active.role as Role;
+  const access = computeAccess({ companyStatus: active.company.status, subscription: active.company.subscription });
   return {
     ...user,
     memberships,
@@ -97,8 +101,10 @@ export const getSessionUser = cache(async () => {
     role,
     employeeId: active.employeeId,
     employerId: active.employerId,
-    permissions: permissionsFor(role, active.permissions, active.company.rolePermissions),
-    teamPermissions: teamPermissionsFor(role, active.company.rolePermissions),
+    access,
+    platformAdmin: isPlatformAdmin(user),
+    permissions: planPermissions(permissionsFor(role, active.permissions, active.company.rolePermissions), access),
+    teamPermissions: planTeamPermissions(teamPermissionsFor(role, active.company.rolePermissions), access),
   };
 });
 
@@ -134,6 +140,7 @@ export async function requirePermission(permission: Permission, back = "/") {
 export async function requireAdmin(back = "/settings") {
   const user = await requireUser();
   if (user.role !== "ADMIN") redirect(`${isStaffRole(user.role) ? back : homePath(user)}?error=` + encodeURIComponent("هذه الصلاحية للمسؤول فقط / Administrators only"));
+  if (!user.access.active) redirect("/billing");
   return user;
 }
 

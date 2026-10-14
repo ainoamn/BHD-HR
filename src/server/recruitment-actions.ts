@@ -12,6 +12,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
+import { aiLockedMessage, aiOpen, fitsLimit, limitMessage } from "@/lib/subscription";
 import { ACTIVE_STAGES, EMPLOYMENT_TYPES, JOB_STATUSES, STAGES, STAGE_LABEL, newApplyToken } from "@/lib/recruitment";
 import { requestOrigin } from "@/lib/request-origin";
 import { removeUpload, saveUpload } from "@/lib/uploads";
@@ -244,6 +245,7 @@ export async function moveCandidate(formData: FormData) {
 /** Reads the stored CV and saves the AI's match score; contact fields are filled only where empty. */
 async function runScreening(candidateId: string, companyId: string, lang: "ar" | "en"): Promise<{ ok: true } | { ok: false; error: string }> {
   const t = (ar: string, en: string) => (lang === "en" ? en : ar);
+  if (!(await aiOpen(companyId))) return { ok: false, error: aiLockedMessage(t) };
   const candidate = await prisma.candidate.findFirst({ where: { id: candidateId, companyId }, include: { job: true } });
   if (!candidate) return { ok: false, error: t("المرشح غير موجود", "Candidate not found") };
   const file = candidate.cvUrl?.startsWith("/files/")
@@ -343,6 +345,8 @@ export async function hireCandidate(formData: FormData) {
   const back = `${LIST}/candidates/${candidate!.id}`;
   if (!can(user, "employees.create")) go(back, { error: t("تعيين المرشح يحتاج صلاحية إضافة الموظفين", "Hiring needs the right to add employees") });
   if (candidate!.stage === "HIRED" || candidate!.employeeId) go(back, { error: t("هذا المرشح عُيّن بالفعل", "This candidate has already been hired") });
+  const room = await fitsLimit(user.companyId, "employees");
+  if (!room.ok) go(back, { error: limitMessage("employees", room, t) });
   const catalog = await getHrCatalog(user.companyId);
   const job = candidate!.job;
   const jobTitle = catalog.jobTitles.find((item) => item.id === job.jobTitleId) || null;

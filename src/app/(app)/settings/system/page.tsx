@@ -18,7 +18,7 @@ export default async function SystemHealthPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const user = await requireAdmin();
   const { t } = await getI18n();
-  const { platform, where } = await visibleErrorScope(user.companyId);
+  const { platform, where } = visibleErrorScope(user.companyId, user.platformAdmin);
   const showSolved = sp.solved === "1";
   const [errors, openCount, backups] = await Promise.all([
     prisma.errorEvent.findMany({ where: { ...where, ...(showSolved ? {} : { resolvedAt: null }) }, orderBy: { lastAt: "desc" }, take: 100 }),

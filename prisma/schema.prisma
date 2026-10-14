@@ -66,6 +66,13 @@ model Company {
   latenessDeduct       Boolean             @default(false)
   workSchedules        WorkSchedule[]
   timeSheets           TimeSheet[]
+  /// ACTIVE or SUSPENDED by the platform admin (nobody in the company can work until it is reactivated).
+  status               String              @default("ACTIVE")
+  suspendedReason      String?
+  /// IP of the request that created the company (sign-up), for the platform admin.
+  signupIp             String?
+  subscription         Subscription?
+  payments             Payment[]
   employees            Employee[]
   leaveRequests        LeaveRequest[]
   employeeRequests     EmployeeRequest[]
@@ -128,9 +135,150 @@ model User {
   tempPassword       String?
   picture            String?
   lastLoginAt        DateTime?
+  lastLoginIp        String?
+  /// Runs the whole platform (/admin): companies, plans, payments. Separate from every company role.
+  isPlatformAdmin    Boolean      @default(false)
+  /// Set by the platform admin: the person cannot sign in anywhere until it is cleared.
+  disabledAt         DateTime?
   memberships        Membership[]
   auditLogs          AuditLog[]
+  loginEvents        LoginEvent[]
   createdAt          DateTime     @default(now())
+}
+
+/// Each sign-in, with the IP it came from (src/lib/login-events.ts); kept 180 days.
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String?
+  userAgent String?
+  /// BHD (single sign-on) or LOCAL (username / password).
+  method    String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+/// A subscription plan (src/lib/plans.ts). Prices in rials (3 decimals); a null limit means unlimited.
+model Plan {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  name          String
+  nameEn        String?
+  tagline       String?
+  taglineEn     String?
+  priceMonthly  Float          @default(0)
+  priceYearly   Float          @default(0)
+  maxEmployees  Int?
+  maxUsers      Int?
+  /// Feature keys on top of the core (FEATURES in src/lib/plans.ts).
+  features      Json?
+  /// Listed on the pricing page; a hidden plan is assigned by the platform admin only.
+  isPublic      Boolean        @default(true)
+  /// Priced on request: shown with "contact us", never bought online.
+  contactOnly   Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  highlight     Boolean        @default(false)
+  sortOrder     Int            @default(0)
+  subscriptions Subscription[]
+  payments      Payment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+/// The company's plan, one row per company. A company without one is a legacy account with everything open.
+/// Whether it still grants access is worked out from the dates (src/lib/subscription.ts).
+model Subscription {
+  id                 String    @id @default(cuid())
+  companyId          String    @unique
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan      @relation(fields: [planId], references: [id])
+  /// TRIAL, ACTIVE, or CANCELED (keeps working to the period end, then stops).
+  status             String    @default("TRIAL")
+  /// MONTHLY or YEARLY.
+  cycle              String    @default("MONTHLY")
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  /// null while ACTIVE = no end date (granted by the platform admin).
+  currentPeriodEnd   DateTime?
+  /// Platform admin overrides of the plan's limits (null = the plan's).
+  maxEmployees       Int?
+  maxUsers           Int?
+  /// Feature keys granted on top of the plan.
+  extraFeatures      Json?
+  notes              String?
+  /// "<end date>:<days>" of the last expiry reminder, so each one goes out once.
+  lastReminder       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+/// A payment or payment attempt for a subscription (src/lib/billing.ts).
+model Payment {
+  id            String    @id @default(cuid())
+  /// Receipt number shown as INV-000123.
+  number        Int       @unique @default(autoincrement())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId        String?
+  plan          Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName      String
+  cycle         String
+  amount        Float
+  currency      String    @default("OMR")
+  /// PENDING, PAID, FAILED or CANCELED.
+  status        String    @default("PENDING")
+  /// THAWANI (card checkout) or MANUAL (bank transfer or cash, confirmed by the platform admin).
+  provider      String
+  /// Checkout session id at the provider.
+  providerRef   String?   @unique
+  /// Transfer reference or cheque number typed by the company or the platform admin.
+  reference     String?
+  periodStart   DateTime?
+  periodEnd     DateTime?
+  paidAt        DateTime?
+  createdById   String?
+  createdByName String?
+  ip            String?
+  note          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// Platform-wide settings: a single row with id "platform" (src/lib/platform.ts).
+model PlatformConfig {
+  id            String   @id @default("platform")
+  /// Plan and length of the free trial every new company starts on.
+  trialPlanCode String   @default("BUSINESS")
+  trialDays     Int      @default(14)
+  /// Bank account shown to companies that pay by transfer.
+  bankDetails   String?
+  supportEmail  String?
+  supportPhone  String?
+  /// A notice shown at the top of every company's pages (maintenance, offers).
+  announcement  String?
+  updatedAt     DateTime @updatedAt
+}
+
+/// What platform admins did; company activity stays in AuditLog.
+model PlatformLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String?
+  companyId String?
+  action    String
+  message   String
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([companyId, createdAt])
 }
 
 /// Access to one company (workspace). userId stays empty for an invitation until that email signs in.

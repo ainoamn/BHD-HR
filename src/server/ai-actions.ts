@@ -4,6 +4,7 @@ import { aiReadDocument, aiTranslate, type ReadDocument, type TranslateKind } fr
 import { can, getSessionUser } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import type { Permission } from "@/lib/permissions";
+import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 
 const READABLE = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 const CAN_READ: Permission[] = ["employees.create", "employees.edit", "documents.create", "documents.edit"];
@@ -16,6 +17,7 @@ export async function readDocumentFile(formData: FormData): Promise<{ data?: Rea
   if (!CAN_READ.some((key) => can(user, key))) {
     return { error: t("لا تملك صلاحية إضافة المستندات", "You can't add documents") };
   }
+  if (!(await aiOpen(user.companyId))) return { error: aiLockedMessage(t) };
   const file = formData.get("file");
   if (!(file instanceof File) || !file.size) return { error: t("اختر ملفاً أولاً", "Choose a file first") };
   if (!READABLE.includes(file.type)) return { error: t("الملف يجب أن يكون صورة أو PDF", "The file must be an image or a PDF") };
