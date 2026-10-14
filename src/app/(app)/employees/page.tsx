@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
+import { BookUser, KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { GetForm } from "@/components/get-form";
@@ -13,8 +13,8 @@ import { getLeaveTypes } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { computeLeaveBalances, leaveWarningText, leaveWarnings } from "@/lib/leave";
-import { NATIONALITIES, nationalityName } from "@/lib/nationalities";
-import { normalizeSearchText } from "@/lib/search";
+import { nationalityName } from "@/lib/nationalities";
+import { employeeFilterQuery, employeeWhere, readEmployeeFilter } from "@/lib/employee-filter";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { money, text } from "@/lib/utils";
@@ -29,6 +29,8 @@ export default async function EmployeesPage({
   const sp = await searchParams;
   const user = await requirePermission("employees.view");
   const { lang, t } = await getI18n();
+  const filter = readEmployeeFilter(sp);
+  const { q, status, employerId } = filter;
   const allow = {
     create: can(user, "employees.create"),
     edit: can(user, "employees.edit"),
@@ -37,42 +39,14 @@ export default async function EmployeesPage({
     docs: can(user, "documents.view"),
     attendance: can(user, "attendance.view"),
   };
-  const q = sp.q?.trim() || "";
-  const status = sp.status && STATUS_LABEL[sp.status] ? sp.status : "ALL";
-  const employerId = sp.employerId || "";
   const limits = {
     urgent: user.company.alertUrgentDays,
     warning: user.company.alertWarningDays,
     early: user.company.alertEarlyDays,
   };
-  const needle = normalizeSearchText(q);
-  const nationalityCodes = q
-    ? NATIONALITIES.filter((item) => normalizeSearchText(item.ar).includes(needle) || item.en.toLowerCase().includes(needle)).map((item) => item.code)
-    : [];
   const [employees, employers, leaveTypes] = await Promise.all([
     prisma.employee.findMany({
-      where: {
-        companyId: user.companyId,
-        ...(status !== "ALL" ? { status } : {}),
-        ...(employerId === "none" ? { employerId: null } : employerId ? { employerId } : {}),
-        ...(q
-          ? {
-              OR: [
-                { fullName: { contains: q, mode: "insensitive" } },
-                { nameEn: { contains: q, mode: "insensitive" } },
-                { employeeNumber: { contains: q, mode: "insensitive" } },
-                { phone: { contains: q, mode: "insensitive" } },
-                { nationality: { contains: q, mode: "insensitive" } },
-                ...(nationalityCodes.length ? [{ nationality: { in: nationalityCodes } }] : []),
-                { jobTitle: { contains: q, mode: "insensitive" } },
-                { jobTitleEn: { contains: q, mode: "insensitive" } },
-                { department: { contains: q, mode: "insensitive" } },
-                { departmentEn: { contains: q, mode: "insensitive" } },
-                { idNumber: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
+      where: employeeWhere(user.companyId, filter),
       include: {
         documents: { select: { expiryDate: true } },
         employer: true,
@@ -97,6 +71,16 @@ export default async function EmployeesPage({
   return (
     <div className="page-wide">
       <PageHeader icon={Users} title={t("الموظفون", "Employees")} description={t("سجل العمال وبيانات الراتب وحالة الوثائق.", "Staff records, salaries and document status.")}>
+        {employees.length ? (
+          <Link
+            href={`/employees/passport-stickers${employeeFilterQuery(filter)}`}
+            className={secondaryBtn}
+            title={t("ملصق بيانات كل عامل في القائمة لوضعه داخل غلاف جوازه الخلفي", "A details sticker for each worker in the list, for the inside back cover of their passport")}
+          >
+            <BookUser size={17} />
+            {t("ملصقات الجوازات", "Passport stickers")}
+          </Link>
+        ) : null}
         {allow.create ? (
           <Link href="/employees/new" className={primaryBtn}>
             <UserPlus size={17} />

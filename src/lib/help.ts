@@ -346,15 +346,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     audience: ["staff"],
     href: "/employees",
     video: "cv-prints",
-    title: b("السيرة الذاتية والملف المطبوع والوصف الوظيفي وبطاقة العمل", "CV, printed profile, job description and business card"),
+    title: b("السيرة الذاتية والملف المطبوع والوصف الوظيفي وبطاقة العمل وملصق الجواز", "CV, printed profile, job description, business card and passport sticker"),
     summary: b(
-      "اطبع ملف الموظف كاملاً بشكل سيرة ذاتية، وبطاقة وصف وظيفي يكتبها الذكاء الاصطناعي، وبطاقة عمل برمز QR.",
-      "Print the employee's full profile as a CV, an AI-written job description card, and a business card with a QR code.",
+      "اطبع ملف الموظف كاملاً بشكل سيرة ذاتية، وبطاقة وصف وظيفي يكتبها الذكاء الاصطناعي، وبطاقة عمل برمز QR، وملصق بيانات العامل ومستنداته لغلاف جوازه الخلفي.",
+      "Print the employee's full profile as a CV, an AI-written job description card, a business card with a QR code, and a sticker of the worker's details and documents for the back cover of their passport.",
     ),
     shots: [
       { file: "profile-print", caption: b("الملف الشخصي المطبوع بأسلوب السيرة الذاتية", "The printed profile in CV style") },
       { file: "job-description", caption: b("بطاقة الوصف الوظيفي بالعربية والإنجليزية", "The bilingual job description card") },
       { file: "business-card", caption: b("بطاقة العمل 90 × 50 مم", "The 90 × 50 mm business card") },
+      { file: "passport-sticker", caption: b("ملصق الجواز 82 × 118 مم (بيانات تجريبية)", "The 82 × 118 mm passport sticker (sample data)") },
     ],
     steps: [
       b("في ملف الموظف بطاقة «الملف الشخصي والمطبوعات» بنسبة اكتمال السيرة.", "In the employee file, the “Profile & prints” card shows how complete the CV is."),
@@ -362,10 +363,21 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("«الوصف الوظيفي» ← «صياغة الوصف بالذكاء الاصطناعي» فيكتب المهام والمؤهلات والمهارات ومؤشرات الأداء باللغتين. عدّل ثم اطبع.", "“Job description” → “Draft with AI” writes duties, qualifications, skills and KPIs in both languages. Edit, then print."),
       b("«بطاقة العمل»: ورقة A4 بعشر بطاقات أو بطاقة واحدة؛ رمز QR يحفظ بيانات الموظف في جهات الاتصال.", "“Business card”: an A4 sheet of ten or a single card; the QR code saves the employee's contact."),
       b("«تعديل السيرة الذاتية» يفتح المحرّر نفسه الذي يراه الموظف في بوابته.", "“Edit CV” opens the same editor the employee sees in their portal."),
+      b(
+        "«ملصق الجواز»: 82 × 118 مم يدخل في الغلاف الخلفي للجواز من الداخل، فيه اسم الجهة وشعارها، وصورة العامل وبياناته، وأرقام مستنداته وتواريخ انتهائها (المنتهي بالأحمر والقريب بالبرتقالي)، ورمز QR للتحقق، وعبارة «إن وُجد هذا الجواز يُرجى تسليمه إلى…» بهاتف الجهة.",
+        "“Passport sticker”: 82 × 118 mm, fits inside the passport's back cover, with the employer's name and logo, the worker's photo and details, document numbers and expiry dates (expired in red, expiring soon in orange), a QR code to verify, and “If found, please return this passport to…” with the employer's phone.",
+      ),
+      b(
+        "لكل العمال دفعة واحدة: في قائمة الموظفين «ملصقات الجوازات» تطبع ملصقاً لكل من في القائمة كما صفّيتها (بالكفيل أو الحالة أو البحث)، أربعة في كل ورقة A4، أو اختر «طابعة ملصقات» لصفحة بمقاس الملصق.",
+        "For all workers at once: “Passport stickers” on the employees list prints one for everyone in the list as filtered (sponsor, status or search), four per A4 sheet, or choose “Label printer” for a page the size of the sticker.",
+      ),
     ],
-    tips: [b("الوصف الوظيفي يُحفظ للمسمى، فيشترك فيه كل من يحمل المسمى نفسه.", "The job description is saved for the job title, so everyone with that title shares it.")],
+    tips: [
+      b("الوصف الوظيفي يُحفظ للمسمى، فيشترك فيه كل من يحمل المسمى نفسه.", "The job description is saved for the job title, so everyone with that title shares it."),
+      b("اطبع الملصق بمقياس 100% («الحجم الفعلي») على ورق لاصق، وأعد طباعته بعد تجديد أي مستند.", "Print the sticker at 100% (“Actual size”) on adhesive paper, and reprint it after renewing any document."),
+    ],
     related: ["portal-cv", "employee-file"],
-    keywords: "سيرة ذاتية طباعة ملف وصف وظيفي بطاقة عمل cv profile job description business card",
+    keywords: "سيرة ذاتية طباعة ملف وصف وظيفي بطاقة عمل ملصق ستكر جواز سفر غلاف cv profile job description business card passport sticker label",
   },
   {
     slug: "attendance",

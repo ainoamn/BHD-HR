@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
+  BookUser,
   BriefcaseBusiness,
   CalendarCheck2,
   ClipboardList,
@@ -1147,6 +1148,7 @@ export default async function EmployeePage({
                 allow.edit ? { href: `${base}/cv`, Icon: FileUser, label: t("تعديل السيرة الذاتية", "Edit CV") } : null,
                 { href: `${base}/job-description`, Icon: ClipboardList, label: t("بطاقة الوصف الوظيفي", "Job description"), ai: true },
                 { href: `${base}/business-card`, Icon: Contact, label: t("بطاقة العمل", "Business card") },
+                { href: `${base}/passport-sticker`, Icon: BookUser, label: t("ملصق الجواز (بياناته ومستنداته)", "Passport sticker (details and documents)") },
               ]
                 .filter((item): item is { href: string; Icon: typeof Printer; label: string; ai?: boolean } => Boolean(item))
                 .map(({ href, Icon, label, ai }) => (
