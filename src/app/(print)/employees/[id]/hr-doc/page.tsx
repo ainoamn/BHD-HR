@@ -32,7 +32,7 @@ export default async function HrDocumentPage({
   if (HR_DOC_NEEDS_SALARY[type] && !can(user, "salaries.view")) redirect(`/employees/${id}?error=${encodeURIComponent(t("لا تملك صلاحية عرض الرواتب", "You can't view salaries"))}`);
   const employee = await prisma.employee.findFirst({
     where: { id, companyId: user.companyId },
-    include: { employer: true, attendance: { select: { type: true, balanceKey: true } }, leaveCredits: { select: { balanceKey: true, days: true } } },
+    include: { employer: true, attendance: { select: { type: true, balanceKey: true, date: true } }, leaveCredits: { select: { balanceKey: true, days: true } } },
   });
   if (!employee) notFound();
   const header = headerFor({ employerName: employee.employer?.name, employerNameEn: employee.employer?.nameEn, employer: employee.employer }, user.company);

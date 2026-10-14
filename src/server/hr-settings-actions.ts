@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth";
 import { DEFAULT_DEPARTMENTS, DEFAULT_JOB_TITLES } from "@/lib/hr-defaults";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
+import { readCycle } from "@/lib/leave";
 import { syncEmployeeSalaries } from "@/lib/pay-items";
 import { prisma } from "@/lib/prisma";
 import { clip, currentPeriod, intValue, num, req, str } from "@/lib/utils";
@@ -177,7 +178,10 @@ export async function saveLeaveType(formData: FormData) {
   const validJobs = new Set((await prisma.jobTitle.findMany({ where: { companyId: user.companyId }, select: { id: true } })).map((job) => job.id));
   const jobTitleIds = allJobs ? [] : [...new Set(formData.getAll("jobTitleIds").map(String))].filter((value) => validJobs.has(value));
   if (!allJobs && jobTitleIds.length === 0) go(back("leave"), { error: t("اختر مسمى وظيفياً واحداً على الأقل أو اجعلها لكل الوظائف", "Pick at least one job title or make it for all jobs") });
-  const data = { ...names, days: Math.round(days * 2) / 2, allJobs, jobTitleIds };
+  const cycle = readCycle(req(formData, "cycle"));
+  const capText = req(formData, "carryCap");
+  const carryCap = cycle === "ONCE" || capText === "" ? null : Math.min(Math.max(Math.round(num(formData, "carryCap") * 2) / 2, 0), 366);
+  const data = { ...names, days: Math.round(days * 2) / 2, allJobs, jobTitleIds, cycle, carryCap };
   if (id) {
     const existing = await prisma.leaveType.findFirst({ where: { id, companyId: user.companyId } });
     if (!existing) go(back("leave"), { error: t("نوع الإجازة غير موجود", "Leave type not found") });

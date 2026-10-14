@@ -37,7 +37,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     allow.leave
       ? prisma.leaveRequest.findMany({
           where: { companyId: user.companyId, status: "PENDING" },
-          include: { employee: { include: { attendance: { select: { type: true, balanceKey: true } }, leaveCredits: { select: { balanceKey: true, days: true } } } } },
+          include: { employee: { include: { attendance: { select: { type: true, balanceKey: true, date: true } }, leaveCredits: { select: { balanceKey: true, days: true } } } } },
           orderBy: { fromDate: "asc" },
         })
       : [],

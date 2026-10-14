@@ -1315,10 +1315,20 @@ export default async function EmployeePage({
                       <div className={cn("h-full rounded-full", warned ? "bg-red-500" : "bg-teal-600")} style={{ width: `${figure.remaining < 0 ? 100 : percent}%` }} />
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      {t(
-                        `مستحق ${daysLabel(figure.entitlement)} + إضافي ${daysLabel(figure.added)} − مستخدم ${daysLabel(figure.used)}`,
-                        `Entitled ${daysLabel(figure.entitlement)} + extra ${daysLabel(figure.added)} − used ${daysLabel(figure.used)}`,
-                      )}
+                      {figure.cycle === "ONCE"
+                        ? t(
+                            `مستحق ${daysLabel(figure.entitlement)} + إضافي ${daysLabel(figure.added)} − مستخدم ${daysLabel(figure.used)}`,
+                            `Entitled ${daysLabel(figure.entitlement)} + extra ${daysLabel(figure.added)} − used ${daysLabel(figure.used)}`,
+                          )
+                        : t(
+                            `مُرحّل ${daysLabel(figure.carried ?? 0)} + مكتسب هذه السنة ${daysLabel(figure.earned ?? 0)} + إضافي ${daysLabel(figure.added)} − مستخدم هذه السنة ${daysLabel(figure.used)}`,
+                            `Carried ${daysLabel(figure.carried ?? 0)} + earned this year ${daysLabel(figure.earned ?? 0)} + extra ${daysLabel(figure.added)} − used this year ${daysLabel(figure.used)}`,
+                          )}
+                      {figure.forfeited ? (
+                        <span className="block text-amber-700">
+                          {t(`سقط ${daysLabel(figure.forfeited)} لتجاوز حد الترحيل في سنوات سابقة`, `${daysLabel(figure.forfeited)} lost to the carry-over limit in past years`)}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                 );

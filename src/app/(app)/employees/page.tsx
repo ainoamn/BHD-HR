@@ -50,7 +50,7 @@ export default async function EmployeesPage({
       include: {
         documents: { select: { expiryDate: true } },
         employer: true,
-        attendance: { select: { type: true, balanceKey: true } },
+        attendance: { select: { type: true, balanceKey: true, date: true } },
         leaveCredits: { select: { balanceKey: true, days: true } },
         account: { select: { id: true } },
       },

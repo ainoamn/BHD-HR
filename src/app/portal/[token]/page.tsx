@@ -77,7 +77,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const today = muscatDay();
   const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests, heldDocuments, custodyForms, manager] = await Promise.all([
     getLeaveTypes(company.id),
-    prisma.attendance.findMany({ where: { employeeId: employee.id }, select: { type: true, balanceKey: true } }),
+    prisma.attendance.findMany({ where: { employeeId: employee.id }, select: { type: true, balanceKey: true, date: true } }),
     prisma.leaveCredit.findMany({ where: { employeeId: employee.id }, select: { balanceKey: true, days: true } }),
     prisma.leaveRequest.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" }, take: 20 }),
     prisma.salary.findMany({

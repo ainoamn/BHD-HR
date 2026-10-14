@@ -318,6 +318,10 @@ model LeaveType {
   allJobs     Boolean  @default(true)
   jobTitleIds String[] @default([])
   sortOrder   Int      @default(0)
+  /// ONCE = `days` once for the whole service (top-ups as credits); YEARLY = `days` every calendar year;
+  /// MONTHLY = days ÷ 12 earned each month. Unused days carry into the next year up to carryCap (null = all).
+  cycle       String   @default("ONCE")
+  carryCap    Float?
   createdAt   DateTime @default(now())
 
   @@unique([companyId, key])

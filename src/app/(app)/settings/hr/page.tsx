@@ -12,6 +12,7 @@ import { requireAdmin } from "@/lib/auth";
 import { ALLOWANCE_BASE, ALLOWANCE_CALC, ALLOWANCE_FREQUENCY, monthName, termText } from "@/lib/constants";
 import { getHrCatalog } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
+import { LEAVE_CYCLES, LEAVE_CYCLE_LABEL, readCycle } from "@/lib/leave";
 import { getI18n } from "@/lib/lang";
 import { normalizeSearchText } from "@/lib/search";
 import { prisma } from "@/lib/prisma";
@@ -145,6 +146,21 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
       <BilingualFields arName="nameAr" enName="nameEn" arLabel={t("اسم الإجازة بالعربية", "Leave name (Arabic)")} enLabel={t("اسم الإجازة بالإنجليزية", "Leave name (English)")} arDefault={type?.nameAr} enDefault={type?.nameEn} required />
       <Field label={t("عدد الأيام المستحقة", "Days entitled")} hint={t("الافتراضي لكل موظف، ويمكن تغييره في ملف الموظف.", "Default for every employee; can be changed per employee.")}>
         <input className={`${fieldClass} w-full`} type="number" name="days" min="0" max="366" step="0.5" defaultValue={type?.days ?? 0} required />
+      </Field>
+      <Field label={t("طريقة الاستحقاق", "How it is earned")}>
+        <select className={`${fieldClass} w-full`} name="cycle" defaultValue={readCycle(type?.cycle)}>
+          {LEAVE_CYCLES.map((value) => (
+            <option key={value} value={value}>
+              {pick(LEAVE_CYCLE_LABEL[value], lang)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field
+        label={t("أقصى ما يُرحّل للسنة التالية", "Most days carried into next year")}
+        hint={t("للسنوي والشهري فقط. فارغ = يُرحّل كل المتبقي؛ وما زاد يسقط في نهاية السنة.", "Yearly and monthly only. Empty = carry everything; anything above is lost at year end.")}
+      >
+        <input className={`${fieldClass} w-full`} type="number" name="carryCap" min="0" max="366" step="0.5" defaultValue={type?.carryCap ?? ""} />
       </Field>
       <fieldset className="min-w-0 space-y-2 md:col-span-2">
         <legend className="text-sm font-medium text-slate-700">{t("مشمولة لـ", "Applies to")}</legend>

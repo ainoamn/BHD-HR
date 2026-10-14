@@ -129,7 +129,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
       where: { companyId: company.id, status: { not: "TERMINATED" } },
       include: {
         documents: true,
-        attendance: { select: { type: true, balanceKey: true } },
+        attendance: { select: { type: true, balanceKey: true, date: true } },
         leaveCredits: { select: { balanceKey: true, days: true } },
       },
     }),
