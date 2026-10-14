@@ -285,8 +285,51 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("لا يُحفظ شيء قرأه الذكاء الاصطناعي قبل أن تضغط الحفظ؛ راجع الأرقام والتواريخ.", "Nothing AI read is saved until you press save; check numbers and dates."),
       b("الهاتف يأخذ رمز عُمان +968 افتراضياً؛ لغير ذلك اضغط زر الرمز واختر الدولة.", "Phone numbers default to Oman +968; press the code button to pick another country."),
     ],
-    related: ["employee-file", "photo-badge", "hr-catalog"],
+    related: ["employee-file", "photo-badge", "hr-catalog", "import-employees"],
     keywords: "إضافة موظف جديد نموذج بطاقة جواز إقامة add employee new form passport",
+  },
+  {
+    slug: "import-employees",
+    group: "people",
+    audience: ["staff"],
+    href: "/employees/import",
+    title: b("استيراد الموظفين من Excel", "Importing employees from Excel"),
+    summary: b(
+      "أضف عشرات الموظفين دفعة واحدة من ملف Excel أو CSV، مع فحص كل صف قبل الحفظ ورفض المكرر.",
+      "Add dozens of employees at once from an Excel or CSV file, with every row checked before saving and duplicates refused.",
+    ),
+    steps: [
+      b("الموظفون ← «استيراد من Excel» ← «تنزيل القالب». الورقة الثانية في القالب تشرح كل عمود.", "Employees → “Import from Excel” → “Download template”. The template's second sheet explains every column."),
+      b("املأ صفاً لكل موظف. الاسم بالعربية إلزامي، والباقي اختياري: الإنجليزي، الجنسية، البطاقة، الجواز، التواريخ، المسمى، القسم، الراتب، البنك…", "Fill one row per employee. The Arabic name is required; the rest is optional: English name, nationality, ID, passport, dates, title, department, salary, bank…"),
+      b("ارفع الملف ← «فحص الملف»: يظهر كل صف بحالته وأخطائه (تاريخ غير مفهوم، رقم مكرر في الملف أو موجود مسبقاً…).", "Upload it → “Check file”: every row shows its status and problems (unreadable date, number repeated in the file or already on record…)."),
+      b("صحّح الملف وأعد رفعه إن أردت، أو اضغط «استيراد» فتُضاف الصفوف السليمة فقط بأرقام موظفين متسلسلة.", "Fix the file and upload again if you like, or press “Import” to add only the rows without problems, numbered in sequence."),
+    ],
+    tips: [
+      b("التواريخ تُقبل بصيغة 2026-10-14 أو 14/10/2026 أو تاريخ Excel. والجنسية بالاسم أو الرمز (OM، IN).", "Dates may be 2026-10-14, 14/10/2026 or an Excel date. Nationality by name or code (OM, IN)."),
+      b("المسميات والأقسام غير الموجودة تُضاف إلى القوائم تلقائياً. حتى 500 صف في الملف.", "Job titles and departments not on the lists are added automatically. Up to 500 rows per file."),
+    ],
+    related: ["add-employee", "bulk-actions"],
+    keywords: "استيراد excel csv ملف موظفين دفعة import employees spreadsheet bulk",
+  },
+  {
+    slug: "bulk-actions",
+    group: "people",
+    audience: ["staff"],
+    href: "/employees",
+    title: b("إجراءات جماعية على الموظفين", "Bulk actions on employees"),
+    summary: b(
+      "علّم عدة موظفين في القائمة ونفّذ عليهم إجراءً واحداً: الملصقات، الحالة، الكفيل، جدول الدوام، أو حسابات الدخول.",
+      "Tick several employees in the list and apply one action to all of them: stickers, status, sponsor, work schedule or sign-in accounts.",
+    ),
+    steps: [
+      b("الموظفون ← علّم المربع بجانب كل موظف، أو «تحديد الكل» لكل من في القائمة كما صُفّيت.", "Employees → tick the box next to each employee, or “Select all” for everyone in the list as filtered."),
+      b("يظهر شريط في الأسفل بعدد المحددين. اختر «الإجراء»:", "A bar appears at the bottom with the count. Choose the “Action”:"),
+      b("«طباعة ملصقات الجوازات»، «تغيير الحالة»، «تغيير الكفيل»، «تغيير جدول الدوام»، أو «فتح حسابات دخول لمن ليس له حساب».", "“Print passport stickers”, “Change status”, “Change sponsor”, “Change work schedule” or “Open sign-in accounts for those without one”."),
+      b("اختر القيمة الجديدة إن لزم ثم «تنفيذ». كل تغيير يُكتب في سجل العمليات لكل موظف.", "Pick the new value if needed, then “Apply”. Every change is written to the activity log for each employee."),
+    ],
+    tips: [b("تحويل الحالة إلى «منتهي الخدمة» جماعياً يوقف حسابات الموظفين كما في التعديل الفردي.", "Changing status to “Terminated” in bulk closes the employees' accounts, as with a single edit.")],
+    related: ["import-employees", "work-schedules", "roles"],
+    keywords: "جماعي تحديد عدة موظفين ملصقات حالة كفيل bulk select many employees",
   },
   {
     slug: "employee-file",
@@ -674,6 +717,63 @@ export const HELP_TOPICS: HelpTopic[] = [
     keywords: "سلفة مكافأة خصم بدل أقساط advance bonus deduction instalment",
   },
   {
+    slug: "payroll-lock",
+    group: "finance",
+    audience: ["staff"],
+    href: "/salaries",
+    title: b("اعتماد مسير الشهر وقفله", "Approving and locking the month's payroll"),
+    summary: b(
+      "مسودة ← مراجعة ← معتمد ← مقفل. الشهر المقفل لا يتغير أبداً، وأي فرق يُكتشف لاحقاً يُصحَّح في أول شهر مفتوح.",
+      "Draft → review → approved → locked. A locked month never changes, and any difference found later is corrected in the first open month.",
+    ),
+    steps: [
+      b("الرواتب ← بطاقة «اعتماد مسير الشهر» أعلى المسير تبيّن مرحلته.", "Payroll → the “Approve the month's payroll” card above the list shows its stage."),
+      b("بعد إنشاء الرواتب ومراجعتها: «إرسال للمراجعة» فيتوقف التعديل.", "Once salaries are created and checked: “Send for review” and editing stops."),
+      b("من يملك صلاحية الصرف يضغط «اعتماد المسير» (أو «إعادة إلى مسودة» مع السبب لتصحيح شيء).", "Someone allowed to pay salaries presses “Approve payroll” (or “Back to draft” with a reason to fix something)."),
+      b("اصرف الرواتب، ثم «قفل الشهر» فلا يُعدَّل ولا يُصرف ولا يُلغى صرف أي راتب فيه.", "Pay the salaries, then “Lock the month”: nothing in it can be edited, paid or unpaid."),
+      b("فرق في شهر مقفل؟ افتح الراتب ← «تسجيل تصحيح» بالمبلغ والسبب؛ يُضاف استحقاقاً أو خصماً في أول شهر مسودة بعنوان الشهر المصحَّح.", "A difference in a locked month? Open the salary → “Record a correction” with the amount and reason; it is added as an entitlement or deduction in the first draft month, titled with the month it corrects."),
+    ],
+    tips: [
+      b("«اعتماد مسير الشهر قبل الصرف» في الإعدادات يمنع الصرف قبل الاعتماد. بدونه يُصرف من المسودة كالمعتاد ويبقى القفل متاحاً.", "“Approve the month's payroll before paying” in Settings blocks payment until approval. Without it you pay from the draft as before and can still lock."),
+      b("«فك القفل» للمسؤول فقط ويطلب سبباً، وكل خطوة مسجّلة في سجل العمليات.", "“Unlock” is admin-only and needs a reason; every step is in the activity log."),
+    ],
+    related: ["payroll", "pay-items", "work-schedules"],
+    keywords: "اعتماد قفل مسير مراجعة تصحيح payroll approve lock review correction period",
+  },
+  {
+    slug: "work-schedules",
+    group: "finance",
+    audience: ["staff"],
+    href: "/settings/work",
+    title: b("جداول الدوام والعمل الإضافي والتأخير", "Work schedules, overtime and lateness"),
+    summary: b(
+      "حدّد ساعات الدوام وأيامه، فيحسب النظام من تسجيل الحضور التأخير والخروج المبكر والعمل الإضافي (نهاري، ليلي، يوم راحة) ويضيفها إلى الراتب عند اعتمادها.",
+      "Set working hours and days, and the system works out lateness, early leaving and overtime (day, night, rest day) from clock-ins, adding them to pay once approved.",
+    ),
+    steps: [
+      b("الإعدادات ← «الدوام والعمل الإضافي» ← «جدول جديد»: الاسم، البداية والنهاية، الاستراحة، سماح التأخير، وأيام العمل. أول جدول يصبح الافتراضي.", "Settings → “Schedules & overtime” → “New schedule”: name, start and end, break, lateness grace and working days. The first schedule becomes the default."),
+      b("في نفس الصفحة: معاملات أجر الإضافي (نهاري 1.25، ليلي 1.5، يوم الراحة 2 افتراضياً)، وهل يُخصم التأخير من الراتب.", "On the same page: overtime multipliers (day 1.25, night 1.5, rest day 2 by default), and whether lateness is deducted from pay."),
+      b("لموظف بجدول مختلف: ملف الموظف ← «جدول الدوام»، أو من قائمة الموظفين بتحديد عدة موظفين ← «تغيير جدول الدوام».", "For someone on a different schedule: employee file → “Work schedule”, or tick several in the employee list → “Change work schedule”."),
+      b("الحضور ← «الإضافي والتأخير»: لكل موظف الأيام والتأخير والخروج المبكر والإضافي ومبلغه. «اعتماد» يضيفها بنداً في راتب الشهر.", "Attendance → “Overtime & lateness”: each employee's days, lateness, early leaving, overtime and its amount. “Approve” adds them as items in the month's salary."),
+    ],
+    sections: [
+      {
+        title: b("كيف يُحسب", "How it is calculated"),
+        items: [
+          b("أجر الساعة = الأساسي ÷ أيام الراتب ÷ ساعات اليوم في الجدول.", "Hourly rate = basic ÷ salary days ÷ the schedule's daily hours."),
+          b("التأخير يُحسب فقط إن تجاوز السماح، وعندها من بداية الدوام. الإضافي بعد نهاية الدوام فقط، والليلي بين 9 مساءً و6 صباحاً.", "Lateness counts only past the grace, and then from the start time. Overtime only after the scheduled end; night hours are 9 pm to 6 am."),
+          b("كل ساعات يوم الراحة إضافي بمعامل يوم الراحة. الاستراحة تُطرح إن زاد الحضور عن 6 ساعات.", "Every hour on a rest day is rest-day overtime. The break is deducted when the day is longer than 6 hours."),
+        ],
+      },
+    ],
+    tips: [
+      b("إن كان مسير الشهر مقفلاً تذهب البنود إلى أول شهر مفتوح. «إلغاء» الاعتماد يحذف بنوده ما لم يُصرف راتبها.", "If the month's payroll is locked the items go to the first open month. “Cancel” an approval removes its items unless that salary was paid."),
+      b("الموظف بلا جدول (ولا جدول افتراضي) لا تُحسب ساعاته.", "Employees with no schedule (and no default) have no hours calculated."),
+    ],
+    related: ["attendance", "payroll-lock", "settings"],
+    keywords: "دوام جدول وردية عمل إضافي تأخير خروج مبكر ساعات schedule shift overtime lateness timesheet",
+  },
+  {
     slug: "expenses",
     group: "finance",
     audience: ["staff"],
@@ -758,6 +858,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       b("الإعدادات ← «الموارد البشرية».", "Settings → “HR”."),
       b("المسميات والأقسام: قوائم جاهزة؛ أضف أو عدّل (يتحدث عند كل موظف) أو احذف غير المستخدم.", "Job titles and departments: ready lists; add, edit (updates every employee) or delete unused ones."),
       b("أنواع الإجازات: الاسم، الأيام المستحقة، ولكل الوظائف أو لمسميات محددة.", "Leave types: name, days per year, and for all jobs or chosen titles."),
+      b("وطريقة الاستحقاق: «رصيد ثابت»، أو «كامل الرصيد مع بداية كل سنة»، أو «يُكتسب شهرياً» (الأيام ÷ 12 كل شهر). وللسنوية والشهرية «حد الترحيل»: ما يزيد عنه من رصيد السنة يسقط في نهايتها، ويظهر المرحَّل والساقط في ملف الموظف.", "And how it is earned: “Fixed balance”, “Full balance every calendar year” or “Earned monthly” (days ÷ 12 each month). Yearly and monthly types take a “carry-over cap”: anything above it is forfeited at year end, and the carried and forfeited days show in the employee file."),
       b("العلاوات: مبلغ أو نسبة، شهرية أو ربعية أو سنوية، مع «إضافتها الآن لكل الموظفين».", "Allowances: amount or percentage, monthly, quarterly or yearly, with “Add to all employees now”."),
     ],
     tips: [b("اكتب الاسم بلغة واحدة فتكمل الأخرى تلقائياً.", "Type a name in one language and the other is filled in.")],
@@ -786,6 +887,36 @@ export const HELP_TOPICS: HelpTopic[] = [
     tips: [b("ما لا يملكه المستخدم يختفي من شاشته، ويرفضه النظام حتى لو حاول مباشرة.", "Anything a user is not allowed disappears from their screen, and the system refuses it even if tried directly.")],
     related: ["sign-in", "team", "settings"],
     keywords: "أدوار صلاحيات حسابات دعوة مستخدم roles permissions accounts invite",
+  },
+  {
+    slug: "system-health",
+    group: "admin",
+    audience: ["staff"],
+    href: "/settings/system",
+    title: b("صحة النظام والنسخ الاحتياطي والحماية", "System health, backups and protection"),
+    summary: b(
+      "سجل بكل خطأ واجهه المستخدمون مع تنبيه للمسؤول، ونسخة احتياطية مشفّرة كل ليلة تُحفظ 30 يوماً، وحماية الدخول والروابط من التخمين.",
+      "A log of every error users hit with an alert to admins, an encrypted backup every night kept for 30 days, and sign-in and links protected from guessing.",
+    ),
+    steps: [
+      b("الإعدادات ← «صحة النظام» (للمسؤول).", "Settings → “System health” (admins)."),
+      b("«النسخ الاحتياطية اليومية» (لمسؤول المنشأة التي تشغّل المنصة): آخر النسخ ووقتها وحجمها. «تعمل بانتظام» تعني أن نسخة نجحت خلال 36 ساعة.", "“Daily backups” (for admins of the company that runs the platform): the latest copies with time and size. “Running regularly” means one succeeded within 36 hours."),
+      b("«سجل الأخطاء»: كل خطأ مجمّع مع عدد مرات حدوثه وأول وآخر مرة والصفحة. بعد إصلاحه اضغط «تم الحل»؛ إن عاد يُفتح من جديد.", "“Error log”: each error grouped with how often it happened, first and last time, and the page. Once fixed press “Solved”; if it returns it reopens."),
+    ],
+    sections: [
+      {
+        title: b("ما يحدث تلقائياً", "What happens on its own"),
+        items: [
+          b("كل ليلة الساعة 2 بتوقيت مسقط تُنسخ القاعدة كاملة ومشفّرة إلى تخزين منفصل، وتُحذف النسخ الأقدم من 30 يوماً.", "Every night at 2 am Muscat time the whole database is copied, encrypted, to separate storage, and copies older than 30 days are deleted."),
+          b("خطأ جديد يرسل بريداً للمسؤولين (مرة في الساعة على الأكثر) عند تفعيل البريد، وغياب النسخة الاحتياطية يظهر خطأً في السجل.", "A new error emails the admins (at most once an hour) when email is set up, and a missed backup shows as an error in the log."),
+          b("8 كلمات مرور خاطئة لحساب واحد، أو 20 من جهاز واحد، توقف المحاولة 15 دقيقة.", "8 wrong passwords for one account, or 20 from one device, pause sign-in for 15 minutes."),
+          b("من يجرّب روابط بوابات أو بطاقات أو خطابات غير صحيحة (30 خلال ساعة) تُرفض كل روابطه ساعة كاملة، حتى الصحيحة.", "Anyone trying wrong portal, badge or letter links (30 within an hour) has every link refused for an hour, even real ones."),
+        ],
+      },
+    ],
+    tips: [b("مفتاح فك تشفير النسخ الاحتياطية عند المالك فقط؛ احفظه في مدير كلمات المرور، فبدونه لا تُفتح أي نسخة.", "The key that decrypts backups is held by the owner only; keep it in a password manager — without it no backup can be opened.")],
+    related: ["settings", "roles"],
+    keywords: "صحة النظام أخطاء نسخ احتياطي حماية تخمين محاولات system health errors backup rate limit security",
   },
 
   // ───────────── Employee portal
@@ -947,6 +1078,29 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
     related: ["expenses", "payroll", "documents"],
     keywords: "حضور قسيمة مستند مصروف بوابة clock payslip document expense portal",
+  },
+  {
+    slug: "portal-app",
+    group: "portal",
+    audience: ["staff", "employee"],
+    portalHref: "",
+    title: b("البوابة كتطبيق، والإشعارات، والتحقق من الجهاز", "The portal as an app, notifications and device check"),
+    summary: b(
+      "ثبّت البوابة على شاشة الهاتف، وفعّل الإشعارات لتصلك قرارات الإجازة والرواتب وتنبيهات المستندات. وأول فتح من جهاز جديد يطلب آخر 4 خانات من رقم بطاقتك.",
+      "Install the portal on your phone's home screen and turn on notifications for leave decisions, salaries and document reminders. The first time it opens on a new device it asks for the last 4 characters of your ID number.",
+    ),
+    steps: [
+      b("أول مرة تفتح رابطك على جهاز: اكتب آخر 4 خانات من رقم بطاقتك الشخصية (أو جوازك إن لم تكن لك بطاقة) ← «متابعة». يتذكر الجهاز 180 يوماً.", "The first time your link opens on a device: type the last 4 characters of your ID number (or passport if you have no ID) → “Continue”. The device is remembered for 180 days."),
+      b("في البوابة: «تثبيت» يضعها على الشاشة الرئيسية كتطبيق. على آيفون: زر المشاركة ← «إضافة إلى الشاشة الرئيسية».", "At the top of the portal: “Install” puts it on the home screen as an app. On iPhone: Share → “Add to Home Screen”."),
+      b("«تفعيل الإشعارات» واسمح بها في المتصفح. يصلك إشعار عند قبول الإجازة أو رفضها، وعند صرف الراتب، وقبل انتهاء مستنداتك بـ 30 و7 أيام.", "“Turn on notifications” and allow them in the browser. You are notified when leave is approved or rejected, when salary is paid, and 30 and 7 days before your documents expire."),
+      b("«إيقاف الإشعارات» يوقفها على هذا الجهاز فقط.", "“Turn off notifications” stops them on this device only."),
+    ],
+    tips: [
+      b("إن ظهر «دخول من جهاز جديد» ولم تكن أنت، اطلب من الموارد البشرية تجديد رابطك فوراً؛ التجديد يلغي كل الأجهزة المحفوظة.", "If you get “Sign-in from a new device” and it was not you, ask HR to renew your link at once; renewing cancels every remembered device."),
+      b("5 إجابات خاطئة خلال ساعة توقف التحقق ساعة. الإدارة تستطيع إيقاف التحقق للمنشأة من الإعدادات.", "5 wrong answers within an hour pause the check for an hour. HR can turn the check off for the company in Settings."),
+    ],
+    related: ["portal", "portal-more"],
+    keywords: "تثبيت تطبيق إشعارات جهاز جديد تحقق install app notifications push new device verify",
   },
 
   // ───────────── Team managers & sponsors

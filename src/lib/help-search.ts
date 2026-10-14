@@ -11,12 +11,14 @@ export function normalizeSearch(value: string) {
 /** Help centre page for each part of the system, so the header's help button opens the right topic. */
 const HELP_FOR_PATH: [string, string][] = [
   ["/employees/new", "add-employee"],
+  ["/employees/import", "import-employees"],
   ["/employees", "employee-file"],
   ["/notifications", "alerts"],
   ["/assistant", "assistant"],
   ["/calendar", "calendar"],
   ["/tasks", "tasks"],
   ["/approvals", "approvals"],
+  ["/attendance/timesheet", "work-schedules"],
   ["/attendance", "attendance"],
   ["/documents/custody", "custody"],
   ["/documents", "documents"],
@@ -33,6 +35,8 @@ const HELP_FOR_PATH: [string, string][] = [
   ["/reports", "reports"],
   ["/activity", "reports"],
   ["/settings/hr", "hr-catalog"],
+  ["/settings/work", "work-schedules"],
+  ["/settings/system", "system-health"],
   ["/settings", "settings"],
 ];
 

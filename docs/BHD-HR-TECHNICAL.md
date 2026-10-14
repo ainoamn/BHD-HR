@@ -358,15 +358,83 @@ src/
 - **منطقة الفريق** `/team` و`/team/[id]` (`lib/team.ts` → `requireTeam`): النطاق من `teamEmployeeIds` (مخزّن لكل طلب): لمدير الفريق كل من تحته في الهيكل التنظيمي بكل المستويات (بحث بالعرض على `managerId`)، ولصاحب العمل الموظفون الذين `employerId` لهم هو كفيله؛ منتهو الخدمة مستبعدون دائماً. موظف خارج النطاق ← 404. الصفحة الرئيسية: إحصاءات، طلبات الإجازة بموافقة/رفض، طلبات المصروفات، تسجيل غياب أو إجازة، وبطاقات الأشخاص (حالة اليوم وأقرب وثيقة منتهية). صفحة الشخص: البيانات، الأرصدة، آخر الغياب، الطلبات، الوثائق، الرواتب، التقييمات المشارَكة — كل قسم حسب صلاحية الفريق.
 - **العمليات المشتركة** تقبل الطرفين عبر `requireActor(perm, teamPerm, back)` الذي يعيد `scope` (`null` للإداري، أو قائمة النطاق): `decideLeaveRequest` (`team.leave.approve`)، `decideExpense` (`team.expenses.approve`)، `saveAttendance` (`team.attendance.create`، إضافة فقط لا تعديل). الطلب لموظف خارج النطاق ← «غير موجود». `/files/<name>`: الموظف 403؛ الفريق يرى وثائق ونسخ هويات من في نطاقه (`team.documents.view`) وإيصالاتهم (`team.expenses.approve`)، ولا يرى السير الذاتية.
 
+### الاختبارات والتكامل المستمر
+
+- **وحدة** (`vitest`، `tests/unit/*.test.ts`): الرواتب، التواريخ، النسخ الاحتياطي (الختم والفتح والاحتفاظ)، المراقبة (تنظيف المسار والبصمة)، مراحل المسير، الدوام والإضافي، دورات الإجازة، الاستيراد، التحقق من الجهاز وحدود المحاولات. `npm test`، وسكربت `build` يشغّلها قبل `next build` فيفشل البناء على Vercel إن فشلت.
+- **متصفح** (`@playwright/test`، `tests/e2e/smoke.spec.ts`): الدخول والحماية، `/api/live` بلا `Set-Cookie`، الصفحات الرئيسية والجديدة، 360px بلا تمرير أفقي، البوابة المفتوحة مباشرة، التحقق من الجهاز الجديد (خطأ ثم صحيح ثم التذكر)، حظر تخمين الروابط، وقفل الحساب بعد 8 محاولات. البيانات من `npm run e2e:seed` (`tests/e2e/seed.ts`، وهمية فقط، ويرفض العمل على غير قاعدة محلية). محلياً: قاعدة Postgres محلية في `DATABASE_URL`، ثم `npx next build` و`PW_CHANNEL=msedge npm run test:e2e` (`playwright.config.ts` يشغّل `next start -p 3100` أو يستخدم خادماً قائماً). الاختباران الأخيران يرسلان `x-forwarded-for` عشوائياً حتى لا يُحظر عنوان المختبِر.
+- **CI** (`.github/workflows/ci.yml`، كل دفع إلى `main` وكل طلب دمج): حاوية Postgres 16 مؤقتة، `db push`، `typecheck`، `npm test`، `next build`، البذر، Playwright (Chromium). عند الفشل يُرفع تقرير Playwright فقط (لا بيانات ولا نسخ).
+
+### النسخ الاحتياطي اليومي المشفّر
+
+- **الدالة** `neon/backup/index.ts` (Neon Function `backup` على فرع `production`، معرّفة في `neon.ts` مع الحاوية الخاصة `backups` والمشغّل `daily-backup` بجدول `0 22 * * *` UTC = 02:00 مسقط). تقبل فقط تسليم المشغّل الموقّع (`parseTriggerDelivery`، نوع `schedule`)؛ أي طلب آخر 401/404.
+- **المحتوى** (`lib/backup-dump.ts`): كل جداول `public` (عدا `_prisma_migrations` و`LiveSignal` و`RateLimit`) صفاً صفاً، بما فيها `StoredFile` (الملفات المرفوعة). **الصيغة** (`lib/backup-format.ts`): NDJSON (رأس، `[table, row]` لكل صف، تذييل بعدد الصفوف لكل جدول) ← gzip ← AES-256-GCM بمفتاح `BACKUP_KEY` (32 بايت base64). الملف `daily/<ISO>.bhdb` = MAGIC + IV 12 + tag 16 + النص المشفّر. التذييل يثبت اكتمال الملف.
+- **الاحتفاظ:** بعد كل نسخة تُحذف من الحاوية النسخ الأقدم من 30 يوماً (`expiredBackups`، ولا يمس ما ليس باسم نسخة).
+- **السجل:** كل تشغيل يُكتب في `BackupRun` (البداية، النهاية، النجاح، المفتاح، الحجم، الجداول، الصفوف، المحذوف، الخطأ). المهمة اليومية `/api/cron/daily` تسجّل خطأ `BACKUP` إن لم تنجح نسخة خلال 36 ساعة (`BACKUP_GRACE_HOURS`)، و`/settings/system` يعرض آخر النسخ لمسؤولي أقدم منشأة (`platformCompanyId`، مشغّل المنصة).
+- **الأسرار:** `BACKUP_KEY` في `.env.local` المحلي (مستثنى) وفي بيئة الدالة فقط، لا في Vercel ولا في Git. **المالك يحفظ نسخة منه في مدير كلمات المرور؛ ضياعه = لا استرجاع.** اعتمادات الحاوية (`AWS_*`) يكتبها `neon deploy` / `neon env pull` في `.env` المحلي.
+- **الاسترجاع** (`scripts/backup.ts`):
+  ```bash
+  npx tsx --env-file=.env --env-file=.env.local scripts/backup.ts list            # النسخ في الحاوية
+  npx tsx --env-file=.env --env-file=.env.local scripts/backup.ts pull [key]      # ← backups/<file> (مستثنى من Git)
+  npx tsx --env-file=.env.local scripts/backup.ts verify backups/<file>           # فك التشفير وفحص التذييل والأعداد
+  # قاعدة فارغة بالمخطط الحالي (prisma db push عليها)، ثم:
+  RESTORE_DATABASE_URL=<رابط القاعدة الفارغة> npx tsx --env-file=.env.local scripts/backup.ts restore backups/<file>
+  ```
+  `restore` يرفض قاعدة فيها بيانات. للرجوع على الإنتاج: استرجع إلى فرع Neon جديد أو قاعدة جديدة، تحقق، ثم بدّل الروابط — لا تكتب فوق `production` مباشرة. احذف ملف `backups/` المحلي بعد الانتهاء.
+- **النشر:** `neon deploy --env .env.local` (يقرأ `BACKUP_KEY` من الملف؛ `neon config plan` يحتاج المتغير في الجلسة). لا مشغّل يدوي؛ للتجربة أنشئ مشغّلاً مؤقتاً `--cron "*/2 * * * *"` ثم احذفه.
+
+### مراقبة الأخطاء
+
+- `src/instrumentation.ts` (`onRequestError`) يلتقط كل خطأ خادم في صفحة أو إجراء أو مسار. `components/error-reporter.tsx` يلتقط أخطاء المتصفح (`error` و`unhandledrejection`) ويرسلها إلى `POST /api/errors` (نفس الموقع فقط، حد حجم، 30 في الساعة لكل عنوان، بلا كوكي). المهمة اليومية والنسخ الاحتياطي يسجّلان `CRON` / `BACKUP`.
+- `lib/errors.ts` → `recordError`: `cleanPath` يحوّل كل مقطع طويل (رموز البوابات والبطاقات والدعوات والمعرّفات) إلى `:id` ويحذف الاستعلام؛ `errorFingerprint` يجمع التكرارات (الأرقام مقنّعة) في صف `ErrorEvent` واحد مع `count` و`firstAt` و`lastAt`؛ المنشأة من كوكي الجلسة. خطأ جديد أو عائد بعد الحل يرسل بريداً للمسؤولين مرة في الساعة على الأكثر (عند تفعيل البريد). لا يرمي أبداً.
+- `/settings/system` (للمسؤول): الأخطاء المفتوحة لمنشأته، ومعها أخطاء بلا منشأة والنسخ الاحتياطية لمسؤولي المنشأة المشغّلة. `resolveErrors` يعلّم خطأً أو الكل محلولاً؛ التكرار يعيد فتحه.
+
+### اعتماد مسير الشهر وقفله
+
+- `PayrollPeriod` لكل (منشأة، سنة، شهر)؛ غياب الصف = `DRAFT`. `lib/payroll-period.ts`: `nextStatus(from, move, approvalRequired)` للتنقل `submit` / `approve` / `return` / `lock` / `unlock`؛ `canEditPeriod` (المسودة فقط)؛ `canPayPeriod` (المسودة أو المعتمد، أو المعتمد فقط إن كان `Company.payrollApproval`)؛ `nextOpenMonth` أول شهر مسودة من شهر معيّن.
+- `server/payroll-period-actions.ts` → `movePayrollPeriod` (الإرسال `salaries.edit`، الاعتماد والقفل `salaries.pay`، فك القفل للمسؤول بسبب إلزامي؛ `PAYROLL_<MOVE>` في السجل) و`addPayrollCorrection` (بند `ENTITLEMENT` / `DEDUCTION` لشهر واحد في `nextOpenMonth` بعنوان الشهر المصحَّح، `notes: PAYROLL_CORRECTION:<salaryId>`).
+- الفرض مركزي في `server/salary-actions.ts` (`guardPeriod`): الإنشاء والتعديل والحذف وإعادة الحساب للمسودة فقط، الصرف حسب `canPayPeriod`، ولا إلغاء صرف ولا شيء في شهر مقفل. `components/payroll-period-bar.tsx` أعلى `/salaries`.
+
+### جداول الدوام والإضافي والتأخير
+
+- `lib/work-time.ts` (منطق صافٍ مختبَر): `dayFigures(day, inAt, outAt, schedule)` — التأخير بعد السماح فقط ثم من البداية؛ الخروج المبكر قبل النهاية؛ الإضافي بعد النهاية فقط؛ الليلي 21:00–06:00؛ كل يوم الراحة إضافي راحة؛ الاستراحة تُطرح إن زاد اليوم عن 6 ساعات؛ الورديات بعد منتصف الليل. `hourlyRate` = الأساسي ÷ `salaryDays` ÷ ساعات الجدول. `monthAmounts` بمعاملات المنشأة.
+- `lib/timesheet.ts`: `scheduleFor` (جدول الموظف أو `Company.defaultScheduleId`)، `monthTimesheet` من `ClockEntry`. `clockPunch` في البوابة يحسب `lateMinutes` من الجدول (أو `workStart` إن لم يوجد).
+- `server/work-actions.ts`: `saveSchedule` / `deleteSchedule` / `saveOvertimeSettings` (المسؤول)؛ `approveTimesheets` (`salaries.edit`) ينشئ `PayItem` (`ENTITLEMENT` للإضافي، `DEDUCTION` للتأخير إن `latenessDeduct`) في `nextOpenMonth` بملاحظة `TIMESHEET:y-m` ثم `TimeSheet` ثم `syncEmployeeSalaries`؛ `withdrawTimesheet` يرفض إن صُرف الراتب أو لم يعد الشهر مسودة.
+
+### دورات الإجازة والترحيل
+
+- `LeaveType.cycle`: `ONCE` (السلوك السابق)، `YEARLY`، `MONTHLY`؛ و`carryCap`. `lib/leave.ts` → `cycleFigures` يمشي سنة بسنة من سنة الالتحاق: نسبة الأشهر في السنة الأولى، الشهري يشمل الشهر الحالي، الترحيل حتى `carryCap` والزائد `forfeited`. الاستخدام يُنسب إلى سنة تاريخه (`Attendance.date`). `LeaveBalance` يضيف `cycle` و`carried` و`earned` و`forfeited`. كل مستدعي `computeLeaveBalances` يمرّر `joiningDate` و`date`.
+
+### تصريح العمل والتأشيرة
+
+`WORK_PERMIT` و`VISA` في `DOC_LABEL` و`EXTRA_DOC_TYPES` (التنبيهات، الملصق، المستندات)، وفي `READ_DOC_TYPES` لقراءة الذكاء الاصطناعي.
+
+### إشعارات الموظف والبوابة القابلة للتثبيت
+
+- `lib/notify.ts` → `notifyEmployee(employeeId, {ar, en, path}, origin, once?)`: إشعار Web Push لكل `PushSubscription`، ثم بريد (`channelReady("EMAIL")` وبريد حقيقي)، ثم واتساب (`WHATSAPP_NOTICE_TEMPLATE`، 3 متغيرات: الاسم، الرسالة، الرابط). لغة الرسالة من الجنسية (`noticeLang`). لا يرمي. مع `once` يُكتب `NoticeLog` (فريد على الموظف والنوع والمرجع) فلا يتكرر.
+- المستدعون (بعد الاستجابة عبر `after()`): قرار الإجازة (`decideLeaveRequest`)، صرف الراتب (`paySalary` / `payAll`، `PAYSLIP`)، تأكيد جهاز جديد، و`remindExpiringDocuments` من المهمة اليومية (30 و7 أيام، 200 في التشغيل).
+- مفاتيح VAPID تُنشأ مرة وتُحفظ في `AppSecret` (`vapid`)، فلا متغيرات بيئة. `public/portal-sw.js`: `push` و`notificationclick` فقط (لا `fetch` ولا تخزين مؤقت). `manifest.webmanifest` لكل بوابة (`/portal/<token>/manifest.webmanifest`، `start_url` البوابة)، والأيقونات `/pwa-icon/<96|192|512>`. `components/portal-app.tsx`: «تثبيت» و«تفعيل / إيقاف الإشعارات» (`savePushSubscription` حتى 10 لكل موظف، `removePushSubscription`).
+
+### استيراد الموظفين والإجراءات الجماعية
+
+- `lib/employee-import.ts`: `IMPORT_COLUMNS` (العناوين بالعربية أو الإنجليزية)، `readDate` (ISO، DD/MM/YYYY، رقم Excel)، `checkRow`، `readTable` (التكرار داخل الملف)، `nationalityByPrefix`. `server/import-actions.ts`: `previewEmployeeImport` (exceljs أو CSV، و`markExisting` للبطاقة والجواز الموجودين) ثم `importEmployees` يعيد الفحص وينشئ المسميات والأقسام الناقصة ويرقّم بالتسلسل (`EMPLOYEE_IMPORT`). القالب `/employees/import-template`. حد 500 صف، `employees.create`.
+- `components/employee-bulk-bar.tsx` ومربعات `form="employee-bulk"` (`BULK_FORM` في `lib/employee-filter.ts`، والمرشّح يقبل `ids`). `bulkEmployees`: `stickers` (يحوّل إلى `/employees/passport-stickers?ids=`)، `status` (مع `terminatedAt` وحذف عضويات الموظف عند الإنهاء)، `employer`، `schedule`، `accounts` (`openMissingEmployeeAccounts` مقيداً بالمحددين). `EMPLOYEE_BULK` لكل موظف.
+
+### التحقق من الجهاز الجديد وحدود المحاولات
+
+- `lib/portal-device.ts`: `deviceChallenge` (آخر 4 من البطاقة، وإلا الجواز، وإلا لا سؤال)، `answerMatches` (مقارنة ثابتة الزمن)، `deviceProof` = HMAC(`AUTH_SECRET`, `portal-device:<id>:<portalToken>`) — تجديد الرابط يُبطل كل الأجهزة. `deviceTrusted`: التحقق متوقف (`Company.portalDeviceCheck`) أو لا سؤال أو كوكي `hr_pdev` صالح (HttpOnly، `path=/portal/<token>`، 180 يوماً) أو جلسة الموظف نفسه أو موظف إداري في المنشأة.
+- `lib/portal.ts`: `findPortalEmployee` (بلا تحقق، للتحقق نفسه) و`portalEmployee` (كل صفحات البوابة وإجراءاتها) يحوّل إلى `/portal/<token>/verify`. `server/portal-device-actions.ts` → `verifyPortalDevice`: 5 أخطاء لكل موظف و20 لكل عنوان في الساعة، ثم الكوكي و`PORTAL_DEVICE` في السجل وإشعار «دخول من جهاز جديد». الكوكي يُكتب في إجراء POST فقط (سياسة الجلسة).
+- `lib/rate-limit.ts`: عدّادات بنافذة ثابتة في `RateLimit` (مفتاح = hash للعنوان أو الحساب، لا القيمة)، `hitLimit` بـ `INSERT … ON CONFLICT` ذري، `isLimited`، `clearLimit`، `purgeExpiredLimits` (المهمة اليومية). `LIMITS`: `loginIp` 20 و`loginAccount` 8 في 15 دقيقة؛ `badToken` 30 في الساعة؛ `deviceEmployee` 5 و`deviceIp` 20 في الساعة؛ `errorReport` 30 في الساعة.
+- `login`: يرفض مسبقاً إن تجاوز العنوان أو الحساب، يعدّ كل كلمة مرور خاطئة، ويمسح عدّاد الحساب عند النجاح. `lookupByToken(token, find)`: الرمز خارج 20–100 حرف لا يُبحث، والخطأ يُعدّ على العنوان، والعنوان المتجاوز يحصل على `null` لكل رمز — مستخدم في البوابة، `/id/<token>`، `/letter/<token>` وإقراره، `/verify/<token>`، `/task/<token>`، `/invite/<token>` وقبوله، `/apply/<token>` وإرساله.
+
 ---
 
 ## 3. نموذج البيانات
 
 | الجدول | الغرض | أهم الحقول |
 |---|---|---|
-| `Company` | المنشأة (مساحة العمل) وإعداداتها — حدّ العزل لكل البيانات | الاسم، `rolePermissions` (JSON: صلاحيات الأدوار المعدّلة لهذه المنشأة؛ الدور غير الموجود يأخذ الافتراضي)، العملة، `salaryDays`، أيام تنبيه المستندات، `payDay`، `leaveWarningDays`، `catalogVersion` (0 = لم يُهيّأ الكتالوج بعد)، الحماية الاجتماعية `spfEnabled` و`spfEmployeeRate` و`spfEmployerRate` و`spfExpatEmployerRate` و`spfWageCap` و`spfBase` (`GROSS`/`BASIC`)، `bankBic` و`bankAccount` لملف WPS، تسجيل الحضور `clockEnabled` و`workLat`/`workLng` و`workRadius` (افتراضياً 200) و`workStart`، التوقيع الإلكتروني `signatoryName` و`signatoryTitle` و`signatureUrl` و`stampUrl`، و`letterAutoKinds` (JSON: أنواع الخطابات المطلوبة التي تصدر تلقائياً) |
+| `Company` | المنشأة (مساحة العمل) وإعداداتها — حدّ العزل لكل البيانات | الاسم، `rolePermissions` (JSON: صلاحيات الأدوار المعدّلة لهذه المنشأة؛ الدور غير الموجود يأخذ الافتراضي)، العملة، `salaryDays`، أيام تنبيه المستندات، `payDay`، `leaveWarningDays`، `catalogVersion` (0 = لم يُهيّأ الكتالوج بعد)، الحماية الاجتماعية `spfEnabled` و`spfEmployeeRate` و`spfEmployerRate` و`spfExpatEmployerRate` و`spfWageCap` و`spfBase` (`GROSS`/`BASIC`)، `bankBic` و`bankAccount` لملف WPS، تسجيل الحضور `clockEnabled` و`workLat`/`workLng` و`workRadius` (افتراضياً 200) و`workStart`، التوقيع الإلكتروني `signatoryName` و`signatoryTitle` و`signatureUrl` و`stampUrl`، و`letterAutoKinds` (JSON: أنواع الخطابات المطلوبة التي تصدر تلقائياً)، `payrollApproval`، `portalDeviceCheck` (افتراضياً مفعّل)، وإعدادات الدوام والإضافي (انظر `WorkSchedule`) |
 | `JobTitle` / `Department` | المسميات الوظيفية والأقسام لكل منشأة | `nameAr` (فريد داخل المنشأة)، `nameEn`؛ وللمسمى `description` (JSON: الوصف الوظيفي بالعربية والإنجليزية) و`descriptionAt` و`descriptionBy` |
-| `LeaveType` | أنواع الإجازات لكل منشأة | `key` (فريد داخل المنشأة؛ `annual`/`sick`/`compensatory`/`other` للأساسية و`t<hex>` للمضافة، وهو ما يُخزَّن في `balanceKey`)، `nameAr`، `nameEn`، `days`، `allJobs`، `jobTitleIds[]`، `sortOrder` |
+| `LeaveType` | أنواع الإجازات لكل منشأة | `key` (فريد داخل المنشأة؛ `annual`/`sick`/`compensatory`/`other` للأساسية و`t<hex>` للمضافة، وهو ما يُخزَّن في `balanceKey`)، `nameAr`، `nameEn`، `days`، `allJobs`، `jobTitleIds[]`، `sortOrder`، `cycle` (`ONCE`/`YEARLY`/`MONTHLY`)، `carryCap` (حد الترحيل، فارغ = بلا حد) |
 | `AllowanceType` | تعريف العلاوة (القيم الافتراضية) | `nameAr`، `nameEn`، `calc` (`FIXED`/`PERCENT`)، `base` (`BASIC`/`PACKAGE`)، `value`، `frequency` (`MONTHLY`/`QUARTERLY`/`SEMI_ANNUAL`/`ANNUAL`)، `payMonth` |
 | `EmployeeAllowance` | علاوة موظف | `employeeId` (حذف متسلسل)، `allowanceTypeId`، نفس حقول القاعدة، `startYear`/`startMonth`، `active` |
 | `User` | الحسابات | `email` (فريد؛ بديل `@accounts.bhd-hr.invalid` لمن لا بريد له)، `username` (فريد، للحسابات المولّدة)، `password` (scrypt أو فارغ لحسابات BHD)، `tempPassword` (كلمة المرور المؤقتة مشفّرة حتى يغيّرها صاحبها)، `mustChangePassword`، `bhdSub` (فريد)، `picture`، `lastLoginAt`. لا دور ولا منشأة على الحساب نفسه |
@@ -403,6 +471,15 @@ src/
 | `PerformanceReview` | تقييم موظف في جولة | `cycleId` (حذف متسلسل)، `employeeId`، `status` (`DRAFT`/`DONE`)، `scores` (JSON: مفتاح المعيار ← 1–5)، `overall`، `strengths`، `improvements`، `goals`، `comment` (داخلي)، `reviewerName`، `completedAt`، `sharedAt` (ظاهر في البوابة)؛ فريد على (`cycleId`، `employeeId`) |
 | `Asset` / `AssetEvent` | عهدة وسجل حركتها | `name`، `category` (`LAPTOP`/`PHONE`/`VEHICLE`/`ACCESS_CARD`/`TOOL`/`UNIFORM`/`FURNITURE`/`OTHER`)، `tag`، `serialNo`، `value`، `purchaseDate`، `status` (`AVAILABLE`/`ASSIGNED`/`MAINTENANCE`/`RETIRED`)، `employeeId`، `assignedAt`. الحدث: `kind` (`CREATE`/`ASSIGN`/`RETURN`/`MAINTENANCE`/`AVAILABLE`/`RETIRE`)، الموظف واسمه، الملاحظة، المنفّذ |
 | `ExpenseClaim` | طلب تعويض مصروف | `employeeId`، `category`، `title`، `amount`، `spentAt`، `receiptUrl`، `source` (`HR`/`PORTAL`)، `status` (`PENDING`/`APPROVED`/`PAID`/`REJECTED`/`CANCELLED`)، القرار (`decidedByName`، `decidedAt`، `decisionNote`)، الصرف (`payMethod`: `SALARY`/`CASH`/`BANK_TRANSFER`/`CHEQUE`، `payItemId`، `paidAt`، `paidByName`) |
+| `PayrollPeriod` | مرحلة مسير الشهر | `companyId`، `year`، `month` (فريد معاً)، `status` (`DRAFT`/`REVIEW`/`APPROVED`/`LOCKED`)، `submittedAt`/`By`، `approvedAt`/`By`، `lockedAt`/`By`، `note`. `Company.payrollApproval` يشترط الاعتماد قبل الصرف |
+| `WorkSchedule` | جدول دوام | `companyId`، `name`/`nameEn`، `startTime`/`endTime` (`HH:MM`)، `breakMinutes` (60)، `graceMinutes` (10)، `workDays` (JSON: أرقام الأيام، الأحد 0). `Employee.scheduleId` (يُفرَّغ عند الحذف)، و`Company.defaultScheduleId` و`overtimeDayRate` (1.25) و`overtimeNightRate` (1.5) و`overtimeRestRate` (2) و`latenessDeduct` |
+| `TimeSheet` | ساعات شهر معتمدة لموظف | `employeeId`+`year`+`month` (فريد)، `days`، `workedMinutes`، `lateMinutes`، `earlyLeaveMinutes`، `overtimeDay`/`Night`/`Rest` (دقائق)، `overtimeAmount`، `latenessAmount`، `payItemIds` (البنود المنشأة)، `approvedAt`، `approvedById` |
+| `ErrorEvent` | مجموعة خطأ | `fingerprint` (فريد)، `companyId` (فارغ للعام)، `source` (`SERVER`/`CLIENT`/`CRON`/`BACKUP`)، `message`، `digest`، `path` (منظّف)، `stack`، `count`، `firstAt`، `lastAt`، `resolvedAt`، `notifiedAt` |
+| `BackupRun` | تشغيل نسخة احتياطية | `startedAt`، `finishedAt`، `ok`، `objectKey`، `bytes`، `tables`، `rows`، `removed`، `error` |
+| `RateLimit` | عدّاد محاولات | `key` (المفتاح: نوع + hash)، `count`، `resetAt` |
+| `PushSubscription` | اشتراك إشعارات لجهاز موظف | `employeeId` (حذف متسلسل)، `endpoint` (فريد)، `p256dh`، `auth`، `userAgent` |
+| `NoticeLog` | إشعار أُرسل مرة واحدة | `companyId`، `employeeId`، `kind`، `ref`، `channels`؛ فريد على (`employeeId`، `kind`، `ref`) |
+| `AppSecret` | أسرار يولّدها النظام | `key` (المفتاح الأساسي، مثل `vapid`)، `value` |
 
 **التواريخ** تُخزّن عند الظهر بتوقيت UTC وتُقرأ بدوال `getUTC*` حتى لا ينزاح اليوم بسبب فرق التوقيت.
 
@@ -599,6 +676,9 @@ sequenceDiagram
 | `RESEND_API_KEY`، `MAIL_FROM` | لإرسال الخطابات بالبريد | مفتاح Resend، والمرسل بصيغة `BHD HR <hr@bhd-om.com>` من نطاق موثّق في Resend. بدونهما تبقى نسخ البريد «بالانتظار» |
 | `WHATSAPP_TOKEN`، `WHATSAPP_PHONE_NUMBER_ID`، `WHATSAPP_TEMPLATE`، `WHATSAPP_TEMPLATE_LANG` | لإرسال الخطابات بواتساب | WhatsApp Business Cloud API (Meta): رمز دائم لمستخدم النظام، معرّف رقم الإرسال، واسم قالب معتمد فيه 4 متغيرات بالترتيب: اسم الموظف، نوع الخطاب، الرقم المرجعي، الرابط. اللغة افتراضياً `ar`. بدونها تبقى نسخ واتساب «بالانتظار» |
 | `WHATSAPP_ACCOUNT_TEMPLATE` | لإرسال بيانات الدخول بواتساب | اسم قالب معتمد في Meta (فئة Utility أو Authentication) فيه 4 متغيرات بالترتيب: الاسم، اسم المستخدم، كلمة المرور المؤقتة، رابط الدخول. يتطلب متغيرات واتساب أعلاه. بدونه تُشارك البيانات يدوياً من بطاقة «حساب الدخول» |
+| `WHATSAPP_NOTICE_TEMPLATE` | لإشعارات الموظف بواتساب | اسم قالب معتمد في Meta (فئة Utility) فيه 3 متغيرات بالترتيب: اسم الموظف، نص الإشعار، رابط البوابة. يتطلب متغيرات واتساب أعلاه. بدونه تصل الإشعارات بالدفع (Push) والبريد فقط |
+| `BACKUP_KEY` | للنسخ الاحتياطي (بيئة دالة Neon فقط، لا Vercel) | 32 بايت عشوائية base64 لتشفير النسخ اليومية وفكّها. في `.env.local` المحلي ويُرفع إلى الدالة بـ `neon deploy --env .env.local`. **احفظ نسخة في مدير كلمات المرور**؛ تغييره لا يفتح النسخ القديمة |
+| `AWS_ACCESS_KEY_ID`، `AWS_SECRET_ACCESS_KEY`، `AWS_ENDPOINT_URL_S3`، `AWS_REGION` | محلياً لسكربت الاسترجاع | اعتمادات حاوية Neon `backups`، يكتبها `neon deploy` / `neon env pull` في `.env`. الدالة تحصل عليها تلقائياً |
 | `VERCEL_OIDC_TOKEN` / `AI_GATEWAY_API_KEY` | محلياً فقط للترجمة | على Vercel يُوفَّر الرمز تلقائياً. محلياً: `vercel env pull <ملف مؤقت>` وانسخ السطر إلى `.env.development.local` ثم احذف الملف المؤقت (الرمز يصلح 12 ساعة). بدونه تعمل الصفحات وتظهر رسالة «تعذرت الترجمة الآلية» |
 
 ---
@@ -616,7 +696,7 @@ npm run dev          # http://localhost:3000
 ### Neon
 
 - المجلد مربوط بالمشروع عبر `neon link --project-id billowing-hat-97652194 --branch production -y` (يكتب `.neon` و`.env.local`، وكلاهما مستثنى).
-- `neon.ts` سياسة الفرع (`defineConfig({})` من `@neon/config/v1`، فارغة). `neon config plan` للمعاينة، و`neon deploy` للتطبيق.
+- `neon.ts` سياسة الفرع (`defineConfig` من `@neon/config/v1`): الدالة `backup` والحاوية `backups` والمشغّل `daily-backup` (انظر «النسخ الاحتياطي اليومي المشفّر» في §2). `neon config plan` للمعاينة (يحتاج `BACKUP_KEY` في الجلسة)، و`neon deploy --env .env.local` للتطبيق. `neon deploy` يكتب روابط القاعدة في `.env` أيضاً؛ احذف أسطر `DATABASE_URL*` و`NEON_BRANCH` منه بعد النشر حتى لا يتصل Prisma CLI بالإنتاج دون قصد.
 - `neon status` يعرض حالة الفرع، و`neon open` يفتح المشروع في اللوحة.
 - مهارات Neon للوكلاء في `.agents/skills/`، وخادم Neon MCP مضاف إلى المحررات.
 - لفرع تجريبي معزول عن الإنتاج: `neon checkout <name>` ثم `neon link` له، وحدّث `.env.local`.
@@ -635,7 +715,7 @@ npm run dev          # http://localhost:3000
 2. خذ نسخة احتياطية (انظر أدناه).
 3. `npx prisma db push` ثم `npx prisma generate`، ثم ادفع الكود.
 
-**النسخ الاحتياطي:** Neon يحتفظ بسجل استرجاع زمني (Point-in-time restore) من لوحته. للنسخة اليدوية: `pg_dump "<DATABASE_URL_UNPOOLED>" > bhd-hr-YYYYMMDD.sql`. ويمكن أخذ نسخة لحظية من الفرع: `neon snapshots`. لا ترفع أي نسخة إلى Git. نسخ SQLite القديمة (`prisma/*.db`) باقية محلياً للرجوع فقط، ومستثناة من Git لأنها بيانات شخصية.
+**النسخ الاحتياطي:** نسخة يومية مشفّرة خارج القاعدة تُحفظ 30 يوماً (انظر §2 للاسترجاع). وNeon يحتفظ بسجل استرجاع زمني (Point-in-time restore، 6 ساعات في الخطة الحالية) من لوحته؛ سجّل وقت UTC قبل أي `db push` على الإنتاج. للنسخة اليدوية: `pg_dump "<DATABASE_URL_UNPOOLED>" > bhd-hr-YYYYMMDD.sql`. ويمكن أخذ نسخة لحظية من الفرع: `neon snapshots`. لا ترفع أي نسخة إلى Git. نسخ SQLite القديمة (`prisma/*.db`) باقية محلياً للرجوع فقط، ومستثناة من Git لأنها بيانات شخصية.
 
 **الأسرار:** `.env` و`.env.*` (عدا `.env.example`) مستثناة من Git ومن رفع Vercel.
 
@@ -643,7 +723,9 @@ npm run dev          # http://localhost:3000
 
 ```bash
 npx tsc --noEmit
-npm run build
+npm test             # اختبارات الوحدة
+npm run build        # prisma generate + اختبارات الوحدة + next build
+npm run test:e2e     # على قاعدة محلية مبذورة (انظر «الاختبارات والتكامل المستمر» في §2)
 ```
 
 **اختبار الصلاحيات دون المساس بالإنتاج:** أنشئ فرع Neon (`neon branches create --name <x> --parent production`)، ضع روابطه في `.env.development.local` (Next.js يقدّمه على `.env.local` في `npm run dev`)، و`prisma db push` عليه بتمرير الروابط في متغيرات الجلسة. لاختبار Server Actions بلا متصفح: كوكي `hr_session` موقّعة بـ `AUTH_SECRET`، وطلب `multipart` فيه الحقل المخفي `$ACTION_ID_<id>` المأخوذ من HTML الصفحة. احذف الملف والفرع بعد الانتهاء.
@@ -669,6 +751,7 @@ npm run build
 
 | التاريخ | التغيير |
 |---|---|
+| 2026-10-14 | 12 تحسيناً في الموثوقية والتشغيل: (1) اختبارات وحدة ومتصفح وCI على GitHub، والبناء يفشل إن فشلت؛ (2) نسخة احتياطية يومية مشفّرة AES-256-GCM إلى حاوية Neon منفصلة، 30 يوماً، مع سكربت الاسترجاع (`neon/backup`، `scripts/backup.ts`)؛ (3) مراقبة الأخطاء (`ErrorEvent`، `/settings/system`، تنبيه المسؤولين)؛ (4) اعتماد مسير الشهر وقفله والتصحيح في أول شهر مفتوح (`PayrollPeriod`)؛ (5) جداول الدوام والإضافي والتأخير من تسجيل الحضور إلى الراتب (`WorkSchedule`، `TimeSheet`، `/settings/work`، `/attendance/timesheet`)؛ (6) استحقاق الإجازة سنوياً أو شهرياً مع حد الترحيل (`LeaveType.cycle` و`carryCap`)؛ (7) تصريح العمل والتأشيرة؛ (8) إشعارات الموظف بالدفع والبريد وواتساب، والبوابة قابلة للتثبيت (`PushSubscription`، `NoticeLog`، `AppSecret`، `portal-sw.js`)؛ (9) استيراد الموظفين من Excel/CSV؛ (10) إجراءات جماعية في قائمة الموظفين؛ (11) التحقق عند فتح البوابة من جهاز جديد (`Company.portalDeviceCheck`)؛ (12) حدود محاولات الدخول وتخمين الروابط (`RateLimit`، `lookupByToken`). `db push` إضافي (أعمدة بقيم افتراضية وجداول جديدة؛ لا حذف) |
 | 2026-10-14 | ملصق الجواز: ملصق 82 × 118 مم لغلاف الجواز الخلفي بشعار الجهة واسمها وصورة العامل وبياناته وأرقام مستنداته وتواريخ انتهائها (ملوّنة حسب حدود التنبيه) ورمز QR وعبارة الإعادة؛ فردي من ملف الموظف (`/employees/<id>/passport-sticker`) أو لكل القائمة المصفّاة (`/employees/passport-stickers`)، ورقة A4 (4) أو طابعة ملصقات. `lib/employee-filter.ts` لفلاتر قائمة الموظفين. بلا تغيير في القاعدة |
 | 2026-10-13 | بوابة الموظف بملء الشاشة ومتجاوبة: `page-wide` بدل `max-w-3xl`، قائمة أقسام جانبية من `lg` وعمودان من `xl`، استعلامات الحاوية داخل البطاقات ومكوّنات البوابة، `SectionSpy` لإبراز القسم المقروء، وتوسيع صفحتي السيرة والشرح إلى `max-w-7xl`. بلا تغيير في القاعدة |
 | 2026-10-13 | البيانات الناقصة يكملها الموظف بإقرار: `lib/self-data.ts` (`SELF_FIELDS`، `LETTER_NEEDS`، `missingFields`، `lettersMissing`، `readSelfInput`، `saveSelfData`، `keptSelfMarks`)، و`SelfDataFields` و`LetterNeedsSwitch`. «أكمل بياناتك الناقصة» في `#profile` (`completeMyDetails`)، وخانات البيان الناقص في نموذج طلب الخطاب وفي «إصدار الآن» لرسائل الراتب (`submitEmployeeRequest` يرفض الطلب حتى تُكمل ويُقرّ). يُملأ الحقل الفارغ فقط، مع `Employee.selfProvided` و`EMPLOYEE_SELF_DATA` في السجل؛ ملاحظة في ملف الموظف وبطاقة الطلب، وتزول العلامة عند تعديل الإدارة للقيمة. عمود `Employee.selfProvided` (`db push` إضافي) |
