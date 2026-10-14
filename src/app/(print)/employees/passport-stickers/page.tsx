@@ -11,7 +11,7 @@ import { requestOrigin } from "@/lib/request-origin";
 const MAX_STICKERS = 200;
 
 /** Passport stickers for everyone in the employees list as filtered there (ended employees only when asked for). */
-export default async function PassportStickersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; employerId?: string; layout?: string }> }) {
+export default async function PassportStickersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; employerId?: string; ids?: string; layout?: string }> }) {
   const sp = await searchParams;
   const user = await requirePermission("employees.view");
   const { t } = await getI18n();

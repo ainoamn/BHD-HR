@@ -14,6 +14,7 @@ import {
 } from "@/lib/accounts";
 import { writeAudit } from "@/lib/audit";
 import { type SessionUser, STAFF_ROLES, can, homePath, isRole, isStaffRole, requireAdmin, requirePermission, requireUser } from "@/lib/auth";
+import { readIds } from "@/lib/employee-filter";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -217,12 +218,13 @@ export async function openAccountsForAll(formData: FormData) {
 }
 
 /** From the employees list: an account for every current employee still without one (those added before accounts were automatic). */
-export async function openMissingEmployeeAccounts() {
+export async function openMissingEmployeeAccounts(formData?: FormData) {
   const user = await requirePermission("employees.edit");
   const { t } = await getI18n();
   const origin = await requestOrigin();
+  const ids = formData ? readIds(formData.getAll("ids").map(String).join(",")) : [];
   const employees = await prisma.employee.findMany({
-    where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null },
+    where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null, ...(ids.length ? { id: { in: ids } } : {}) },
     include: { _count: { select: { reports: { where: { status: { not: "TERMINATED" } } } } } },
     orderBy: { createdAt: "asc" },
     take: BATCH,

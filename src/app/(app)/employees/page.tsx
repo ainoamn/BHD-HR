@@ -4,6 +4,7 @@ import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { GetForm } from "@/components/get-form";
 import { EmployeeAvatar } from "@/components/employee-avatar";
+import { EmployeeBulkBar } from "@/components/employee-bulk-bar";
 import { DeleteButton } from "@/components/row-forms";
 import { EmptyState, PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
@@ -14,7 +15,7 @@ import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { computeLeaveBalances, leaveWarningText, leaveWarnings } from "@/lib/leave";
 import { nationalityName } from "@/lib/nationalities";
-import { employeeFilterQuery, employeeWhere, readEmployeeFilter } from "@/lib/employee-filter";
+import { BULK_FORM, employeeFilterQuery, employeeWhere, readEmployeeFilter } from "@/lib/employee-filter";
 import { prisma } from "@/lib/prisma";
 import { packageGross } from "@/lib/salary";
 import { money, text } from "@/lib/utils";
@@ -44,7 +45,7 @@ export default async function EmployeesPage({
     warning: user.company.alertWarningDays,
     early: user.company.alertEarlyDays,
   };
-  const [employees, employers, leaveTypes] = await Promise.all([
+  const [employees, employers, leaveTypes, schedules] = await Promise.all([
     prisma.employee.findMany({
       where: employeeWhere(user.companyId, filter),
       include: {
@@ -58,6 +59,7 @@ export default async function EmployeesPage({
     }),
     prisma.employer.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true }, orderBy: { name: "asc" } }),
     getLeaveTypes(user.companyId),
+    prisma.workSchedule.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true }, orderBy: { createdAt: "asc" } }),
   ]);
   const employerName = (employer: { name: string; nameEn: string | null } | null) =>
     employer ? (lang === "en" && employer.nameEn ? employer.nameEn : employer.name) : "—";
@@ -181,6 +183,13 @@ export default async function EmployeesPage({
       ) : (
         <>
         <p className="mb-2 px-1 text-xs font-medium text-slate-500">{t(`${employees.length} موظف`, `${employees.length} employee(s)`)}</p>
+        <EmployeeBulkBar
+          returnTo={`/employees${employeeFilterQuery(filter)}`}
+          canEdit={allow.edit}
+          statuses={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label: pick(label, lang) }))}
+          employers={employers.map((employer) => ({ value: employer.id, label: employerName(employer) }))}
+          schedules={schedules.map((schedule) => ({ value: schedule.id, label: lang === "en" && schedule.nameEn ? schedule.nameEn : schedule.name }))}
+        />
         <div className="table-shell">
           <table className="table-stack min-w-full text-sm">
             <thead>
@@ -212,6 +221,15 @@ export default async function EmployeesPage({
                 return (
                   <tr key={employee.id}>
                     <td className="cell-title px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                      <input
+                        type="checkbox"
+                        name="ids"
+                        value={employee.id}
+                        form={BULK_FORM}
+                        className="size-4 shrink-0 accent-teal-700"
+                        aria-label={t(`تحديد ${name}`, `Select ${name}`)}
+                      />
                       <Link href={`/employees/${employee.id}`} className="group flex min-w-0 items-center gap-3">
                         <EmployeeAvatar name={name} photo={employee.photoUrl} className="size-10 rounded-full bg-teal-50 text-sm text-teal-800 ring-1 ring-inset ring-teal-100" />
                         <span className="min-w-0">
@@ -222,6 +240,7 @@ export default async function EmployeesPage({
                           </span>
                         </span>
                       </Link>
+                      </div>
                     </td>
                     <td className="tabular hidden px-4 py-3 font-medium whitespace-nowrap text-slate-500 xl:table-cell" data-label={t("الرقم", "No.")}>
                       {employee.employeeNumber}

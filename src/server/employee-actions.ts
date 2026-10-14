@@ -4,7 +4,9 @@ import { Prisma } from "@prisma/client";
 import { ensureTeamManager, openAndSend, sendSummary } from "@/lib/accounts";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
-import { EMPLOYER_KIND, NEW_EMPLOYER } from "@/lib/constants";
+import { EMPLOYER_KIND, NEW_EMPLOYER, STATUS_LABEL } from "@/lib/constants";
+import { readIds } from "@/lib/employee-filter";
+import { openMissingEmployeeAccounts } from "@/server/account-actions";
 import { readAllowanceRows, readEmployeeInput, readLeaveDays } from "@/lib/employee-input";
 import { nextEmployeeNumber } from "@/lib/employee-number";
 import { getHrCatalog } from "@/lib/hr-catalog";
@@ -18,7 +20,7 @@ import { keptSelfMarks, readSelfMarks } from "@/lib/self-data";
 import { newBadgeToken } from "@/lib/badge";
 import { mimeFor, removeUpload, saveUpload } from "@/lib/uploads";
 import { normalizePhone } from "@/lib/phone";
-import { clip, money, req, str } from "@/lib/utils";
+import { clip, money, req, safeReturn, str } from "@/lib/utils";
 
 type Catalog = Awaited<ReturnType<typeof getHrCatalog>>;
 
@@ -319,4 +321,54 @@ export async function deleteEmployee(formData: FormData) {
   });
   refreshAll();
   go("/employees", { message: t("تم حذف الموظف", "Employee deleted") });
+}
+
+const BULK_OPS = ["stickers", "status", "employer", "schedule", "accounts"] as const;
+
+/** One change for every employee ticked in the list: print stickers, set status, sponsor or schedule, or open accounts. */
+export async function bulkEmployees(formData: FormData) {
+  const user = await requirePermission("employees.view", "/employees");
+  const { t } = await getI18n();
+  const back = safeReturn(formData.get("returnTo"), "/employees");
+  const ids = readIds(formData.getAll("ids").map(String).join(","));
+  const op = req(formData, "op") as (typeof BULK_OPS)[number];
+  if (!ids.length) go(back, { error: t("حدّد موظفاً واحداً على الأقل", "Tick at least one employee") });
+  if (!BULK_OPS.includes(op)) go(back, { error: t("اختر الإجراء", "Choose an action") });
+  if (op === "stickers") go(`/employees/passport-stickers?ids=${ids.join(",")}`);
+  if (!can(user, "employees.edit")) go(back, { error: t("ليست لديك صلاحية تعديل الموظفين", "You cannot edit employees") });
+  if (op === "accounts") return openMissingEmployeeAccounts(formData);
+
+  const employees = await prisma.employee.findMany({ where: { companyId: user.companyId, id: { in: ids } }, select: { id: true, fullName: true, status: true, employerId: true, scheduleId: true } });
+  if (!employees.length) go(back, { error: t("الموظفون غير موجودين", "Employees not found") });
+  let label = "";
+  if (op === "status") {
+    const status = req(formData, "status");
+    if (!STATUS_LABEL[status]) go(back, { error: t("اختر الحالة", "Choose the status") });
+    const ending = employees.filter((employee) => status === "TERMINATED" && employee.status !== "TERMINATED").map((employee) => employee.id);
+    const returning = employees.filter((employee) => status !== "TERMINATED" && employee.status === "TERMINATED").map((employee) => employee.id);
+    await prisma.$transaction([
+      prisma.employee.updateMany({ where: { companyId: user.companyId, id: { in: employees.map((employee) => employee.id) } }, data: { status } }),
+      prisma.employee.updateMany({ where: { id: { in: ending } }, data: { terminatedAt: new Date() } }),
+      prisma.employee.updateMany({ where: { id: { in: returning } }, data: { terminatedAt: null } }),
+      prisma.membership.deleteMany({ where: { employeeId: { in: ending }, role: { in: ["EMPLOYEE", "TEAM_MANAGER"] } } }),
+    ]);
+    label = STATUS_LABEL[status].ar;
+  } else if (op === "employer") {
+    const value = req(formData, "employerId");
+    const employer = value ? await prisma.employer.findFirst({ where: { id: value, companyId: user.companyId }, select: { id: true, name: true } }) : null;
+    if (value && !employer) go(back, { error: t("الكفيل غير موجود", "Sponsor not found") });
+    await prisma.employee.updateMany({ where: { companyId: user.companyId, id: { in: employees.map((employee) => employee.id) } }, data: { employerId: employer?.id ?? null } });
+    label = employer ? `الكفيل ${employer.name}` : "بدون كفيل";
+  } else {
+    const value = req(formData, "scheduleId");
+    const schedule = value ? await prisma.workSchedule.findFirst({ where: { id: value, companyId: user.companyId }, select: { id: true, name: true } }) : null;
+    if (value && !schedule) go(back, { error: t("الجدول غير موجود", "Schedule not found") });
+    await prisma.employee.updateMany({ where: { companyId: user.companyId, id: { in: employees.map((employee) => employee.id) } }, data: { scheduleId: schedule?.id ?? null } });
+    label = schedule ? `جدول الدوام ${schedule.name}` : "الجدول الافتراضي";
+  }
+  for (const employee of employees) {
+    await writeAudit({ userId: user.id, employeeId: employee.id, action: "EMPLOYEE_BULK", message: `تعديل جماعي: ${employee.fullName} ← ${label}` });
+  }
+  refreshAll();
+  go(back, { message: t(`عُدّل ${employees.length} موظف: ${label}`, `Updated ${employees.length} employee(s)`) });
 }
