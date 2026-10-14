@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { channelReady, sendEmailMessage } from "./delivery";
 import { prisma } from "./prisma";
+import { lookupByToken } from "./rate-limit";
 import { TASK_PRIORITY, isTaskPriority } from "./tasks";
 import { formatDate } from "./utils";
 
@@ -87,8 +88,9 @@ export async function sendTaskInvite(inviteId: string, origin: string, note?: st
 
 /** The open invite behind a /task/<token> link, or null when it is unknown or revoked. */
 export async function inviteByToken(token: string) {
-  if (!token || token.length < 20 || token.length > 64) return null;
-  const invite = await prisma.taskInvite.findUnique({ where: { token }, include: { task: { include: { company: { select: { id: true, name: true, nameEn: true } } } } } });
+  const invite = await lookupByToken(token, (key) =>
+    prisma.taskInvite.findUnique({ where: { token: key }, include: { task: { include: { company: { select: { id: true, name: true, nameEn: true } } } } } }),
+  );
   if (!invite || invite.revokedAt) return null;
   return invite;
 }

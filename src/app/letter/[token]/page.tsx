@@ -10,6 +10,7 @@ import { getI18n } from "@/lib/lang";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { sealedLetter } from "@/lib/letter-seal";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDateTime } from "@/lib/utils";
 import { acknowledgeLetter } from "@/server/letter-actions";
@@ -22,7 +23,9 @@ export const metadata: Metadata = { robots: { index: false, follow: false }, ref
 export default async function EmployeeLetterPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const { t } = await getI18n();
-  const found = token.length >= 20 ? await prisma.letter.findUnique({ where: { token }, include: { employee: { include: { employer: true } }, company: true } }) : null;
+  const found = await lookupByToken(token, (key) =>
+    prisma.letter.findUnique({ where: { token: key }, include: { employee: { include: { employer: true } }, company: true } }),
+  );
   if (!found) notFound();
   if (!found.viewedAt) await prisma.letter.update({ where: { id: found.id }, data: { viewedAt: new Date() } });
   const { letter, seal } = await sealedLetter(found, await requestOrigin(), true);

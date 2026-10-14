@@ -8,6 +8,7 @@ import { pick } from "@/lib/i18n";
 import { inlineLogo } from "@/lib/inline-logo";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { EMPLOYMENT_LABEL } from "@/lib/recruitment";
 import { formatDate } from "@/lib/utils";
 import { submitApplication } from "@/server/apply-actions";
@@ -21,7 +22,7 @@ export default async function ApplyPage({ params, searchParams }: { params: Prom
   const { token } = await params;
   const sp = await searchParams;
   const { lang, t } = await getI18n();
-  const job = token.length >= 20 ? await prisma.jobOpening.findUnique({ where: { applyToken: token }, include: { company: true } }) : null;
+  const job = await lookupByToken(token, (applyToken) => prisma.jobOpening.findUnique({ where: { applyToken }, include: { company: true } }));
   const closed = !job || job.status !== "OPEN" || (job.closesAt !== null && job.closesAt.getTime() + 86400000 < Date.now());
   if (!job || closed) {
     return (

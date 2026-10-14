@@ -8,6 +8,7 @@ import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { ACTION_LABEL, MODULES, MODULE_ACTIONS, MODULE_LABEL, permissionsFor } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { formatDate } from "@/lib/utils";
 import { logout } from "@/server/auth-actions";
 import { acceptInvite } from "@/server/invite-actions";
@@ -20,7 +21,7 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
   const user = await getSessionUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
   const { lang, t } = await getI18n();
-  const invite = await prisma.membership.findUnique({ where: { inviteToken: token }, include: { company: true } });
+  const invite = await lookupByToken(token, (inviteToken) => prisma.membership.findUnique({ where: { inviteToken }, include: { company: true } }));
   const inviter = invite?.invitedById ? await prisma.user.findUnique({ where: { id: invite.invitedById }, select: { name: true, email: true } }) : null;
   const email = user.email.toLowerCase();
   const takenByOther = Boolean(invite?.userId && invite.userId !== user.id);

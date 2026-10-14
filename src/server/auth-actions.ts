@@ -9,6 +9,7 @@ import { go } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
+import { LIMITS, clearLimit, clientIp, hitLimit, isLimited, limitKey, waitText } from "@/lib/rate-limit";
 import { req, str } from "@/lib/utils";
 import { ensureWorkspace, linkInvitations } from "@/lib/workspace";
 
@@ -18,7 +19,17 @@ export async function login(formData: FormData) {
   const password = req(formData, "password");
   const next = safeReturnPath(str(formData, "next"));
   const back = `/login?local=1${next === "/" ? "" : `&next=${encodeURIComponent(next)}`}`;
-  const { t } = await getI18n();
+  const { lang, t } = await getI18n();
+  const ipKey = limitKey("loginIp", await clientIp());
+  const accountKey = limitKey("loginAccount", login);
+  const tooMany = (seconds: number) =>
+    go(back, {
+      error: t(
+        `محاولات دخول خاطئة كثيرة. حاول بعد ${waitText(seconds, lang)}.`,
+        `Too many wrong sign-in attempts. Try again in ${waitText(seconds, lang)}.`,
+      ),
+    });
+  if ((await isLimited(ipKey, LIMITS.loginIp)) || (await isLimited(accountKey, LIMITS.loginAccount))) tooMany(LIMITS.loginAccount.windowSeconds);
   const user = login.includes("@") ? await prisma.user.findUnique({ where: { email: login } }) : await prisma.user.findUnique({ where: { username: login } });
   if (user?.bhdSub && !user.password) {
     go(back, {
@@ -33,8 +44,11 @@ export async function login(formData: FormData) {
     if (count === 0) {
       go(back, { error: t("النظام غير مُعد بعد. من مجلد المشروع شغّل الأمر: npm run db:setup", "System not set up. Run: npm run db:setup") });
     }
+    const [perIp, perAccount] = await Promise.all([hitLimit(ipKey, LIMITS.loginIp), hitLimit(accountKey, LIMITS.loginAccount)]);
+    if (!perIp.ok || !perAccount.ok) tooMany(Math.max(perIp.ok ? 0 : perIp.retryAfter, perAccount.ok ? 0 : perAccount.retryAfter));
     go(back, { error: t("اسم المستخدم أو كلمة المرور غير صحيحة", "Wrong username or password") });
   }
+  await clearLimit(accountKey);
   if (user!.username) {
     if (!(await prisma.membership.count({ where: { userId: user!.id } }))) {
       go(back, { error: t("هذا الحساب موقوف. تواصل مع الموارد البشرية.", "This account is closed. Contact HR.") });

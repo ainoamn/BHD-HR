@@ -10,6 +10,7 @@ import { composeLetters, issueComposed, muscatToday, OPEN_DRAFT, readDraftConten
 import { copyTarget } from "@/lib/letter-issue";
 import { isLetterKind, LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { requestOrigin } from "@/lib/request-origin";
 import { clip, formatDate, parseDateInput, req, safeReturn, str, toDateInput } from "@/lib/utils";
 
@@ -310,7 +311,7 @@ export async function deleteLetterTemplate(id: string): Promise<{ ok?: boolean; 
 /** Public: the employee confirms receipt from the link in the copy. */
 export async function acknowledgeLetter(formData: FormData) {
   const token = req(formData, "token");
-  const letter = token ? await prisma.letter.findUnique({ where: { token } }) : null;
+  const letter = await lookupByToken(token, (key) => prisma.letter.findUnique({ where: { token: key } }));
   if (!letter) go("/login");
   if (!letter!.acknowledgedAt && !letter!.cancelledAt) {
     await prisma.letter.update({ where: { id: letter!.id }, data: { acknowledgedAt: new Date() } });

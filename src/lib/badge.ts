@@ -1,6 +1,8 @@
 import { randomBytes } from "crypto";
 import QRCode from "qrcode";
+import { cache } from "react";
 import { prisma } from "./prisma";
+import { lookupByToken } from "./rate-limit";
 
 /** 16 random bytes (22 characters) keep the QR code small enough to scan from a printed card. */
 export function newBadgeToken() {
@@ -24,7 +26,6 @@ export async function qrSvg(text: string) {
 }
 
 /** The employee behind a scanned badge; null for an unknown or retired key. */
-export async function badgeEmployee(token: string) {
-  if (!token || token.length < 20) return null;
-  return prisma.employee.findUnique({ where: { badgeToken: token }, include: { company: true, employer: true } });
-}
+export const badgeEmployee = cache((token: string) =>
+  lookupByToken(token, (badgeToken) => prisma.employee.findUnique({ where: { badgeToken }, include: { company: true, employer: true } })),
+);

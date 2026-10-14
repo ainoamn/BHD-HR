@@ -7,6 +7,7 @@ import { COMPANY_COOKIE, getSessionUser, sessionCookieOptions } from "@/lib/auth
 import { go } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { req } from "@/lib/utils";
 
 /** Only the account whose email was invited can take the seat; the link alone grants nothing. */
@@ -16,7 +17,7 @@ export async function acceptInvite(formData: FormData) {
   const user = await getSessionUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(back)}`);
   const { t } = await getI18n();
-  const invite = await prisma.membership.findUnique({ where: { inviteToken: token } });
+  const invite = await lookupByToken(token, (inviteToken) => prisma.membership.findUnique({ where: { inviteToken } }));
   if (!invite) go(back);
   const email = user!.email.toLowerCase();
   if (invite!.userId && invite!.userId !== user!.id) go(back);

@@ -49,6 +49,18 @@ export async function isLimited(key: string, rule: LimitRule) {
   return Boolean(row && row.resetAt > new Date() && row.count >= rule.limit);
 }
 
+/**
+ * Looks up a record by a secret link token. Misses count against the caller's IP; an IP over the limit gets null
+ * for every token (even a real one), so guessing links tells nothing. Tokens outside 20–100 characters never match.
+ */
+export async function lookupByToken<T>(token: string, find: (token: string) => Promise<T | null>) {
+  const ipKey = limitKey("badToken", await clientIp());
+  if (await isLimited(ipKey, LIMITS.badToken)) return null;
+  const found = token && token.length >= 20 && token.length <= 100 ? await find(token) : null;
+  if (!found) await hitLimit(ipKey, LIMITS.badToken);
+  return found;
+}
+
 export async function clearLimit(key: string) {
   await prisma.rateLimit.deleteMany({ where: { key } });
 }

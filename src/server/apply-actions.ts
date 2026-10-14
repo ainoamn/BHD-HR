@@ -5,6 +5,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { MAX_PUBLIC_APPLICATIONS } from "@/lib/recruitment";
 import { removeUpload, saveUpload } from "@/lib/uploads";
 import { clip, num, req, round3, str } from "@/lib/utils";
@@ -15,7 +16,7 @@ export async function submitApplication(formData: FormData) {
   const token = req(formData, "token");
   const back = `/apply/${token}`;
   if (str(formData, "website")) go(`${back}?done=1`);
-  const job = token.length >= 20 ? await prisma.jobOpening.findUnique({ where: { applyToken: token } }) : null;
+  const job = await lookupByToken(token, (applyToken) => prisma.jobOpening.findUnique({ where: { applyToken } }));
   if (!job || job.status !== "OPEN" || (job.closesAt && job.closesAt.getTime() + 86400000 < Date.now())) {
     go(back, { error: t("هذا الشاغر لم يعد يستقبل طلبات", "This vacancy is no longer taking applications") });
   }

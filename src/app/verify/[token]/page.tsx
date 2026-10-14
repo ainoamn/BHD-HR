@@ -9,6 +9,7 @@ import { getI18n } from "@/lib/lang";
 import { LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { letterFingerprint, sealedLetter } from "@/lib/letter-seal";
 import { prisma } from "@/lib/prisma";
+import { lookupByToken } from "@/lib/rate-limit";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
@@ -20,7 +21,9 @@ export const metadata: Metadata = { robots: { index: false, follow: false }, ref
 export default async function VerifyLetterPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const { lang, t } = await getI18n();
-  const found = token.length >= 20 ? await prisma.letter.findUnique({ where: { verifyToken: token }, include: { employee: { include: { employer: true } }, company: true } }) : null;
+  const found = await lookupByToken(token, (verifyToken) =>
+    prisma.letter.findUnique({ where: { verifyToken }, include: { employee: { include: { employer: true } }, company: true } }),
+  );
   if (!found || !found.fingerprint) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">

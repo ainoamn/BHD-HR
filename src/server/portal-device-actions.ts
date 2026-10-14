@@ -15,9 +15,9 @@ import { req } from "@/lib/utils";
 export async function verifyPortalDevice(formData: FormData) {
   const { lang, t } = await getI18n();
   const token = req(formData, "token");
-  const employee = await findPortalEmployee(token);
-  if (!employee) go("/portal/invalid", { error: t("الرابط غير صالح أو أُوقف", "This link is invalid or was turned off") });
   const back = `/portal/${token}/verify`;
+  const employee = await findPortalEmployee(token);
+  if (!employee) go(back);
   const challenge = deviceChallenge(employee!);
   if (!challenge) go(`/portal/${token}`);
   const employeeKey = limitKey("deviceEmployee", employee!.id);

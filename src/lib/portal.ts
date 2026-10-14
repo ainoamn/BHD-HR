@@ -5,7 +5,7 @@ import type { Lang } from "./i18n";
 import { attendanceChoices, leaveApplies, type LeaveTypeInfo, LEAVE_CHOICE } from "./leave";
 import { deviceTrusted } from "./portal-device";
 import { prisma } from "./prisma";
-import { LIMITS, clientIp, hitLimit, isLimited, limitKey } from "./rate-limit";
+import { lookupByToken } from "./rate-limit";
 
 export function newPortalToken() {
   return randomBytes(24).toString("base64url");
@@ -20,19 +20,12 @@ export function portalUrl(origin: string, token: string) {
  * has ended. Unknown tokens count against the caller's IP, and an IP over the limit gets null for every token, so
  * guessing links tells nothing.
  */
-export const findPortalEmployee = cache(async (token: string) => {
-  const ipKey = limitKey("badToken", await clientIp());
-  if (await isLimited(ipKey, LIMITS.badToken)) return null;
-  const employee =
-    token && token.length >= 20 && token.length <= 100
-      ? await prisma.employee.findUnique({ where: { portalToken: token }, include: { company: true, employer: true } })
-      : null;
-  if (!employee || employee.status === "TERMINATED") {
-    await hitLimit(ipKey, LIMITS.badToken);
-    return null;
-  }
-  return employee;
-});
+export const findPortalEmployee = cache((token: string) =>
+  lookupByToken(token, async (portalToken) => {
+    const employee = await prisma.employee.findUnique({ where: { portalToken }, include: { company: true, employer: true } });
+    return employee && employee.status !== "TERMINATED" ? employee : null;
+  }),
+);
 
 /** The employee behind a portal link for pages and actions: a browser that has not passed the new-device check is sent to it. */
 export async function portalEmployee(token: string) {
