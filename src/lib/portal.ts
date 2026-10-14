@@ -1,7 +1,11 @@
 import { randomBytes } from "crypto";
+import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { Lang } from "./i18n";
 import { attendanceChoices, leaveApplies, type LeaveTypeInfo, LEAVE_CHOICE } from "./leave";
+import { deviceTrusted } from "./portal-device";
 import { prisma } from "./prisma";
+import { LIMITS, clientIp, hitLimit, isLimited, limitKey } from "./rate-limit";
 
 export function newPortalToken() {
   return randomBytes(24).toString("base64url");
@@ -11,11 +15,29 @@ export function portalUrl(origin: string, token: string) {
   return `${origin}/portal/${token}`;
 }
 
-/** The employee behind a portal link; null for an unknown token or an employee whose service has ended. */
+/**
+ * The employee behind a portal link, with no device check; null for an unknown token or an employee whose service
+ * has ended. Unknown tokens count against the caller's IP, and an IP over the limit gets null for every token, so
+ * guessing links tells nothing.
+ */
+export const findPortalEmployee = cache(async (token: string) => {
+  const ipKey = limitKey("badToken", await clientIp());
+  if (await isLimited(ipKey, LIMITS.badToken)) return null;
+  const employee =
+    token && token.length >= 20 && token.length <= 100
+      ? await prisma.employee.findUnique({ where: { portalToken: token }, include: { company: true, employer: true } })
+      : null;
+  if (!employee || employee.status === "TERMINATED") {
+    await hitLimit(ipKey, LIMITS.badToken);
+    return null;
+  }
+  return employee;
+});
+
+/** The employee behind a portal link for pages and actions: a browser that has not passed the new-device check is sent to it. */
 export async function portalEmployee(token: string) {
-  if (!token || token.length < 20) return null;
-  const employee = await prisma.employee.findUnique({ where: { portalToken: token }, include: { company: true, employer: true } });
-  if (!employee || employee.status === "TERMINATED") return null;
+  const employee = await findPortalEmployee(token);
+  if (employee && !(await deviceTrusted(employee))) redirect(`/portal/${token}/verify`);
   return employee;
 }
 

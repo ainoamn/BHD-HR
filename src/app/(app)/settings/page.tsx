@@ -346,6 +346,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     </span>
                   </span>
                 </label>
+                <label className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-sm text-slate-800 ring-1 ring-inset ring-slate-100 md:col-span-2">
+                  <input type="checkbox" name="portalDeviceCheck" value="1" defaultChecked={company.portalDeviceCheck} className="mt-0.5 size-4 shrink-0 accent-teal-700" />
+                  <span>
+                    <span className="block font-semibold">{t("التحقق عند فتح البوابة من جهاز جديد", "Verify when a portal opens on a new device")}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                      {t(
+                        "يُطلب من الموظف آخر 4 خانات من رقم بطاقته (أو جوازه) أول مرة يفتح رابطه على جهاز، فلا يكفي الرابط وحده إن وصل لغيره. يُتذكر الجهاز 180 يوماً.",
+                        "The employee types the last 4 characters of their ID (or passport) number the first time their link opens on a device, so the link alone is not enough if someone else gets it. The device is remembered for 180 days.",
+                      )}
+                    </span>
+                  </span>
+                </label>
                 <div className="flex items-end justify-end md:col-span-2">
                   <SubmitButton className="w-full sm:w-auto">
                     <Save size={16} />

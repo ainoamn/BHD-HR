@@ -67,6 +67,7 @@ export async function updateCompanySettings(formData: FormData) {
       payDay,
       leaveWarningDays,
       payrollApproval: req(formData, "payrollApproval") === "1",
+      portalDeviceCheck: req(formData, "portalDeviceCheck") === "1",
       logoUrl,
     },
   });

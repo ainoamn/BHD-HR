@@ -55,6 +55,8 @@ model Company {
   /// Salaries are paid only after the month's payroll is approved (src/lib/payroll-period.ts).
   payrollApproval      Boolean             @default(false)
   payrollPeriods       PayrollPeriod[]
+  /// A portal link opened on a new device asks for the last 4 characters of the ID / passport number (src/lib/portal-device.ts).
+  portalDeviceCheck    Boolean             @default(true)
   /// Work schedules and overtime (src/lib/work-time.ts): the schedule of employees without their own, rates as multiples of the hourly basic wage.
   defaultScheduleId    String?
   overtimeDayRate      Float               @default(1.25)
