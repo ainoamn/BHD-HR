@@ -3,6 +3,7 @@ import { getDailyBrief } from "@/lib/brief";
 import { channelReady, sendEmailMessage, sendPendingCopies } from "@/lib/delivery";
 import { BACKUP_GRACE_HOURS, backupStatus, recordError } from "@/lib/errors";
 import { issueDueLetterDrafts } from "@/lib/letter-drafts";
+import { remindExpiringDocuments } from "@/lib/notify";
 import { permissionsFor } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { purgeExpiredLimits } from "@/lib/rate-limit";
@@ -63,5 +64,6 @@ async function runDaily(origin: string) {
     await recordError({ source: "BACKUP", message: `No successful backup in the last ${BACKUP_GRACE_HOURS} hours`, path: "/settings/system", origin });
   }
   const limitsCleared = await purgeExpiredLimits();
-  return { ok: true, emailReady, scheduledLetters, results, backupOverdue: backup.overdue, limitsCleared };
+  const expiryReminders = await remindExpiringDocuments(origin);
+  return { ok: true, emailReady, scheduledLetters, results, backupOverdue: backup.overdue, limitsCleared, expiryReminders };
 }

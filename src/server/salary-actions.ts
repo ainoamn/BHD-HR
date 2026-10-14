@@ -1,15 +1,18 @@
 "use server";
 
 import type { Employee, Employer } from "@prisma/client";
+import { after } from "next/server";
 import { writeAudit } from "@/lib/audit";
 import { requirePermission, type SessionUser } from "@/lib/auth";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { syncSalaryLines } from "@/lib/pay-items";
+import { notifyEmployee } from "@/lib/notify";
 import { countAbsenceDays } from "@/lib/payroll";
 import { PERIOD_LABEL, canEditPeriod, canPayPeriod, periodStatus } from "@/lib/payroll-period";
 import { prisma } from "@/lib/prisma";
+import { requestOrigin } from "@/lib/request-origin";
 import { buildSalaryAmounts } from "@/lib/salary";
 import { clip, intValue, money, num, parseDateInput, req, round3, str, todayInputValue } from "@/lib/utils";
 
@@ -18,6 +21,26 @@ function periodFrom(formData: FormData) {
   const month = intValue(formData, "month");
   if (year < 2000 || year > 2100 || month < 1 || month > 12) return null;
   return { year, month };
+}
+
+/** Tells each paid employee their payslip is ready, after the response has gone out. */
+async function announcePaid(rows: { id: string; employeeId: string; netSalary: number; year: number; month: number }[], currency: string) {
+  if (!rows.length) return;
+  const origin = await requestOrigin();
+  after(async () => {
+    for (const row of rows) {
+      await notifyEmployee(
+        row.employeeId,
+        {
+          ar: { title: "صُرف راتبك", body: `راتب ${monthName(row.month, "ar")} ${row.year}: ${money(row.netSalary, currency)}. قسيمة الراتب جاهزة في بوابتك.` },
+          en: { title: "Your salary was paid", body: `${monthName(row.month, "en")} ${row.year} salary: ${money(row.netSalary, currency)}. Your payslip is ready in the portal.` },
+          path: `/payslip/${row.id}`,
+        },
+        origin,
+        { kind: "PAYSLIP", ref: row.id },
+      );
+    }
+  });
 }
 
 function salariesPath(year: number, month: number, employerId?: string) {
@@ -237,6 +260,7 @@ export async function payAll(formData: FormData) {
     }
   });
   const total = round3(payable.reduce((sum, salary) => sum + salary.netSalary, 0));
+  await announcePaid(payable, user.company.currency);
   await writeAudit({
     userId: user.id,
     action: "PAY_ALL",
@@ -397,6 +421,7 @@ export async function paySalary(formData: FormData) {
       ...snapshot(salary!.employee),
     },
   });
+  await announcePaid([salary!], user.company.currency);
   await writeAudit({
     userId: user.id,
     employeeId: salary!.employeeId,

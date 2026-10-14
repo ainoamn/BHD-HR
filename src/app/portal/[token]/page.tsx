@@ -8,7 +8,9 @@ import { nationalityName } from "@/lib/nationalities";
 import { packageGross } from "@/lib/salary";
 import { Tr, TranslateToggle } from "@/components/ai-translate";
 import { cvCompleteness, cvFor, hasCvContent, readCv } from "@/lib/cv";
+import { PortalApp } from "@/components/portal-app";
 import { PortalRequests } from "@/components/portal-requests";
+import { vapidKeys } from "@/lib/notify";
 import { CUSTODY_DIRECTION, HELD_STATUS_LABEL, HELD_STATUS_TONE, heldDocLabel } from "@/lib/custody";
 import { LETTER_KIND, readAutoKinds, type LetterKind } from "@/lib/letters";
 import { submitEmployeeRequest } from "@/server/employee-request-actions";
@@ -73,6 +75,8 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
   const base = `/portal/${token}`;
   const session = await getSessionUser();
   const signedIn = session && session.employeeId === employee.id ? session : null;
+  /** HR opening someone's portal must not sign their own browser up for that employee's notifications. */
+  const staffViewer = Boolean(session && !signedIn && isStaffRole(session.role));
   const headerPill = "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20";
   const today = muscatDay();
   const [leaveTypes, attendance, credits, requests, salaries, documents, letters, clockToday, clockRecent, reviews, claims, employeeRequests, heldDocuments, custodyForms, manager] = await Promise.all([
@@ -313,6 +317,7 @@ export default async function PortalPage({ params, searchParams }: { params: Pro
         </aside>
         <main className="min-w-0 space-y-4">
           <Flash error={sp.error} message={sp.message} />
+          {staffViewer ? null : <PortalApp token={token} publicKey={(await vapidKeys()).publicKey} />}
           <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
             <div className="@container min-w-0 space-y-4">
               <Card id="profile" className="scroll-mt-16 lg:scroll-mt-6">

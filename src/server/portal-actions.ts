@@ -235,3 +235,28 @@ export async function clockPunch(input: { token: string; lat?: number | null; ln
   refreshAll();
   return { message: t(`سُجّل انصرافك ${muscatTime(now)}`, `Clocked out at ${muscatTime(now)}`) };
 }
+
+/** Saves a browser that allowed notifications from the portal; one employee keeps at most 10 browsers. */
+export async function savePushSubscription(input: { token: string; endpoint: string; p256dh: string; auth: string; userAgent?: string }) {
+  const employee = await portalEmployee(String(input.token || ""));
+  if (!employee) return { ok: false };
+  const endpoint = String(input.endpoint || "");
+  const p256dh = String(input.p256dh || "");
+  const auth = String(input.auth || "");
+  if (!/^https:\/\/[^\s]{10,1000}$/.test(endpoint) || p256dh.length < 20 || p256dh.length > 200 || auth.length < 8 || auth.length > 100) return { ok: false };
+  await prisma.pushSubscription.upsert({
+    where: { endpoint },
+    create: { employeeId: employee.id, endpoint, p256dh, auth, userAgent: clip(String(input.userAgent || ""), 200) },
+    update: { employeeId: employee.id, p256dh, auth },
+  });
+  const extra = await prisma.pushSubscription.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: "desc" }, skip: 10, select: { id: true } });
+  if (extra.length) await prisma.pushSubscription.deleteMany({ where: { id: { in: extra.map((row) => row.id) } } });
+  return { ok: true };
+}
+
+export async function removePushSubscription(input: { token: string; endpoint: string }) {
+  const employee = await portalEmployee(String(input.token || ""));
+  if (!employee) return { ok: false };
+  await prisma.pushSubscription.deleteMany({ where: { employeeId: employee.id, endpoint: String(input.endpoint || "") } });
+  return { ok: true };
+}

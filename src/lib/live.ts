@@ -6,7 +6,7 @@ const WRITES = new Set(["create", "createMany", "createManyAndReturn", "update",
  * Bookkeeping that is not data anyone is looking at; DailyBrief is also written while a page renders. ErrorEvent
  * must stay quiet: a page that fails while rendering would otherwise refresh itself into the same error forever.
  */
-const QUIET = new Set(["LiveSignal", "AuditLog", "DailyBrief", "StoredFile", "ErrorEvent", "BackupRun", "RateLimit"]);
+const QUIET = new Set(["LiveSignal", "AuditLog", "DailyBrief", "StoredFile", "ErrorEvent", "BackupRun", "RateLimit", "PushSubscription", "NoticeLog", "AppSecret"]);
 /** Updates that only record that someone looked at a page; they run while pages render, so signalling them would loop. */
 const SEEN_FIELDS = new Set(["lastSeenAt", "lastLoginAt"]);
 /** Company-wide records every employee portal shows (names, leave types, the company header). */

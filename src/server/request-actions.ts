@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
+import { after } from "next/server";
 import { writeAudit } from "@/lib/audit";
 import { requireActor, requireAdmin, requirePermission } from "@/lib/auth";
 import { parseWorkStart, validCoords } from "@/lib/clock";
@@ -10,7 +11,9 @@ import { go, refreshAll } from "@/lib/http";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { attendanceLabel, computeLeaveBalances, eachUtcDate, leaveName, parseAttendanceChoice } from "@/lib/leave";
+import { notifyEmployee } from "@/lib/notify";
 import { newPortalToken } from "@/lib/portal";
+import { requestOrigin } from "@/lib/request-origin";
 import { prisma } from "@/lib/prisma";
 import { removeUpload } from "@/lib/uploads";
 import { clip, daysLabel, formatDate, num, req, safeReturn, str } from "@/lib/utils";
@@ -35,6 +38,18 @@ export async function decideLeaveRequest(formData: FormData) {
   if (req(formData, "decision") !== "approve") {
     await prisma.leaveRequest.update({ where: { id: request!.id }, data: { status: "REJECTED", ...decided } });
     await writeAudit({ userId: user.id, employeeId: employee.id, action: "LEAVE_REQUEST_REJECT", message: `رفض طلب إجازة ${employee.fullName} ${period}${note ? ` — ${note}` : ""}` });
+    const origin = await requestOrigin();
+    after(() =>
+      notifyEmployee(
+        employee.id,
+        {
+          ar: { title: "رُفض طلب إجازتك", body: `طلبك ${period}${note ? ` — ${note}` : ""}` },
+          en: { title: "Your leave request was declined", body: `Your request ${period}${note ? ` — ${note}` : ""}` },
+          path: "#leave",
+        },
+        origin,
+      ),
+    );
     refreshAll();
     go(back, { message: t("رُفض الطلب", "Request rejected") });
   }
@@ -84,6 +99,19 @@ export async function decideLeaveRequest(formData: FormData) {
     action: "LEAVE_REQUEST_APPROVE",
     message: `وافق على ${kind} للموظف ${employee.fullName} ${period} (${dates.length} يوم)${overdraft ? ` — تجاوز الرصيد بـ ${daysLabel(overdraft)} يوم` : ""}`,
   });
+  const origin = await requestOrigin();
+  const kindEn = attendanceLabel({ type: choice!.type, balanceKey: choice!.balanceKey }, leaveTypes, "en");
+  after(() =>
+    notifyEmployee(
+      employee.id,
+      {
+        ar: { title: "تمت الموافقة على إجازتك", body: `${kind} ${period} (${dates.length} يوم)` },
+        en: { title: "Your leave was approved", body: `${kindEn} ${period} (${dates.length} day(s))` },
+        path: "#leave",
+      },
+      origin,
+    ),
+  );
   refreshAll();
   go(back, { message: lang === "en" ? `Approved and recorded: ${dates.length} day(s)` : `تمت الموافقة وسُجّلت ${dates.length} يوم في الحضور` });
 }

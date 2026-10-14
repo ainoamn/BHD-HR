@@ -212,6 +212,8 @@ model Employee {
   scheduleId         String?
   schedule           WorkSchedule?       @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   timeSheets         TimeSheet[]
+  pushSubscriptions  PushSubscription[]
+  notices            NoticeLog[]
   /// Key of the employee's personal portal link /portal/<token>; null = no portal.
   portalToken        String?             @unique
   /// Profile photo (/files/<name>, a square JPEG resized in the browser).
@@ -507,6 +509,42 @@ model ClockEntry {
 
   @@unique([employeeId, day])
   @@index([companyId, day])
+}
+
+/// A browser that allowed notifications from the employee's portal (src/lib/notify.ts).
+model PushSubscription {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId])
+}
+
+/// A notice sent to an employee, so reminders such as document expiry go out once per kind and reference.
+model NoticeLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind       String
+  ref        String
+  channels   String
+  createdAt  DateTime @default(now())
+
+  @@unique([employeeId, kind, ref])
+  @@index([companyId, createdAt])
+}
+
+/// Keys the app makes for itself on first use (the web-push VAPID pair); never shown in the UI.
+model AppSecret {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
 }
 
 /// A working pattern: times are "HH:MM" Muscat, an end before the start runs past midnight; workDays are 0 = Sunday … 6 = Saturday.

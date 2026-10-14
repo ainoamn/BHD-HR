@@ -26,7 +26,8 @@
     "next": "^15.5.4",
     "qrcode": "^1.5.4",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1151.0",
@@ -38,6 +39,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@types/web-push": "^3.6.4",
     "pg": "^8.23.1",
     "postcss": "^8.5.6",
     "prisma": "^6.16.2",
