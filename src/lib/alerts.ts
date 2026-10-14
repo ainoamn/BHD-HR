@@ -6,6 +6,7 @@ import { reminderDayIn, payDayFor } from "./calendar";
 import { muscatDateTime } from "./clock";
 import { DOC_LABEL, monthName } from "./constants";
 import { heldDocLabel } from "./custody";
+import { backupStatus, visibleErrorScope } from "./errors";
 import { daysUntil, describeExpiry } from "./expiry";
 import { getLeaveTypes } from "./hr-catalog";
 import { type Lang, makeT, pick } from "./i18n";
@@ -39,9 +40,47 @@ export const getAlerts = cache(async () => {
   const { lang } = await getI18n();
   const user = await getSessionUser();
   if (!user) return [] as AlertItem[];
-  const [personal, shared] = await Promise.all([taskNotices(user.id, user.companyId, lang), computeAlerts(user.company, user.permissions, lang)]);
-  return [...personal, ...shared];
+  const [personal, shared, system] = await Promise.all([
+    taskNotices(user.id, user.companyId, lang),
+    computeAlerts(user.company, user.permissions, lang),
+    user.role === "ADMIN" ? systemAlerts(user.companyId, lang) : [],
+  ]);
+  return [...personal, ...system, ...shared];
 });
+
+/** For admins: open errors their company (or, for the platform company, the whole system) ran into, and a missed backup. */
+async function systemAlerts(companyId: string, lang: Lang): Promise<AlertItem[]> {
+  const t = makeT(lang);
+  const { platform, where } = await visibleErrorScope(companyId);
+  const [open, backups] = await Promise.all([
+    prisma.errorEvent.aggregate({ where: { ...where, resolvedAt: null }, _count: true, _max: { lastAt: true } }),
+    platform ? backupStatus() : null,
+  ]);
+  const alerts: AlertItem[] = [];
+  if (backups?.overdue) {
+    alerts.push({
+      id: "system-backup",
+      severity: "danger",
+      title: t("النسخ الاحتياطي اليومي متأخر", "Daily backup is overdue"),
+      message: backups.lastOk
+        ? t(`آخر نسخة ناجحة ${formatDate(backups.lastOk.startedAt)}`, `Last successful backup ${formatDate(backups.lastOk.startedAt)}`)
+        : t("لم تنجح أي نسخة بعد", "No backup has succeeded yet"),
+      href: "/settings/system",
+      days: -950,
+    });
+  }
+  if (open._count) {
+    alerts.push({
+      id: "system-errors",
+      severity: "warning",
+      title: t(`${open._count} خطأ في النظام يحتاج مراجعة`, `${open._count} system error(s) to review`),
+      message: open._max.lastAt ? t(`آخرها ${formatDate(open._max.lastAt)}`, `Latest ${formatDate(open._max.lastAt)}`) : "",
+      href: "/settings/system",
+      days: -600,
+    });
+  }
+  return alerts;
+}
 
 /** Unread task notices for one user; they clear when the user opens the task. */
 async function taskNotices(userId: string, companyId: string, lang: Lang): Promise<AlertItem[]> {

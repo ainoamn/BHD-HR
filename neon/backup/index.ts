@@ -38,7 +38,7 @@ async function runBackup(now: Date) {
   const db = new Client({ connectionString: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL });
   await db.connect();
   const runId = randomUUID();
-  await record(db, `INSERT INTO "BackupRun" (id, "startedAt") VALUES ($1, now())`, [runId]);
+  await record(db, `INSERT INTO "BackupRun" (id, "startedAt") VALUES ($1, timezone('UTC', now()))`, [runId]);
   try {
     const { buffer, counts } = await dumpDatabase(db);
     const sealed = sealBackup(buffer, key);
@@ -49,13 +49,13 @@ async function runBackup(now: Date) {
     const rows = Object.values(counts).reduce((sum, count) => sum + count, 0);
     await record(
       db,
-      `UPDATE "BackupRun" SET "finishedAt" = now(), ok = true, "objectKey" = $2, bytes = $3, tables = $4, rows = $5, removed = $6 WHERE id = $1`,
+      `UPDATE "BackupRun" SET "finishedAt" = timezone('UTC', now()), ok = true, "objectKey" = $2, bytes = $3, tables = $4, rows = $5, removed = $6 WHERE id = $1`,
       [runId, objectKey, sealed.length, Object.keys(counts).length, rows, expired.length],
     );
     return { objectKey, bytes: sealed.length, rows, removed: expired.length };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await record(db, `UPDATE "BackupRun" SET "finishedAt" = now(), ok = false, error = $2 WHERE id = $1`, [runId, message.slice(0, 500)]);
+    await record(db, `UPDATE "BackupRun" SET "finishedAt" = timezone('UTC', now()), ok = false, error = $2 WHERE id = $1`, [runId, message.slice(0, 500)]);
     throw error;
   } finally {
     await db.end();

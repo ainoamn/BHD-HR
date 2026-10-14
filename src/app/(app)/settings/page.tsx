@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
+import { Activity, BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
 import { WorkSitePicker } from "@/components/work-site-picker";
 import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
@@ -15,6 +15,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { STAFF_ROLES, requireUser } from "@/lib/auth";
 import { channelReady } from "@/lib/delivery";
+import { backupStatus, visibleErrorScope } from "@/lib/errors";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { TEAM_PERMISSIONS, TEAM_PERMISSION_LABEL, normalizePermissions, readRoleMap, rolePreset, teamPreset } from "@/lib/permissions";
@@ -147,6 +148,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       : []),
   ];
   const Chevron = lang === "en" ? ChevronRight : ChevronLeft;
+  const errorScope = isAdmin ? await visibleErrorScope(user.companyId) : null;
+  const platformAdmin = Boolean(errorScope?.platform);
+  const [openErrors, backupOverdue] = errorScope
+    ? await Promise.all([prisma.errorEvent.count({ where: { ...errorScope.where, resolvedAt: null } }), platformAdmin ? backupStatus().then((status) => status.overdue) : false])
+    : [0, false];
   const autoKinds = readAutoKinds(user.company.letterAutoKinds);
 
   return (
@@ -203,6 +209,32 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 </span>
               </span>
               <Chevron size={20} className="relative shrink-0 text-white/60 transition group-hover:text-white" />
+            </Link>
+          ) : null}
+
+          {isAdmin ? (
+            <Link
+              href="/settings/system"
+              className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal-200"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+                  <Activity size={19} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-slate-900">{t("صحة النظام", "System health")}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                    {platformAdmin
+                      ? t("سجل الأخطاء والنسخ الاحتياطية اليومية.", "Error log and daily backups.")
+                      : t("سجل الأخطاء التي واجهها مستخدمو منشأتك.", "Errors your company's users ran into.")}
+                  </span>
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {openErrors ? <ToneBadge tone="red">{t(`${openErrors} خطأ مفتوح`, `${openErrors} open`)}</ToneBadge> : null}
+                {backupOverdue ? <ToneBadge tone="red">{t("النسخ الاحتياطي متأخر", "Backup overdue")}</ToneBadge> : null}
+                <Chevron size={18} className="text-slate-400 transition group-hover:text-teal-700" />
+              </span>
             </Link>
           ) : null}
 

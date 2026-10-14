@@ -1,9 +1,11 @@
 import { isPlaceholderEmail } from "@/lib/accounts";
 import { getDailyBrief } from "@/lib/brief";
 import { channelReady, sendEmailMessage, sendPendingCopies } from "@/lib/delivery";
+import { BACKUP_GRACE_HOURS, backupStatus, recordError } from "@/lib/errors";
 import { issueDueLetterDrafts } from "@/lib/letter-drafts";
 import { permissionsFor } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { purgeExpiredLimits } from "@/lib/rate-limit";
 import { originOf } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +14,22 @@ export const maxDuration = 60;
 /**
  * Runs every morning (vercel.json "crons"). Vercel sends `Authorization: Bearer $CRON_SECRET`; without the
  * secret configured the job refuses to run. Issues the letters scheduled for today, then for each company: sends waiting letter copies, and emails the
- * daily brief to admins and managers once the email channel is configured.
+ * daily brief to admins and managers once the email channel is configured. Also checks that last night's backup ran
+ * and clears expired attempt counters; any failure is recorded in the error log.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
   const origin = originOf(request);
+  try {
+    return Response.json(await runDaily(origin));
+  } catch (error) {
+    await recordError({ source: "CRON", message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : null, path: "/api/cron/daily", origin });
+    return Response.json({ ok: false }, { status: 500 });
+  }
+}
+
+async function runDaily(origin: string) {
   const scheduledLetters = await issueDueLetterDrafts(origin);
   const emailReady = channelReady("EMAIL");
   const companies = await prisma.company.findMany({ include: { memberships: { where: { acceptedAt: { not: null }, role: { in: ["ADMIN", "MANAGER"] } }, include: { user: true } } } });
@@ -46,5 +58,10 @@ export async function GET(request: Request) {
     }
     results.push({ company: company.id.slice(-6), sent: copies.sent, failed: copies.failed, briefs, errors });
   }
-  return Response.json({ ok: true, emailReady, scheduledLetters, results });
+  const backup = await backupStatus();
+  if (backup.overdue) {
+    await recordError({ source: "BACKUP", message: `No successful backup in the last ${BACKUP_GRACE_HOURS} hours`, path: "/settings/system", origin });
+  }
+  const limitsCleared = await purgeExpiredLimits();
+  return { ok: true, emailReady, scheduledLetters, results, backupOverdue: backup.overdue, limitsCleared };
 }

@@ -1174,6 +1174,38 @@ model LiveSignal {
   at    DateTime @default(now())
 }
 
+/// Attempt counters per hashed IP or account (src/lib/rate-limit.ts): sign-in, portal links, device checks.
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
+/// Server and browser errors grouped by fingerprint (src/lib/errors.ts), shown in Settings › System health.
+/// companyId = the signed-in user's company when known; null = public pages, portal, scheduled jobs (platform admins).
+model ErrorEvent {
+  id          String    @id @default(cuid())
+  companyId   String?
+  fingerprint String    @unique
+  /// SERVER, CLIENT, CRON or BACKUP.
+  source      String
+  message     String
+  /// Next.js error digest, matching the server log entry.
+  digest      String?
+  /// Page path with ids and tokens masked.
+  path        String?
+  stack       String?
+  count       Int       @default(1)
+  firstAt     DateTime  @default(now())
+  lastAt      DateTime  @default(now())
+  resolvedAt  DateTime?
+  notifiedAt  DateTime?
+
+  @@index([companyId, lastAt])
+}
+
 /// One run of the daily encrypted backup (neon/backup, written with plain SQL); shown in Settings › System health.
 model BackupRun {
   id         String    @id @default(cuid())
