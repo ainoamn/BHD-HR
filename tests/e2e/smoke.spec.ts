@@ -56,7 +56,8 @@ test.describe("signed in", () => {
     for (const [path, text] of [
       ["/settings/work", "جداول الدوام"],
       ["/attendance/timesheet", "تأخير وخروج مبكر"],
-      ["/employees/import", "استيراد موظفين من ملف"],
+      ["/employees/import", "إضافة موظفين دفعة واحدة"],
+      ["/employees/complete", "إكمال بيانات الموظفين"],
       ["/settings/system", "النسخ الاحتياطي"],
     ]) {
       await page.goto(path);
@@ -72,7 +73,7 @@ test.describe("signed in", () => {
 
   test("no page overflows a 360px screen", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
-    for (const path of ["/", "/employees", "/salaries", "/settings", "/settings/work", "/attendance/timesheet", "/employees/import", "/settings/system"]) {
+    for (const path of ["/", "/employees", "/salaries", "/settings", "/settings/work", "/attendance/timesheet", "/employees/import", "/employees/complete", "/settings/system"]) {
       await page.goto(path);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow, path).toBeLessThanOrEqual(1);

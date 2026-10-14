@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { checkRow, matchHeader, parseCsv, readDate, readTable } from "@/lib/employee-import";
+import { normalizeLabourWorker } from "@/lib/ai";
+import { profileGaps } from "@/lib/employee-gaps";
+import { checkRow, findHeaderRow, headerKeys, matchHeader, parseCsv, readDate, readEmployerKind, readTable } from "@/lib/employee-import";
 
 describe("headers", () => {
   it("matches Arabic, English, keys and the template's two-language headers", () => {
@@ -45,6 +47,94 @@ describe("rows", () => {
 
   it("needs a name column", () => {
     expect(readTable([["Phone"], ["123"]]).missingName).toBe(true);
+  });
+});
+
+describe("ministry of labour sheets", () => {
+  it("finds the header below title rows and reads the ministry's column names", () => {
+    const { rows, missingName } = readTable([
+      ["وزارة العمل — قائمة العمال"],
+      ["اسم المنشأة: شركة تجربة", ""],
+      ["م", "اسم العامل", "الرقم المدني", "الجنسية", "المهنة", "رقم ترخيص العمل", "تاريخ انتهاء الترخيص", "اسم صاحب العمل", "السجل التجاري"],
+      ["1", "عامل تجريبي", "12345678", "Pakistani", "عامل بناء", "WP-77", "31/12/2027", "شركة تجربة", "1234567"],
+      ["م", "اسم العامل", "الرقم المدني", "", "", "", "", "", ""],
+      ["2", "", "", "", "", "", "", "", ""],
+    ]);
+    expect(missingName).toBe(false);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].line).toBe(4);
+    expect(rows[0].errors).toEqual([]);
+    expect(rows[0].values).toMatchObject({
+      fullName: "عامل تجريبي",
+      idNumber: "12345678",
+      nationality: "PK",
+      jobTitle: "عامل بناء",
+      workPermitNumber: "WP-77",
+      workPermitExpiry: "2027-12-31",
+      employerName: "شركة تجربة",
+      employerIdNumber: "1234567",
+    });
+  });
+
+  it("uses each field once and accepts an English name alone", () => {
+    expect(headerKeys(["Name", "Worker name", "Phone"])).toEqual(["fullName", null, "phone"]);
+    const { rows } = readTable([["Name English", "Civil No"], ["Test Worker", "99"]]);
+    expect(rows[0].values).toMatchObject({ fullName: "Test Worker", nameEn: "Test Worker", idNumber: "99" });
+    expect(findHeaderRow([["x"], ["y"], ["الاسم الكامل", "الجنسية"]])).toBe(2);
+  });
+
+  it("reads the sponsor type", () => {
+    expect(readEmployerKind("شركة")).toBe("COMPANY");
+    expect(readEmployerKind("Individual")).toBe("PERSON");
+    expect(readEmployerKind("فرد")).toBe("PERSON");
+    expect(readEmployerKind("?")).toBe("");
+  });
+});
+
+describe("missing details", () => {
+  const base = {
+    nationality: "OM",
+    gender: "MALE",
+    dateOfBirth: new Date("1990-01-01"),
+    phone: "96890000000",
+    idNumber: "1",
+    idExpiry: new Date("2030-01-01"),
+    passportNumber: null,
+    passportExpiry: null,
+    employerId: null,
+    jobTitle: "Clerk",
+    joiningDate: new Date("2024-01-01"),
+    basicSalary: 500,
+    bankBic: "BMUSOMRX",
+    bankAccount: "1",
+  };
+
+  it("asks Omanis only for the common details", () => {
+    expect(profileGaps(base)).toEqual([]);
+    expect(profileGaps({ ...base, phone: " ", basicSalary: 0, bankAccount: null })).toEqual(["phone", "basicSalary", "bank"]);
+  });
+
+  it("asks expatriates for passport, sponsor and work permit", () => {
+    expect(profileGaps({ ...base, nationality: "IN", hasWorkPermit: false })).toEqual(["passportNumber", "passportExpiry", "employer", "workPermit"]);
+    expect(profileGaps({ ...base, nationality: "IN", passportNumber: "P", passportExpiry: new Date(), employerId: "e" })).toEqual([]);
+  });
+});
+
+describe("labour file values", () => {
+  it("keeps clean values and drops malformed ones", () => {
+    const worker = normalizeLabourWorker({
+      fullName: "  عامل   تجريبي ",
+      nationality: "in",
+      gender: "male",
+      dateOfBirth: "1990-13-01",
+      idExpiry: "2028-02-29",
+      basicSalary: "OMR 325.500",
+      idNumber: "12 34 56",
+      employerKind: "company",
+      jobTitle: 7,
+    });
+    expect(worker).toMatchObject({ fullName: "عامل تجريبي", nationality: "IN", gender: "MALE", dateOfBirth: "", idExpiry: "2028-02-29", basicSalary: "325.5", idNumber: "123456", employerKind: "COMPANY", jobTitle: "7" });
+    expect(worker.passportNumber).toBe("");
   });
 });
 

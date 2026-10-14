@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Plan } from "@prisma/client";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Gift, Sparkles } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
-import { CYCLE_LABEL, FEATURES, FEATURE_LABEL, formatRial, limitText, priceFor, readFeatures, yearlySavingMonths, type Cycle } from "@/lib/plans";
+import { CYCLE_LABEL, FEATURES, FEATURE_LABEL, formatRial, isFreePlan, limitText, priceFor, readFeatures, yearlySavingMonths, type Cycle } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 type PlanView = Pick<Plan, "id" | "code" | "name" | "nameEn" | "tagline" | "taglineEn" | "priceMonthly" | "priceYearly" | "maxEmployees" | "maxUsers" | "features" | "contactOnly" | "highlight">;
@@ -46,7 +46,7 @@ export function PlanGrid({
   const t = (ar: string, en: string) => (lang === "en" ? en : ar);
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {plans.map((plan) => {
+      {plans.filter((plan) => !isFreePlan(plan)).map((plan) => {
         const price = priceFor(plan, cycle);
         const features = readFeatures(plan.features);
         const saving = cycle === "YEARLY" ? yearlySavingMonths(plan) : 0;
@@ -109,6 +109,34 @@ export function PlanGrid({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** The free plan, shown as one strip under the paid plans rather than a fifth card. */
+export function FreePlanStrip({ plans, lang, current, action }: { plans: PlanView[]; lang: Lang; current?: boolean; action: React.ReactNode }) {
+  const plan = plans.find((item) => isFreePlan(item));
+  if (!plan) return null;
+  const t = (ar: string, en: string) => (lang === "en" ? en : ar);
+  return (
+    <div className="flex flex-col gap-4 rounded-3xl border border-dashed border-teal-300 bg-teal-50/60 p-5 sm:flex-row sm:items-center sm:p-6">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-teal-700 shadow-card ring-1 ring-inset ring-teal-100">
+        <Gift size={22} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-900">{lang === "en" && plan.nameEn ? plan.nameEn : plan.name}</h3>
+          <span className="rounded-full bg-teal-700 px-2.5 py-0.5 text-xs font-bold text-white">{t("مجاناً دائماً", "Free forever")}</span>
+          {current ? <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-teal-800 ring-1 ring-inset ring-teal-200/70">{t("باقتك", "Your plan")}</span> : null}
+        </div>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          {t(
+            `حتى ${limitText(plan.maxEmployees, lang)} موظف و${limitText(plan.maxUsers, lang)} مستخدم: الرواتب مع ملف WPS والحماية الاجتماعية، والحضور والإجازات، والمستندات وبوابة الموظف.`,
+            `Up to ${limitText(plan.maxEmployees, lang)} employees and ${limitText(plan.maxUsers, lang)} user: payroll with WPS and social protection, attendance and leave, documents and the employee portal.`,
+          )}
+        </p>
+      </div>
+      <div className="shrink-0 sm:w-48">{action}</div>
     </div>
   );
 }

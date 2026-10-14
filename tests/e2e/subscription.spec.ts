@@ -85,4 +85,15 @@ test.describe("platform admin and plans", () => {
     await page.goto("/billing");
     await expect(page.getByText("الأعمال").first()).toBeVisible();
   });
+
+  test("the free plan is offered but refused while the company is over its limits", async ({ page }) => {
+    await page.goto("/pricing");
+    await expect(page.getByText("مجاناً دائماً").first()).toBeVisible();
+    await page.goto("/billing");
+    await expect(page.getByText("مجاناً دائماً").first()).toBeVisible();
+    await page.getByRole("button", { name: "انتقل إلى المجانية" }).click();
+    const dialog = page.locator("dialog[open]");
+    if (await dialog.isVisible()) await dialog.getByRole("button", { name: "تأكيد" }).click();
+    await expect(page.getByText(/تسمح بـ 2 موظف ولديك/).first()).toBeVisible();
+  });
 });

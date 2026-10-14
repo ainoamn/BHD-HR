@@ -115,6 +115,13 @@ export default async function Welcome({ searchParams }: { searchParams: Promise<
       a: t(`لا. التجربة ${info.trialDays} يوماً بكل المزايا ودون أي بيانات دفع. عند انتهائها تختار الباقة وتدفع.`, `No. The trial is ${info.trialDays} days with every feature and no payment details. When it ends you pick a plan and pay.`),
     },
     {
+      q: t("هل توجد باقة مجانية؟", "Is there a free plan?"),
+      a: t(
+        "نعم، مجانية دائماً لمنشأة فيها موظفان ومستخدم واحد: الرواتب مع ملف WPS والحماية الاجتماعية، والحضور والإجازات، والمستندات وبوابة الموظف. تنتقل إليها من صفحة الاشتراك بلا دفع، وتترقّى متى شئت.",
+        "Yes, free forever for a business with two employees and one user: payroll with WPS and social protection, attendance and leave, documents and the employee portal. Switch to it from the subscription page with no payment, and upgrade whenever you like.",
+      ),
+    },
+    {
       q: t("كيف أدفع؟", "How do I pay?"),
       a: t("بالبطاقة البنكية عبر بوابة ثواني العُمانية فتتفعّل الباقة فوراً، أو بالتحويل البنكي ونفعّلها بعد تأكيد وصول المبلغ. تصلك فاتورة بكل دفعة.", "By card through Oman's Thawani gateway and the plan starts at once, or by bank transfer and we activate it once the money arrives. You get a receipt for every payment."),
     },

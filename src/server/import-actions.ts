@@ -1,21 +1,26 @@
 "use server";
 
 import ExcelJS from "exceljs";
+import { aiMapImportColumns } from "@/lib/ai";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
-import { newBadgeToken } from "@/lib/badge";
-import { MAX_IMPORT_ROWS, checkRow, parseCsv, readTable, type ImportRow, type ImportValues } from "@/lib/employee-import";
-import { nextEmployeeNumber } from "@/lib/employee-number";
-import { getHrCatalog } from "@/lib/hr-catalog";
+import { IMPORT_COLUMNS, MAX_IMPORT_ROWS, checkRow, findHeaderRow, headerKeys, parseCsv, readTable, type ImportRow, type ImportValues } from "@/lib/employee-import";
+import { findExistingEmployees, intakeContext, saveIntake } from "@/lib/employee-intake";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import { prisma } from "@/lib/prisma";
-import { fitsLimit, limitMessage } from "@/lib/subscription";
-import { parseDateInput } from "@/lib/utils";
+import { aiOpen, fitsLimit, limitMessage } from "@/lib/subscription";
 
 const MAX_FILE = 5 * 1024 * 1024;
 
-export type ImportPreview = { rows: ImportRow[]; ignored: string[]; tooMany?: boolean; error?: string; fileName?: string };
+export type ImportPreview = {
+  rows: ImportRow[];
+  ignored: string[];
+  /** Columns the AI recognised: the heading in the file and the field it was read as. */
+  aiColumns?: { header: string; key: string }[];
+  tooMany?: boolean;
+  error?: string;
+  fileName?: string;
+};
 
 function cellText(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return "";
@@ -47,23 +52,29 @@ async function readSheet(file: File): Promise<string[][]> {
   return Array.from(table, (row) => row ?? []);
 }
 
-/** Rows whose ID or passport number another employee of the company already has get an error. */
-async function markExisting(companyId: string, rows: ImportRow[]) {
-  const ids = rows.map((row) => row.values.idNumber).filter(Boolean);
-  const passports = rows.map((row) => row.values.passportNumber).filter(Boolean);
-  if (!ids.length && !passports.length) return;
-  const existing = await prisma.employee.findMany({
-    where: { companyId, OR: [{ idNumber: { in: ids, mode: "insensitive" } }, { passportNumber: { in: passports, mode: "insensitive" } }] },
-    select: { fullName: true, employeeNumber: true, idNumber: true, passportNumber: true },
+/** Headings the built-in names did not recognise, read by the AI from the heading and a few values under it. */
+async function aiKeys(header: string[], body: string[][], keys: (string | null)[]) {
+  const unknown = header.map((cell, index) => (String(cell ?? "").trim() && !keys[index] ? index : -1)).filter((index) => index >= 0);
+  if (!unknown.length) return { keys, aiColumns: [] };
+  const used = new Set(keys.filter(Boolean));
+  const fields = IMPORT_COLUMNS.filter((column) => !used.has(column.key)).map(({ key, ar, en }) => ({ key, ar, en }));
+  const samples = unknown.map((index) =>
+    body
+      .map((row) => String(row?.[index] ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((value) => value.slice(0, 60)),
+  );
+  const mapped = await aiMapImportColumns({ fields, headers: unknown.map((index) => String(header[index]).slice(0, 80)), samples });
+  const next = [...keys];
+  const aiColumns: { header: string; key: string }[] = [];
+  mapped.forEach((key, position) => {
+    if (!key || used.has(key)) return;
+    used.add(key);
+    next[unknown[position]] = key;
+    aiColumns.push({ header: String(header[unknown[position]]), key });
   });
-  for (const row of rows) {
-    const match = existing.find(
-      (employee) =>
-        (row.values.idNumber && employee.idNumber?.toUpperCase() === row.values.idNumber.toUpperCase()) ||
-        (row.values.passportNumber && employee.passportNumber?.toUpperCase() === row.values.passportNumber.toUpperCase()),
-    );
-    if (match) row.errors.push(`موجود مسبقاً: ${match.fullName} (${match.employeeNumber}) / Already on file`);
-  }
+  return { keys: next, aiColumns };
 }
 
 /** Step 1: reads the uploaded file and returns every row checked, without saving anything. */
@@ -80,19 +91,42 @@ export async function previewEmployeeImport(_previous: ImportPreview | null, for
   } catch {
     return { rows: [], ignored: [], error: t("تعذرت قراءة الملف. احفظه بصيغة ‎.xlsx أو ‎.csv وحاول مجدداً.", "Could not read the file. Save it as .xlsx or .csv and try again.") };
   }
-  const result = readTable(table);
+  const headerRow = findHeaderRow(table);
+  const header = table[headerRow] ?? [];
+  let keys = headerKeys(header);
+  let aiColumns: { header: string; key: string }[] = [];
+  if (await aiOpen(user.companyId)) {
+    try {
+      ({ keys, aiColumns } = await aiKeys(header, table.slice(headerRow + 1, headerRow + 12), keys));
+    } catch (error) {
+      console.error("AI column mapping failed", error);
+    }
+  }
+  const result = readTable(table, { headerRow, keys });
   if (result.missingName) {
-    return { rows: [], ignored: [], error: t("لم يُعثر على عمود «الاسم الكامل» في الصف الأول. استخدم القالب.", "No “Full name” column in the first row. Use the template.") };
+    return {
+      rows: [],
+      ignored: [],
+      error: t("لم يُعثر على عمود «الاسم الكامل» أو «اسم العامل». استخدم القالب أو أضف عنواناً لعمود الاسم.", "No “Full name” or “Worker name” column was found. Use the template or add a heading to the name column."),
+    };
   }
   if (!result.rows.length) return { rows: [], ignored: result.ignored, error: t("لا توجد صفوف بيانات في الملف", "The file has no data rows") };
-  await markExisting(user.companyId, result.rows);
-  return { rows: result.rows, ignored: result.ignored, tooMany: result.tooMany, fileName: file.name };
+  const existing = await findExistingEmployees(
+    user.companyId,
+    result.rows.map((row) => row.values),
+  );
+  result.rows.forEach((row, index) => (row.existing = existing[index]));
+  return { rows: result.rows, ignored: result.ignored, aiColumns, tooMany: result.tooMany, fileName: file.name };
 }
 
-/** Step 2: creates the rows that passed, checking each one again. Rows with any problem are skipped. */
+/**
+ * Step 2: saves the rows that passed, checking each one again. New employees are added; employees already on
+ * file are updated with the file's values when `updateExisting` is on, else skipped. Rows with errors are skipped.
+ */
 export async function importEmployees(formData: FormData) {
   const user = await requirePermission("employees.create", "/employees");
   const { t } = await getI18n();
+  const update = formData.get("updateExisting") === "on" && can(user, "employees.edit");
   let payload: ImportValues[] = [];
   try {
     const parsed = JSON.parse(String(formData.get("payload") || "[]"));
@@ -101,83 +135,54 @@ export async function importEmployees(formData: FormData) {
     payload = [];
   }
   const rows = payload.map((values, index) => checkRow(Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value ?? "")])), index + 2));
-  await markExisting(user.companyId, rows);
-  const valid = rows.filter((row) => !row.errors.length);
-  if (!valid.length) go("/employees/import", { error: t("لا توجد صفوف صالحة للاستيراد", "No valid rows to import") });
-  const room = await fitsLimit(user.companyId, "employees", valid.length);
+  const existing = await findExistingEmployees(
+    user.companyId,
+    rows.map((row) => row.values),
+  );
+  const valid = rows.map((row, index) => ({ row, existing: existing[index] })).filter(({ row }) => !row.errors.length);
+  const fresh = valid.filter((item) => !item.existing);
+  const matched = valid.filter((item) => item.existing);
+  if (!fresh.length && !(update && matched.length)) {
+    go("/employees/import", {
+      error: matched.length
+        ? t("كل الموظفين في الملف مسجلون مسبقاً. فعّل «تحديث بيانات الموظفين الموجودين» لتحديثهم.", "Everyone in the file is already on record. Turn on “Update existing employees” to update them.")
+        : t("لا توجد صفوف صالحة للاستيراد", "No valid rows to import"),
+    });
+  }
+  const room = await fitsLimit(user.companyId, "employees", fresh.length);
   if (!room.ok) {
     go("/employees/import", {
       error: `${limitMessage("employees", room, t)} ${t(`المتاح الآن: ${Math.max(0, room.limit - room.used)}.`, `Room left: ${Math.max(0, room.limit - room.used)}.`)}`,
     });
   }
-  const salaryAccess = can(user, "salaries.edit");
-  const catalog = await getHrCatalog(user.companyId);
-  const jobs = [...catalog.jobTitles];
-  const departments = [...catalog.departments];
-  const findOrCreate = async <T extends { id: string; nameAr: string; nameEn: string | null }>(list: T[], name: string | undefined, create: (nameAr: string) => Promise<T>) => {
-    if (!name) return null;
-    const lower = name.toLowerCase();
-    let item = list.find((entry) => entry.nameAr === name || entry.nameEn?.toLowerCase() === lower);
-    if (!item) {
-      item = await create(name);
-      list.push(item);
-    }
-    return item;
-  };
-  const first = Number((await nextEmployeeNumber(user.companyId)).replace(/\D/g, ""));
+  const since = Date.now() - 1000;
+  const ctx = await intakeContext(user);
   let created = 0;
-  for (const [index, { values }] of valid.entries()) {
-    const job = await findOrCreate(jobs, values.jobTitle, (nameAr) => prisma.jobTitle.create({ data: { companyId: user.companyId, nameAr } }));
-    const department = await findOrCreate(departments, values.department, (nameAr) => prisma.department.create({ data: { companyId: user.companyId, nameAr } }));
-    const date = (key: string) => (values[key] ? parseDateInput(values[key]) : null);
-    const amount = (key: string) => (salaryAccess && values[key] ? Number(values[key]) : 0);
-    await prisma.employee.create({
-      data: {
-        companyId: user.companyId,
-        employeeNumber: `EMP-${String(first + index).padStart(4, "0")}`,
-        badgeToken: newBadgeToken(),
-        fullName: values.fullName,
-        nameEn: values.nameEn || null,
-        nationality: values.nationality || null,
-        gender: values.gender || null,
-        dateOfBirth: date("dateOfBirth"),
-        phone: values.phone || null,
-        email: values.email || null,
-        idNumber: values.idNumber || null,
-        idExpiry: date("idExpiry"),
-        passportNumber: values.passportNumber || null,
-        passportExpiry: date("passportExpiry"),
-        residenceNumber: values.residenceNumber || null,
-        residenceExpiry: date("residenceExpiry"),
-        joiningDate: date("joiningDate"),
-        contractEnd: date("contractEnd"),
-        jobTitleId: job?.id ?? null,
-        jobTitle: job?.nameAr ?? null,
-        jobTitleEn: job?.nameEn ?? null,
-        departmentId: department?.id ?? null,
-        department: department?.nameAr ?? null,
-        departmentEn: department?.nameEn ?? null,
-        basicSalary: amount("basicSalary"),
-        housingAllowance: amount("housingAllowance"),
-        transportAllowance: amount("transportAllowance"),
-        otherAllowance: amount("otherAllowance"),
-        bankBic: salaryAccess ? values.bankBic || null : null,
-        bankAccount: salaryAccess ? values.bankAccount || null : null,
-      },
-    });
-    created += 1;
+  let updated = 0;
+  const sponsors = new Set<string>();
+  const done = new Set<string>();
+  for (const item of update ? valid : fresh) {
+    if (item.existing && done.has(item.existing.id)) continue;
+    const result = await saveIntake(ctx, item.row.values, item.existing?.id ?? null);
+    done.add(result.employee.id);
+    if (result.created) created += 1;
+    else updated += 1;
+    if (result.sponsor?.created) sponsors.add(result.sponsor.name);
   }
-  const skipped = rows.length - valid.length;
+  const skipped = rows.length - created - updated;
   await writeAudit({
     userId: user.id,
     action: "EMPLOYEE_IMPORT",
-    message: t(`استورد ${created} موظفاً من ملف${skipped ? ` (تخطى ${skipped} صفاً فيه أخطاء)` : ""}`, `Imported ${created} employee(s) from a file${skipped ? ` (skipped ${skipped} with errors)` : ""}`),
+    message: t(
+      `استورد ${created} موظفاً جديداً${updated ? ` وحدّث ${updated}` : ""} من ملف${sponsors.size ? `، وأضاف ${sponsors.size} كفيلاً` : ""}${skipped ? ` (تخطى ${skipped} صفاً)` : ""}`,
+      `Imported ${created} new employee(s)${updated ? `, updated ${updated}` : ""} from a file${sponsors.size ? `, added ${sponsors.size} sponsor(s)` : ""}${skipped ? ` (skipped ${skipped} row(s))` : ""}`,
+    ),
   });
   refreshAll();
-  go("/employees", {
+  go(`/employees/complete?since=${since}`, {
     message: t(
-      `استُورد ${created} موظفاً${skipped ? `، وتُخطّي ${skipped} صفاً فيه أخطاء` : ""}. افتح ملف كل موظف لإضافة الوثائق وفتح حساب البوابة.`,
-      `Imported ${created} employee(s)${skipped ? `; skipped ${skipped} with errors` : ""}. Open each file to add documents and portal access.`,
+      `أُضيف ${created} موظفاً${updated ? ` وحُدّثت بيانات ${updated}` : ""}${sponsors.size ? `، وفُتح ${sponsors.size} كفيل جديد` : ""}${skipped ? `، وتُخطّي ${skipped} صفاً (أخطاء أو موجود مسبقاً)` : ""}. أكمل البيانات الناقصة أدناه.`,
+      `Added ${created} employee(s)${updated ? `, updated ${updated}` : ""}${sponsors.size ? `, opened ${sponsors.size} new sponsor(s)` : ""}${skipped ? `; skipped ${skipped} row(s) (errors or already on record)` : ""}. Complete the missing details below.`,
     ),
   });
 }

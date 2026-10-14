@@ -49,12 +49,24 @@ export async function GET(request: Request) {
     account: t("رقم الحساب", "Account number"),
     phone: t("رقم الهاتف، يُضاف رمز عُمان 968 إن لم يُكتب رمز", "Phone; Oman's 968 is added when no code is given"),
     email: t("البريد الإلكتروني", "Email address"),
+    employerKind: t("شركة أو فرد (Company / Individual)", "Company or Individual"),
+  };
+  const columnHints: Record<string, string> = {
+    employerName: t("اسم الكفيل أو المنشأة؛ إن لم يكن مسجلاً يُفتح كفيل جديد تلقائياً", "Sponsor or establishment name; a new sponsor is opened automatically if not on record"),
+    employerIdNumber: t("السجل التجاري للشركة أو الرقم المدني للكفيل الفرد", "The company's CR number, or the individual sponsor's civil number"),
+    workPermitNumber: t("يُحفظ ضمن وثائق الموظف كتصريح عمل مع تاريخ انتهائه", "Kept in the employee's documents as a work permit with its expiry"),
   };
   for (const column of columns) {
-    help.addRow({ name: `${column.ar} / ${column.en}${column.required ? " *" : ""}`, hint: hints[column.kind] });
+    help.addRow({ name: `${column.ar} / ${column.en}${column.required ? " *" : ""}`, hint: columnHints[column.key] ?? hints[column.kind] });
   }
   help.addRow({});
-  help.addRow({ name: t("ملاحظات", "Notes"), hint: t("الصف الأول أسماء الأعمدة ولا يُغيَّر. يمكن حذف الأعمدة غير المطلوبة. الحد 500 موظف في الملف. يُرفض الصف إن كان رقم البطاقة أو الجواز مسجلاً لموظف آخر.", "Keep the first row as the column names. Columns you do not need can be removed. Up to 500 employees per file. A row is refused if its ID or passport number is already on file.") });
+  help.addRow({
+    name: t("ملاحظات", "Notes"),
+    hint: t(
+      "الصف الأول أسماء الأعمدة ولا يُغيَّر. يمكن حذف الأعمدة غير المطلوبة، ويُقبل ملف وزارة العمل المصدّر بأسماء أعمدته. الحد 500 موظف في الملف. من كان رقمه المدني أو جوازه أو تصريح عمله مسجلاً يُنبَّه عليه، ويمكن اختيار تحديث بياناته.",
+      "Keep the first row as the column names. Columns you do not need can be removed; a Ministry of Labour export is accepted with its own column names. Up to 500 employees per file. Rows whose civil, passport or work permit number is already on file are flagged, and you can choose to update them.",
+    ),
+  });
 
   const buffer = await book.xlsx.writeBuffer();
   return new NextResponse(buffer as ArrayBuffer, {

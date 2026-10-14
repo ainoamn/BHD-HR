@@ -1,6 +1,6 @@
 import type { Plan, Subscription } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { FEATURES, formatRial, limitText, priceFor, readFeatures, yearlySavingMonths } from "@/lib/plans";
+import { DEFAULT_PLANS, FEATURES, formatRial, isFreePlan, limitText, priceFor, readFeatures, yearlySavingMonths } from "@/lib/plans";
 import { addMonths, computeAccess, hasFeature, periodAfterPayment, planPermissions, planTeamPermissions } from "@/lib/subscription";
 
 const DAY = 86_400_000;
@@ -25,6 +25,26 @@ const sub = (over: Partial<Subscription> = {}, planOver: Partial<Plan> = {}) =>
     plan: plan(planOver),
     ...over,
   }) as Subscription & { plan: Plan };
+
+describe("free plan", () => {
+  it("is the one public plan without a price that is not arranged with sales", () => {
+    const free = DEFAULT_PLANS.find((item) => item.code === "FREE")!;
+    expect(isFreePlan(free)).toBe(true);
+    expect(free).toMatchObject({ maxEmployees: 2, maxUsers: 1, features: [] });
+    expect(DEFAULT_PLANS.filter((item) => isFreePlan(item)).map((item) => item.code)).toEqual(["FREE"]);
+    expect(isFreePlan({ priceMonthly: 0, priceYearly: 0, contactOnly: true })).toBe(false);
+  });
+
+  it("never expires and keeps only the core open", () => {
+    const access = computeAccess({
+      companyStatus: "ACTIVE",
+      subscription: sub({ currentPeriodEnd: null }, { code: "FREE", priceMonthly: 0, priceYearly: 0, maxEmployees: 2, maxUsers: 1, features: [] }),
+      now: new Date(now.getTime() + 3650 * DAY),
+    });
+    expect(access).toMatchObject({ state: "ACTIVE", active: true, maxEmployees: 2, maxUsers: 1, endsAt: null, features: [] });
+    expect(planPermissions(["employees.view", "salaries.create", "attendance.create", "tasks.view", "letters.create"] as never[], access)).toEqual(["employees.view", "salaries.create", "attendance.create"]);
+  });
+});
 
 describe("company access", () => {
   it("keeps companies from before plans fully open", () => {

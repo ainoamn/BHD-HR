@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
@@ -8,7 +9,7 @@ import { channelReady, sendEmailMessage } from "@/lib/delivery";
 import { go } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { receiptNumber, writePlatformLog } from "@/lib/platform";
-import { formatRial, isCycle, priceFor } from "@/lib/plans";
+import { formatRial, isCycle, isFreePlan, priceFor } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { clientIp } from "@/lib/rate-limit";
 import { requestOrigin } from "@/lib/request-origin";
@@ -55,6 +56,40 @@ async function chosenPlan(formData: FormData, companyId: string) {
     });
   }
   return { plan: plan!, cycle, amount, planName: lang === "en" && plan!.nameEn ? plan!.nameEn : plan!.name };
+}
+
+/** The free plan needs no payment: it starts now, has no end date, and only fits a company within its limits. */
+export async function chooseFreePlan(formData: FormData) {
+  const user = await requireBillingAdmin();
+  const { lang, t } = await getI18n();
+  const plan = await prisma.plan.findUnique({ where: { code: req(formData, "plan") } });
+  if (!plan || !plan.isActive || !plan.isPublic || !isFreePlan(plan)) go(BACK, { error: t("الباقة غير متاحة", "This plan is not available") });
+  const current = await prisma.subscription.findUnique({ where: { companyId: user.companyId } });
+  if (current?.planId === plan!.id && current.status === "ACTIVE" && !current.currentPeriodEnd) go(BACK, { message: t("أنت على الباقة المجانية", "You are on the free plan") });
+  const [employees, users] = await Promise.all([countedEmployees(user.companyId), countedUsers(user.companyId)]);
+  const planName = lang === "en" && plan!.nameEn ? plan!.nameEn : plan!.name;
+  if (plan!.maxEmployees !== null && employees > plan!.maxEmployees) {
+    go(BACK, {
+      error: t(
+        `الباقة ${planName} تسمح بـ ${plan!.maxEmployees} موظف ولديك ${employees}. أنهِ خدمة من لم يعد يعمل أو اختر باقة مدفوعة.`,
+        `The ${planName} plan allows ${plan!.maxEmployees} employees and you have ${employees}. End the service of those who left or choose a paid plan.`,
+      ),
+    });
+  }
+  if (plan!.maxUsers !== null && users > plan!.maxUsers) {
+    go(BACK, {
+      error: t(
+        `الباقة ${planName} تسمح بـ ${plan!.maxUsers} مستخدم ولديك ${users}. أزل المستخدمين الإضافيين من الإعدادات أو اختر باقة مدفوعة.`,
+        `The ${planName} plan allows ${plan!.maxUsers} user(s) and you have ${users}. Remove the extra users in Settings or choose a paid plan.`,
+      ),
+    });
+  }
+  const now = new Date();
+  const data = { planId: plan!.id, status: "ACTIVE", cycle: "MONTHLY", trialEndsAt: null, currentPeriodStart: now, currentPeriodEnd: null, maxEmployees: null, maxUsers: null, extraFeatures: Prisma.DbNull, lastReminder: null };
+  await prisma.subscription.upsert({ where: { companyId: user.companyId }, update: data, create: { companyId: user.companyId, ...data } });
+  await writeAudit({ userId: user.id, action: "BILLING_FREE", message: `انتقل إلى الباقة المجانية ${plan!.name}` });
+  await writePlatformLog({ userId: user.id, userName: user.name, companyId: user.companyId, action: "PLAN_FREE", message: `${user.company.name}: ${plan!.name}` });
+  go(BACK, { message: t("أنت الآن على الباقة المجانية. يمكنك الترقية في أي وقت.", "You are now on the free plan. You can upgrade any time.") });
 }
 
 async function tooManyPending(companyId: string) {

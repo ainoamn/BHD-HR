@@ -94,6 +94,22 @@ export type PlanSeed = {
 /** Starting plans, created once; the platform admin changes prices, limits and features from /admin/plans. */
 export const DEFAULT_PLANS: PlanSeed[] = [
   {
+    code: "FREE",
+    name: "المجانية",
+    nameEn: "Free",
+    tagline: "الرواتب والحضور لمنشأة صغيرة جداً، مجاناً دائماً",
+    taglineEn: "Payroll and attendance for a very small business, free forever",
+    priceMonthly: 0,
+    priceYearly: 0,
+    maxEmployees: 2,
+    maxUsers: 1,
+    features: [],
+    isPublic: true,
+    contactOnly: false,
+    highlight: false,
+    sortOrder: 5,
+  },
+  {
     code: "BASIC",
     name: "الأساسية",
     nameEn: "Basic",
@@ -158,6 +174,11 @@ export const DEFAULT_PLANS: PlanSeed[] = [
     sortOrder: 40,
   },
 ];
+
+/** A plan anyone can switch to without paying: no price for either period and not arranged with sales. */
+export function isFreePlan(plan: { priceMonthly: number; priceYearly: number; contactOnly: boolean }) {
+  return !plan.contactOnly && plan.priceMonthly <= 0 && plan.priceYearly <= 0;
+}
 
 export function priceFor(plan: { priceMonthly: number; priceYearly: number }, cycle: string) {
   return cycle === "YEARLY" ? plan.priceYearly : plan.priceMonthly;

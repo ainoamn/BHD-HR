@@ -1,20 +1,25 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
-import { CircleAlert, CircleCheck, FileSpreadsheet, Upload } from "lucide-react";
+import Link from "next/link";
+import { useActionState, useMemo, useState } from "react";
+import { CircleAlert, CircleCheck, FileSpreadsheet, Sparkles, Upload, UserCheck } from "lucide-react";
 import { useLang } from "@/components/lang-provider";
 import { SubmitButton } from "@/components/submit-button";
 import { fieldClass } from "@/components/ui";
 import { importEmployees, previewEmployeeImport, type ImportPreview } from "@/server/import-actions";
 
-const SHOWN = ["fullName", "nationality", "idNumber", "passportNumber", "jobTitle", "joiningDate", "basicSalary"] as const;
+const SHOWN = ["fullName", "nationality", "idNumber", "passportNumber", "jobTitle", "employerName", "joiningDate", "basicSalary"] as const;
 
 /** Upload → check every row → import the rows without problems. Nothing is saved before the second step. */
-export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
+export function EmployeeImport({ labels, canUpdate }: { labels: Record<string, string>; canUpdate: boolean }) {
   const { t } = useLang();
   const [preview, upload, pending] = useActionState<ImportPreview | null, FormData>(previewEmployeeImport, null);
+  const [updateExisting, setUpdateExisting] = useState(false);
   const valid = useMemo(() => preview?.rows.filter((row) => !row.errors.length) ?? [], [preview]);
+  const fresh = valid.filter((row) => !row.existing).length;
+  const existing = valid.length - fresh;
   const invalid = (preview?.rows.length ?? 0) - valid.length;
+  const count = fresh + (updateExisting ? existing : 0);
 
   return (
     <div className="space-y-5">
@@ -39,14 +44,20 @@ export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
       {preview && !preview.error && !pending ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-            <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
-              <FileSpreadsheet size={16} className="text-teal-700" />
+            <span className="inline-flex min-w-0 items-center gap-1.5 break-all font-semibold text-slate-800">
+              <FileSpreadsheet size={16} className="shrink-0 text-teal-700" />
               {preview.fileName}
             </span>
             <span className="inline-flex items-center gap-1.5 text-emerald-700">
               <CircleCheck size={16} />
-              {t(`${valid.length} صف جاهز`, `${valid.length} ready`)}
+              {t(`${fresh} موظف جديد`, `${fresh} new`)}
             </span>
+            {existing ? (
+              <span className="inline-flex items-center gap-1.5 text-amber-700">
+                <UserCheck size={16} />
+                {t(`${existing} موجود مسبقاً`, `${existing} already on record`)}
+              </span>
+            ) : null}
             {invalid ? (
               <span className="inline-flex items-center gap-1.5 text-red-700">
                 <CircleAlert size={16} />
@@ -54,6 +65,15 @@ export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
               </span>
             ) : null}
           </div>
+          {preview.aiColumns?.length ? (
+            <p className="flex items-start gap-1.5 text-xs text-teal-800">
+              <Sparkles size={14} className="mt-0.5 shrink-0" />
+              <span>
+                {t("أعمدة تعرّف عليها الذكاء الاصطناعي: ", "Columns recognised by AI: ")}
+                {preview.aiColumns.map((column) => `${column.header} ← ${labels[column.key] ?? column.key}`).join("، ")}
+              </span>
+            </p>
+          ) : null}
           {preview.ignored.length ? (
             <p className="text-xs text-slate-500">
               {t("أعمدة لم تُعرف وتُركت: ", "Columns not recognised and left out: ")}
@@ -62,8 +82,26 @@ export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
           ) : null}
           {preview.tooMany ? <p className="text-xs text-amber-700">{t("الملف فيه أكثر من 500 صف؛ عُرض أول 500 فقط.", "The file has more than 500 rows; only the first 500 are shown.")}</p> : null}
 
+          {existing ? (
+            <div className="space-y-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200" role="status">
+              <p className="flex items-start gap-2">
+                <CircleAlert size={17} className="mt-0.5 shrink-0" />
+                {t(
+                  `تنبيه: ${existing} من الموظفين في الملف مسجلون مسبقاً (نفس الرقم المدني أو الجواز أو تصريح العمل). لن يُضافوا مرة ثانية.`,
+                  `Note: ${existing} employee(s) in the file are already on record (same civil, passport or work permit number). They won't be added twice.`,
+                )}
+              </p>
+              {canUpdate ? (
+                <label className="flex items-start gap-2 font-medium">
+                  <input type="checkbox" checked={updateExisting} onChange={(event) => setUpdateExisting(event.target.checked)} className="mt-1 size-4 accent-teal-700" />
+                  {t("تحديث بيانات الموظفين الموجودين بقيم الملف (الخانات الفارغة في الملف لا تمسح شيئاً)", "Update existing employees with the file's values (empty cells in the file erase nothing)")}
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="max-h-[60vh] overflow-auto rounded-xl ring-1 ring-inset ring-slate-200">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[820px] text-sm">
               <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
                 <tr>
                   <th className="px-3 py-2 text-start font-semibold">{t("السطر", "Line")}</th>
@@ -77,7 +115,7 @@ export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {preview.rows.map((row) => (
-                  <tr key={row.line} className={row.errors.length ? "bg-red-50" : undefined}>
+                  <tr key={row.line} className={row.errors.length ? "bg-red-50" : row.existing ? "bg-amber-50" : undefined}>
                     <td className="px-3 py-2 text-slate-500" dir="ltr">
                       {row.line}
                     </td>
@@ -93,6 +131,13 @@ export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
                             <li key={error}>{error}</li>
                           ))}
                         </ul>
+                      ) : row.existing ? (
+                        <span className="block text-xs text-amber-800">
+                          {t("موجود مسبقاً: ", "On record: ")}
+                          <Link href={`/employees/${row.existing.id}/edit`} className="font-semibold underline" target="_blank">
+                            {row.existing.fullName} ({row.existing.employeeNumber})
+                          </Link>
+                        </span>
                       ) : (
                         <CircleCheck size={16} className="text-emerald-700" />
                       )}
@@ -103,14 +148,19 @@ export function EmployeeImport({ labels }: { labels: Record<string, string> }) {
             </table>
           </div>
 
-          {valid.length ? (
+          {count ? (
             <form action={importEmployees}>
-              <input type="hidden" name="payload" value={JSON.stringify(valid.map((row) => row.values))} />
+              <input type="hidden" name="payload" value={JSON.stringify(valid.filter((row) => updateExisting || !row.existing).map((row) => row.values))} />
+              {updateExisting ? <input type="hidden" name="updateExisting" value="on" /> : null}
               <SubmitButton
-                pendingLabel={t("جارٍ الاستيراد...", "Importing...")}
-                confirm={t(`إضافة ${valid.length} موظفاً إلى النظام؟`, `Add ${valid.length} employee(s) to the system?`)}
+                pendingLabel={t("جارٍ الحفظ...", "Saving...")}
+                confirm={
+                  updateExisting && existing
+                    ? t(`إضافة ${fresh} موظفاً جديداً وتحديث بيانات ${existing}؟`, `Add ${fresh} new employee(s) and update ${existing}?`)
+                    : t(`إضافة ${fresh} موظفاً إلى النظام؟`, `Add ${fresh} employee(s) to the system?`)
+                }
               >
-                {t(`استيراد ${valid.length} موظفاً`, `Import ${valid.length} employee(s)`)}
+                {updateExisting && existing ? t(`حفظ ${count} موظفاً`, `Save ${count} employee(s)`) : t(`استيراد ${fresh} موظفاً`, `Import ${fresh} employee(s)`)}
               </SubmitButton>
             </form>
           ) : null}

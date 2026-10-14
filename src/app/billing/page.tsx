@@ -1,21 +1,21 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AlertTriangle, ArrowRight, Building2, CreditCard, Landmark, LogOut, Receipt, ShieldOff, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, CreditCard, Gift, Landmark, LogOut, Receipt, ShieldOff, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LangToggle } from "@/components/lang-provider";
-import { CycleSwitch, PlanGrid } from "@/components/plan-cards";
+import { CycleSwitch, FreePlanStrip, PlanGrid } from "@/components/plan-cards";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, InfoItem, SectionTitle, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { homePath, isStaffRole, requireUser } from "@/lib/auth";
 import { cardPaymentsReady, thawaniConfig } from "@/lib/billing";
 import { getI18n } from "@/lib/lang";
 import { platformConfig, receiptNumber } from "@/lib/platform";
-import { CYCLE_LABEL, FEATURES, FEATURE_LABEL, PAYMENT_STATUS, formatRial, isCycle, limitText, type Cycle } from "@/lib/plans";
+import { CYCLE_LABEL, FEATURES, FEATURE_LABEL, PAYMENT_STATUS, formatRial, isCycle, isFreePlan, limitText, type Cycle } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { ACCESS_LABEL, ACCESS_TONE, countedEmployees, countedUsers } from "@/lib/subscription";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { logout } from "@/server/auth-actions";
-import { cancelPayment, checkPayment, requestManualPayment, startCheckout } from "@/server/billing-actions";
+import { cancelPayment, checkPayment, chooseFreePlan, requestManualPayment, startCheckout } from "@/server/billing-actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false } };
@@ -57,7 +57,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const cardReady = cardPaymentsReady();
   const testMode = cardReady && !thawaniConfig()!.live;
   const pending = payments.filter((payment) => payment.status === "PENDING");
-  const buyable = plans.filter((plan) => !plan.contactOnly);
+  const buyable = plans.filter((plan) => !plan.contactOnly && !isFreePlan(plan));
+  const freePlan = plans.find((plan) => isFreePlan(plan));
+  const onFree = Boolean(freePlan && access.planId === freePlan.id && access.state === "ACTIVE");
   const back = staff ? "/" : homePath(user);
 
   return (
@@ -119,7 +121,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                 <h1 className="text-lg font-bold text-slate-900">{t("انتهى الاشتراك", "The subscription has ended")}</h1>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
                   {admin
-                    ? t("اختر باقة وادفع لمتابعة العمل فوراً. كل بياناتك محفوظة كما هي.", "Choose a plan and pay to carry on at once. All your data is kept as it is.")
+                    ? t(
+                        "اختر باقة وادفع لمتابعة العمل فوراً، أو انتقل إلى الباقة المجانية إن كان عدد موظفيك ومستخدميك ضمن حدودها. كل بياناتك محفوظة كما هي.",
+                        "Choose a plan and pay to carry on at once, or move to the free plan if your employees and users fit its limits. All your data is kept as it is.",
+                      )
                     : t("بيانات منشأتك محفوظة، والعمل متوقف حتى يجدّد مسؤول المنشأة الاشتراك.", "Your company's data is kept; work is paused until the company administrator renews.")}
                 </p>
               </div>
@@ -247,6 +252,34 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                       <Landmark size={16} />
                       {t("ادفع بالتحويل", "Pay by transfer")}
                     </a>
+                  )
+                }
+              />
+              <FreePlanStrip
+                plans={plans}
+                lang={lang}
+                current={onFree}
+                action={
+                  onFree || !freePlan ? null : (
+                    <form action={chooseFreePlan}>
+                      <input type="hidden" name="plan" value={freePlan.code} />
+                      <SubmitButton
+                        variant="secondary"
+                        className="w-full"
+                        pendingLabel={t("جارٍ التفعيل...", "Switching...")}
+                        confirm={
+                          access.state === "ACTIVE" || access.state === "TRIAL" || access.state === "GRACE"
+                            ? t(
+                                "الانتقال إلى الباقة المجانية يبدأ فوراً، وتُغلق المزايا غير المشمولة فيها، ولا يُسترد ما تبقى من باقتك الحالية. متابعة؟",
+                                "Moving to the free plan starts now, closes the features it doesn't include, and the rest of your current plan is not refunded. Continue?",
+                              )
+                            : undefined
+                        }
+                      >
+                        <Gift size={16} />
+                        {t("انتقل إلى المجانية", "Switch to free")}
+                      </SubmitButton>
+                    </form>
                   )
                 }
               />

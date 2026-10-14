@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LogIn } from "lucide-react";
 import { LangToggle } from "@/components/lang-provider";
-import { CycleSwitch, PlanGrid } from "@/components/plan-cards";
+import { CycleSwitch, FreePlanStrip, PlanGrid } from "@/components/plan-cards";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { primaryBtn, secondaryBtn } from "@/components/ui";
 import type { Lang } from "@/lib/i18n";
@@ -74,10 +74,19 @@ export function PricingSection({ lang, cycle, basePath, plans, trialDays }: { la
           )
         }
       />
+      <FreePlanStrip
+        plans={plans}
+        lang={lang}
+        action={
+          <Link href="/login" className={cn(secondaryBtn, "w-full")}>
+            {t("ابدأ مجاناً", "Start free")}
+          </Link>
+        }
+      />
       <p className="text-center text-sm leading-6 text-slate-500">
         {t(
-          `كل باقة تبدأ بتجربة مجانية ${trialDays} يوماً بكل المزايا، بدون بطاقة. الأسعار بالريال العُماني، ويمكنك الترقية أو التغيير في أي وقت، والأيام المدفوعة المتبقية تُحتسب لك.`,
-          `Every plan starts with a ${trialDays}-day free trial with every feature, no card needed. Prices in Omani rials; upgrade or switch any time and unused paid days carry over.`,
+          `كل باقة تبدأ بتجربة مجانية ${trialDays} يوماً بكل المزايا، بدون بطاقة، ثم تختار باقة أو تنتقل إلى المجانية. الأسعار بالريال العُماني، ويمكنك الترقية أو التغيير في أي وقت، والأيام المدفوعة المتبقية تُحتسب لك.`,
+          `Every plan starts with a ${trialDays}-day free trial with every feature, no card needed; then pick a plan or move to the free one. Prices in Omani rials; upgrade or switch any time and unused paid days carry over.`,
         )}
       </p>
     </div>

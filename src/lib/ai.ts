@@ -164,6 +164,120 @@ export async function aiReadDocument(data: Uint8Array, mediaType: string): Promi
   };
 }
 
+/**
+ * Which field each spreadsheet column holds, from its header and a few sample values; `fields` lists the keys
+ * the import knows. Unrecognised columns come back as null.
+ */
+export async function aiMapImportColumns(input: { fields: { key: string; ar: string; en: string }[]; headers: string[]; samples: string[][] }) {
+  const { text } = await generateText({
+    model: MODEL,
+    temperature: 0,
+    providerOptions: { gateway: { models: VISION_FALLBACKS } },
+    system: [
+      "You map the columns of an employee spreadsheet from a company in the Sultanate of Oman (often exported from the Ministry of Labour portal) to the fields of an HR system.",
+      "For each column, from its header and sample values, choose the one field key it holds, or null when it matches none. Use each key at most once. A civil number / resident card number is idNumber; a labour card / work permit number is workPermitNumber; the employer, sponsor or establishment is employerName, its CR or civil number employerIdNumber; the worker's occupation is jobTitle.",
+      "Reply with a JSON array of the same length as headers, holding a key string or null, and nothing else.",
+    ].join(" "),
+    prompt: JSON.stringify({ fields: input.fields, headers: input.headers, samples: input.samples }),
+  });
+  const parsed = parseJson<unknown[]>(text, "[");
+  const known = new Set(input.fields.map((field) => field.key));
+  return input.headers.map((_, index) => {
+    const key = parsed?.[index];
+    return typeof key === "string" && known.has(key) ? key : null;
+  });
+}
+
+/** Fields read from a Ministry of Labour worker file; keys are the employee import's (src/lib/employee-import.ts). */
+export const LABOUR_FIELDS = [
+  "fullName",
+  "nameEn",
+  "nationality",
+  "gender",
+  "dateOfBirth",
+  "phone",
+  "idNumber",
+  "idExpiry",
+  "passportNumber",
+  "passportExpiry",
+  "workPermitNumber",
+  "workPermitExpiry",
+  "jobTitle",
+  "jobTitleEn",
+  "joiningDate",
+  "contractEnd",
+  "basicSalary",
+  "employerName",
+  "employerNameEn",
+  "employerIdNumber",
+  "employerKind",
+] as const;
+
+export type LabourWorker = Record<(typeof LABOUR_FIELDS)[number], string>;
+
+const LABOUR_DATES = new Set(["dateOfBirth", "idExpiry", "passportExpiry", "workPermitExpiry", "joiningDate", "contractEnd"]);
+
+/**
+ * Workers printed on an Omani Ministry of Labour document (worker data, labour card, work permit / clearance,
+ * a list of an establishment's workers, an employment contract). Nothing is guessed: unclear fields are empty.
+ */
+export async function aiReadLabourFile(data: Uint8Array, mediaType: string): Promise<{ title: string; workers: LabourWorker[] } | null> {
+  const { text } = await generateText({
+    model: VISION_MODEL,
+    temperature: 0,
+    providerOptions: { gateway: { models: VISION_FALLBACKS } },
+    system: [
+      "You read documents issued by the Ministry of Labour of the Sultanate of Oman (worker data printouts, labour cards, work permits / labour clearances, lists of an establishment's workers, employment contracts) for an HR system, and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
+      "Return one entry in workers per worker on the document (a list may have many; read every row).",
+      "fullName: the worker's name in Arabic script; nameEn: in Latin script as printed. nationality: ISO 3166 alpha-2 code (OM, IN, PK, BD, NP, LK, PH, EG...). gender: MALE or FEMALE.",
+      "idNumber: the worker's civil number / resident card number; idExpiry: its expiry. passportNumber / passportExpiry: the passport. workPermitNumber: the work permit / labour card / clearance number; workPermitExpiry: its expiry.",
+      "jobTitle: the occupation in Arabic, jobTitleEn in English. joiningDate: start of employment or registration; contractEnd: end of contract. basicSalary: the monthly basic wage in Omani rials as a plain number.",
+      "employerName: the employer / sponsor / establishment name in Arabic (or as printed), employerNameEn in English; employerIdNumber: its commercial registration (CR) or, for an individual sponsor, civil number; employerKind: COMPANY for a company or establishment, PERSON for an individual sponsor, else empty.",
+      "Dates are YYYY-MM-DD (Gregorian; convert Hijri only if no Gregorian date is printed). Numbers in Latin digits without spaces. title: the document's title as printed.",
+      `Reply with JSON only: {"title":"","workers":[{${LABOUR_FIELDS.map((key) => `"${key}":""`).join(",")}}]}`,
+    ].join(" "),
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Read this Ministry of Labour document." },
+          { type: "file", data, mediaType },
+        ],
+      },
+    ],
+  });
+  const parsed = parseJson<{ title?: unknown; workers?: unknown }>(text, "{");
+  if (!parsed || !Array.isArray(parsed.workers)) return null;
+  const workers = parsed.workers
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .slice(0, 50)
+    .map((item) => normalizeLabourWorker(item))
+    .filter((worker) => worker.fullName || worker.nameEn);
+  return { title: typeof parsed.title === "string" ? parsed.title.trim().slice(0, 150) : "", workers };
+}
+
+/** Trims the AI's values and drops what does not fit: malformed dates, codes and amounts become empty. */
+export function normalizeLabourWorker(item: Record<string, unknown>): LabourWorker {
+  const worker = {} as LabourWorker;
+  for (const key of LABOUR_FIELDS) {
+    const raw = item[key];
+    let value = typeof raw === "string" ? raw.trim() : typeof raw === "number" && Number.isFinite(raw) ? String(raw) : "";
+    if (LABOUR_DATES.has(key)) value = /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : "";
+    else if (key === "nationality") value = /^[A-Za-z]{2}$/.test(value) ? value.toUpperCase() : "";
+    else if (key === "gender" || key === "employerKind") {
+      value = value.toUpperCase();
+      const allowed = key === "gender" ? ["MALE", "FEMALE"] : ["COMPANY", "PERSON"];
+      if (!allowed.includes(value)) value = "";
+    } else if (key === "basicSalary") {
+      const amount = Number(value.replace(/[^\d.]/g, ""));
+      value = value && Number.isFinite(amount) && amount > 0 && amount < 1_000_000 ? String(amount) : "";
+    } else if (["idNumber", "passportNumber", "workPermitNumber", "employerIdNumber"].includes(key)) value = value.replace(/\s+/g, "").slice(0, 40);
+    else value = value.replace(/\s+/g, " ").slice(0, 150);
+    worker[key] = value;
+  }
+  return worker;
+}
+
 export type CandidateScreening = {
   score: number;
   summary: string;

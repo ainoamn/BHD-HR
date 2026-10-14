@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookUser, FileUp, KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
+import { BookUser, ClipboardCheck, FileUp, KeyRound, Pencil, Search, UserPlus, Users } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { GetForm } from "@/components/get-form";
@@ -8,6 +8,7 @@ import { EmployeeBulkBar } from "@/components/employee-bulk-bar";
 import { DeleteButton } from "@/components/row-forms";
 import { EmptyState, PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
+import { profileGaps } from "@/lib/employee-gaps";
 import { STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { worstExpiry } from "@/lib/expiry";
 import { getLeaveTypes } from "@/lib/hr-catalog";
@@ -69,6 +70,13 @@ export default async function EmployeesPage({
   const withoutAccount = allow.edit
     ? await prisma.employee.count({ where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null } })
     : 0;
+  const salaryEdit = can(user, "salaries.edit");
+  const incomplete = allow.edit
+    ? employees.filter(
+        (employee) =>
+          employee.status !== "TERMINATED" && profileGaps(employee).some((gap) => salaryEdit || (gap !== "basicSalary" && gap !== "bank")),
+      ).length
+    : 0;
 
   return (
     <div className="page-wide">
@@ -83,10 +91,16 @@ export default async function EmployeesPage({
             {t("ملصقات الجوازات", "Passport stickers")}
           </Link>
         ) : null}
+        {incomplete ? (
+          <Link href="/employees/complete" className={secondaryBtn}>
+            <ClipboardCheck size={17} />
+            {t(`بيانات ناقصة (${incomplete})`, `Missing details (${incomplete})`)}
+          </Link>
+        ) : null}
         {allow.create ? (
           <Link href="/employees/import" className={secondaryBtn}>
             <FileUp size={17} />
-            {t("استيراد من Excel", "Import from Excel")}
+            {t("إضافة دفعة (Excel / PDF)", "Bulk add (Excel / PDF)")}
           </Link>
         ) : null}
         {allow.create ? (
