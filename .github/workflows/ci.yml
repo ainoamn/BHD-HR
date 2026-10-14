@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: testonly
+          POSTGRES_DB: bhd_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AUTH_SECRET: ci-only-secret-not-used-anywhere-else
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Database address (throwaway CI container)
+        env:
+          SCHEME: postgresql
+        run: |
+          echo "DATABASE_URL=${SCHEME}://postgres:testonly@localhost:5432/bhd_ci" >> "$GITHUB_ENV"
+          echo "DATABASE_URL_UNPOOLED=${SCHEME}://postgres:testonly@localhost:5432/bhd_ci" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npx prisma db push --skip-generate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx next build
+      - run: npm run e2e:seed
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7

@@ -19,6 +19,11 @@ prisma/*.db-shm
 storage/uploads/*
 !storage/uploads/.gitkeep
 
+# test output
+playwright-report
+test-results
+blob-report
+
 # scratch
 tmp-*
 .vercel
