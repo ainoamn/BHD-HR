@@ -120,6 +120,15 @@ async function resolveEmployer(formData: FormData, user: { id: string; companyId
   return employer!.id;
 }
 
+/** The chosen work schedule; undefined keeps the saved one when the form had no schedule field. */
+async function resolveSchedule(formData: FormData, companyId: string) {
+  if (!formData.has("scheduleId")) return undefined;
+  const value = req(formData, "scheduleId");
+  if (!value) return null;
+  const schedule = await prisma.workSchedule.findFirst({ where: { id: value, companyId }, select: { id: true } });
+  return schedule?.id ?? null;
+}
+
 /** The chosen direct manager, refusing the employee itself and any chain that would loop back to it. */
 async function resolveManager(formData: FormData, companyId: string, selfId: string | null, errorPath: string) {
   const { t } = await getI18n();
@@ -147,6 +156,7 @@ export async function createEmployee(formData: FormData) {
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : [];
   const employerId = await resolveEmployer(formData, user, "/employees/new");
   const managerId = await resolveManager(formData, user.companyId, null, "/employees/new");
+  const scheduleId = await resolveSchedule(formData, user.companyId);
   const files = await readDocFiles(formData, {}, user.companyId, "/employees/new");
   const employeeNumber = await nextEmployeeNumber(user.companyId);
   const employee = await prisma.$transaction(async (tx) => {
@@ -158,6 +168,7 @@ export async function createEmployee(formData: FormData) {
         leaveDays: readLeaveDays(formData, catalog.leaveTypes),
         employerId,
         managerId,
+        scheduleId,
         terminatedAt: input.status === "TERMINATED" ? new Date() : null,
         employeeNumber,
         badgeToken: newBadgeToken(),
@@ -217,6 +228,7 @@ export async function updateEmployee(formData: FormData) {
   const allowances = salaryAccess ? readAllowanceRows(formData, new Set(catalog.allowanceTypes.map((type) => type.id))) : null;
   const employerId = await resolveEmployer(formData, user, errorPath);
   const managerId = await resolveManager(formData, user.companyId, id, errorPath);
+  const scheduleId = await resolveSchedule(formData, user.companyId);
   const files = await readDocFiles(formData, existing!, user.companyId, errorPath);
   const marks = keptSelfMarks(readSelfMarks(existing!.selfProvided), existing!, input);
   await prisma.$transaction(
@@ -231,6 +243,7 @@ export async function updateEmployee(formData: FormData) {
           leaveDays: readLeaveDays(formData, catalog.leaveTypes),
           employerId,
           managerId,
+          scheduleId,
           terminatedAt: input.status === "TERMINATED" ? (existing!.terminatedAt ?? new Date()) : null,
         },
       });

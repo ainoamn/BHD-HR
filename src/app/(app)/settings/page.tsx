@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { Activity, BellRing, Building2, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
+import { Activity, BellRing, Building2, CalendarClock, ChevronLeft, ChevronRight, Info, Landmark, Mail, MapPin, MessageCircle, PenLine, Save, Send, Settings, ShieldCheck, Sparkles, UserCog, UserPlus, UsersRound, Zap } from "lucide-react";
 import { WorkSitePicker } from "@/components/work-site-picker";
 import { updateClockSettings } from "@/server/request-actions";
 import { SearchSelect } from "@/components/search-select";
@@ -235,6 +235,26 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 {backupOverdue ? <ToneBadge tone="red">{t("النسخ الاحتياطي متأخر", "Backup overdue")}</ToneBadge> : null}
                 <Chevron size={18} className="text-slate-400 transition group-hover:text-teal-700" />
               </span>
+            </Link>
+          ) : null}
+
+          {isAdmin ? (
+            <Link
+              href="/settings/work"
+              className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200/90 bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:border-teal-200"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+                  <CalendarClock size={19} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-slate-900">{t("الدوام والعمل الإضافي", "Schedules & overtime")}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                    {t("جداول الدوام وأجر الإضافي وخصم التأخير.", "Work schedules, overtime pay and lateness deductions.")}
+                  </span>
+                </span>
+              </span>
+              <Chevron size={18} className="shrink-0 text-slate-400 transition group-hover:text-teal-700" />
             </Link>
           ) : null}
 

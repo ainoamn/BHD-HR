@@ -55,6 +55,15 @@ model Company {
   /// Salaries are paid only after the month's payroll is approved (src/lib/payroll-period.ts).
   payrollApproval      Boolean             @default(false)
   payrollPeriods       PayrollPeriod[]
+  /// Work schedules and overtime (src/lib/work-time.ts): the schedule of employees without their own, rates as multiples of the hourly basic wage.
+  defaultScheduleId    String?
+  overtimeDayRate      Float               @default(1.25)
+  overtimeNightRate    Float               @default(1.5)
+  overtimeRestRate     Float               @default(2)
+  /// Lateness and early leave are deducted from pay when the month's timesheet is approved.
+  latenessDeduct       Boolean             @default(false)
+  workSchedules        WorkSchedule[]
+  timeSheets           TimeSheet[]
   employees            Employee[]
   leaveRequests        LeaveRequest[]
   employeeRequests     EmployeeRequest[]
@@ -199,6 +208,10 @@ model Employee {
   managerId          String?
   manager            Employee?           @relation("ReportsTo", fields: [managerId], references: [id], onDelete: SetNull)
   reports            Employee[]          @relation("ReportsTo")
+  /// Own work schedule; empty = the company's default schedule.
+  scheduleId         String?
+  schedule           WorkSchedule?       @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  timeSheets         TimeSheet[]
   /// Key of the employee's personal portal link /portal/<token>; null = no portal.
   portalToken        String?             @unique
   /// Profile photo (/files/<name>, a square JPEG resized in the browser).
@@ -490,6 +503,52 @@ model ClockEntry {
 
   @@unique([employeeId, day])
   @@index([companyId, day])
+}
+
+/// A working pattern: times are "HH:MM" Muscat, an end before the start runs past midnight; workDays are 0 = Sunday … 6 = Saturday.
+model WorkSchedule {
+  id           String     @id @default(cuid())
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name         String
+  nameEn       String?
+  startTime    String
+  endTime      String
+  breakMinutes Int        @default(60)
+  /// Minutes after the start that are not counted as late.
+  graceMinutes Int        @default(10)
+  workDays     Json
+  employees    Employee[]
+  createdAt    DateTime   @default(now())
+
+  @@index([companyId])
+}
+
+/// An employee's approved month of clock-ins: minutes, the money it became and the pay items created for it.
+model TimeSheet {
+  id                String   @id @default(cuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId        String
+  employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  year              Int
+  month             Int
+  days              Int
+  workedMinutes     Int
+  lateMinutes       Int
+  earlyLeaveMinutes Int
+  overtimeDay       Int
+  overtimeNight     Int
+  overtimeRest      Int
+  overtimeAmount    Float
+  latenessAmount    Float
+  /// PayItem ids created on approval, removed again if the approval is withdrawn.
+  payItemIds        Json?
+  approvedAt        DateTime @default(now())
+  approvedById      String?
+
+  @@unique([employeeId, year, month])
+  @@index([companyId, year, month])
 }
 
 model Attendance {

@@ -11,8 +11,10 @@ import { attendanceLabel, eachUtcDate } from "@/lib/leave";
 import { MAX_PENDING_UPLOADS, MAX_REQUEST_DAYS, portalEmployee, portalLeaveChoices } from "@/lib/portal";
 import { prisma } from "@/lib/prisma";
 import { VIA_PROFILE, missingFields, readSelfInput, saveSelfData } from "@/lib/self-data";
+import { scheduleFor, toSchedule } from "@/lib/timesheet";
 import { removeUpload, saveUpload } from "@/lib/uploads";
 import { clip, daysLabel, formatDate, num, parseDateInput, req, round3, str } from "@/lib/utils";
+import { dayFigures } from "@/lib/work-time";
 
 /** Every portal action starts here: the link is the only credential. */
 async function employeeFor(formData: FormData) {
@@ -216,7 +218,8 @@ export async function clockPunch(input: { token: string; lat?: number | null; ln
   const day = muscatDay(now);
   const entry = await prisma.clockEntry.findUnique({ where: { employeeId_day: { employeeId: employee.id, day } } });
   if (!entry) {
-    const late = lateMinutes(now, company.workStart);
+    const schedule = await scheduleFor(employee.id, company.id);
+    const late = schedule ? dayFigures(day, now, null, toSchedule(schedule)).lateMinutes : lateMinutes(now, company.workStart);
     await prisma.clockEntry.create({
       data: { companyId: company.id, employeeId: employee.id, day, inAt: now, inLat: coords?.[0], inLng: coords?.[1], inDistance: distance, lateMinutes: late },
     });

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, CalendarRange, TriangleAlert } from "lucide-react";
+import { CalendarDays, CalendarRange, Timer, TriangleAlert } from "lucide-react";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { PeriodFilter } from "@/components/period-filter";
@@ -133,14 +133,20 @@ export default async function AttendancePage({
               `${clockEntries.length} of ${employees.length} clocked in from the portal`,
             )}
             action={
-              <form method="get" className="flex items-center gap-2">
-                <input type="hidden" name="year" value={year} />
-                <input type="hidden" name="month" value={month} />
-                <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-sm" aria-label={t("اليوم", "Day")} />
-                <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                  {t("عرض", "Show")}
-                </button>
-              </form>
+              <div className="flex flex-wrap items-center gap-2">
+                <form method="get" className="flex items-center gap-2">
+                  <input type="hidden" name="year" value={year} />
+                  <input type="hidden" name="month" value={month} />
+                  <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-sm" aria-label={t("اليوم", "Day")} />
+                  <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    {t("عرض", "Show")}
+                  </button>
+                </form>
+                <Link href={`/attendance/timesheet?year=${year}&month=${month}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800">
+                  <Timer size={15} />
+                  {t("الإضافي والتأخير", "Overtime & lateness")}
+                </Link>
+              </div>
             }
           >
             {t("سجل الدوام", "Clock-in log")} — {formatDate(clockDate)}

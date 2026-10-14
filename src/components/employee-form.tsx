@@ -35,6 +35,7 @@ export async function EmployeeForm({
   showSalary = true,
   canManageCatalog = false,
   managers = [],
+  schedules = [],
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employee?: Employee;
@@ -42,6 +43,8 @@ export async function EmployeeForm({
   employers: { id: string; name: string; nameEn: string | null }[];
   /** Other employees of the company, for the direct-manager field. */
   managers?: { id: string; fullName: string; nameEn: string | null; employeeNumber: string }[];
+  /** The company's work schedules; the field is hidden when there are none. */
+  schedules?: { id: string; name: string; nameEn: string | null; startTime: string; endTime: string }[];
   catalog: Catalog;
   allowances?: EmployeeAllowance[];
   defaultEmployerId?: string | null;
@@ -236,6 +239,18 @@ export async function EmployeeForm({
               ariaLabel={t("المدير المباشر", "Direct manager")}
             />
           </div>
+          {schedules.length ? (
+            <Field label={t("جدول الدوام", "Work schedule")}>
+              <select className={`${fieldClass} w-full`} name="scheduleId" defaultValue={employee?.scheduleId || ""}>
+                <option value="">{t("الجدول الافتراضي للمنشأة", "The company default")}</option>
+                {schedules.map((schedule) => (
+                  <option key={schedule.id} value={schedule.id}>
+                    {(lang === "en" && schedule.nameEn ? schedule.nameEn : schedule.name) + ` (${schedule.startTime}–${schedule.endTime})`}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
           <Field label={t("تاريخ الالتحاق", "Joining date")}>
             <input className={`${fieldClass} w-full`} type="date" name="joiningDate" defaultValue={toDateInput(employee?.joiningDate)} />
           </Field>

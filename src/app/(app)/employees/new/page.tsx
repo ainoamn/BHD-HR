@@ -12,7 +12,7 @@ export default async function NewEmployeePage({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const user = await requirePermission("employees.create");
   const { t } = await getI18n();
-  const [employers, catalog, managers] = await Promise.all([
+  const [employers, catalog, managers, schedules] = await Promise.all([
     prisma.employer.findMany({
       where: { companyId: user.companyId },
       select: { id: true, name: true, nameEn: true },
@@ -24,6 +24,7 @@ export default async function NewEmployeePage({ searchParams }: { searchParams: 
       select: { id: true, fullName: true, nameEn: true, employeeNumber: true },
       orderBy: { fullName: "asc" },
     }),
+    prisma.workSchedule.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true, startTime: true, endTime: true }, orderBy: { createdAt: "asc" } }),
   ]);
   return (
     <div className="mx-auto max-w-4xl">
@@ -35,6 +36,7 @@ export default async function NewEmployeePage({ searchParams }: { searchParams: 
         currency={user.company.currency}
         employers={employers}
         managers={managers}
+        schedules={schedules}
         defaultEmployerId={sp.employerId}
         showSalary={can(user, "salaries.edit")}
         canManageCatalog={user.role === "ADMIN"}
