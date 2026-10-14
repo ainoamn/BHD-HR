@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, BadgeCheck, ChevronDown, CircleDollarSign, HandCoins, PencilLine, Printer, ReceiptText, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, ChevronDown, CircleDollarSign, FilePenLine, HandCoins, Lock, PencilLine, Printer, ReceiptText, RefreshCw, Trash2 } from "lucide-react";
 import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
@@ -11,6 +11,8 @@ import { PAYMENT_LABEL, PAY_KIND_LABEL, monthName } from "@/lib/constants";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
+import { PERIOD_LABEL, PERIOD_TONE, canEditPeriod, canPayPeriod, periodStatus } from "@/lib/payroll-period";
+import { addPayrollCorrection } from "@/server/payroll-period-actions";
 import { prisma } from "@/lib/prisma";
 import { packageGross, totalEarnings } from "@/lib/salary";
 import { daysLabel, formatDate, money, round3, todayInputValue } from "@/lib/utils";
@@ -48,7 +50,15 @@ export default async function SalaryDetailPage({
       )}
     </>
   );
-  const allow = { edit: can(user, "salaries.edit"), remove: can(user, "salaries.delete"), pay: can(user, "salaries.pay"), addItem: can(user, "salaries.create") };
+  const periodState = await periodStatus(user.companyId, salary.year, salary.month);
+  const editable = canEditPeriod(periodState);
+  const allow = {
+    edit: can(user, "salaries.edit") && editable,
+    remove: can(user, "salaries.delete") && editable,
+    pay: can(user, "salaries.pay") && (salary.paid ? periodState !== "LOCKED" : canPayPeriod(periodState, user.company.payrollApproval)),
+    addItem: can(user, "salaries.create") && editable,
+    correct: can(user, "salaries.edit") && (periodState === "LOCKED" || (salary.paid && !editable)),
+  };
   const currency = user.company.currency;
   const gross = packageGross(salary);
   const daily = user.company.salaryDays > 0 ? gross / user.company.salaryDays : 0;
@@ -82,6 +92,12 @@ export default async function SalaryDetailPage({
         <ToneBadge tone={salary.paid ? "green" : "amber"} className="px-3 py-1 text-sm">
           {salary.paid ? t("مصروف", "Paid") : t("غير مصروف", "Unpaid")}
         </ToneBadge>
+        {periodState !== "DRAFT" ? (
+          <ToneBadge tone={PERIOD_TONE[periodState]} className="px-3 py-1 text-sm">
+            {periodState === "LOCKED" ? <Lock size={13} /> : null}
+            {t(`مسير الشهر: ${PERIOD_LABEL[periodState].ar}`, `Month: ${PERIOD_LABEL[periodState].en}`)}
+          </ToneBadge>
+        ) : null}
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
 
@@ -160,6 +176,43 @@ export default async function SalaryDetailPage({
         </section>
 
         <div className="min-w-0 space-y-5">
+          {allow.correct ? (
+            <Card>
+              <SectionTitle
+                hint={t(
+                  "لا يتغير راتب هذا الشهر. يُضاف الفرق استحقاقاً أو خصماً لمرة واحدة في أول شهر مسيره مسودة، ويُسجّل في سجل العمليات.",
+                  "This month's salary does not change. The difference is added once, as an entitlement or deduction, in the first month whose payroll is a draft, and logged.",
+                )}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <FilePenLine size={18} className="text-teal-700" />
+                  {t("تسجيل تصحيح", "Record a correction")}
+                </span>
+              </SectionTitle>
+              <form action={addPayrollCorrection} className="grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="salaryId" value={salary.id} />
+                <Field label={t("النوع", "Type")}>
+                  <select name="direction" className={`${fieldClass} w-full`} defaultValue="add">
+                    <option value="add">{t("مستحق للموظف (يُضاف)", "Owed to the employee (added)")}</option>
+                    <option value="deduct">{t("مستحق على الموظف (يُخصم)", "Owed by the employee (deducted)")}</option>
+                  </select>
+                </Field>
+                <Field label={t("المبلغ", "Amount")}>
+                  <input className={`${fieldClass} tabular w-full`} type="number" min="0.001" step="0.001" name="amount" required />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label={t("السبب", "Reason")}>
+                    <input className={`${fieldClass} w-full`} name="reason" maxLength={150} required placeholder={t("مثال: ساعات إضافية لم تُحتسب", "e.g. overtime that was missed")} />
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <SubmitButton variant="secondary" className="w-full sm:w-auto">
+                    {t("حفظ التصحيح", "Save correction")}
+                  </SubmitButton>
+                </div>
+              </form>
+            </Card>
+          ) : null}
           {salary.paid ? (
             <Card>
               <SectionTitle>

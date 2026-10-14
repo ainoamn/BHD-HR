@@ -66,6 +66,7 @@ export async function updateCompanySettings(formData: FormData) {
       alertEarlyDays,
       payDay,
       leaveWarningDays,
+      payrollApproval: req(formData, "payrollApproval") === "1",
       logoUrl,
     },
   });

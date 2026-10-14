@@ -8,6 +8,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { syncSalaryLines } from "@/lib/pay-items";
 import { countAbsenceDays } from "@/lib/payroll";
+import { PERIOD_LABEL, canEditPeriod, canPayPeriod, periodStatus } from "@/lib/payroll-period";
 import { prisma } from "@/lib/prisma";
 import { buildSalaryAmounts } from "@/lib/salary";
 import { clip, intValue, money, num, parseDateInput, req, round3, str, todayInputValue } from "@/lib/utils";
@@ -55,14 +56,33 @@ function snapshot(employee: Employee & { employer: Employer | null }) {
   };
 }
 
-async function unpaidSalary(id: string, companyId: string) {
+/** Stops unless the month's payroll allows this: edits in DRAFT only, payment per the approval rule, never in LOCKED. */
+async function guardPeriod(user: SessionUser, year: number, month: number, need: "edit" | "pay" | "unpay", back: string) {
+  const { lang, t } = await getI18n();
+  const status = await periodStatus(user.companyId, year, month);
+  const allowed = need === "edit" ? canEditPeriod(status) : need === "pay" ? canPayPeriod(status, user.company.payrollApproval) : status !== "LOCKED";
+  if (allowed) return;
+  const label = PERIOD_LABEL[status][lang];
+  if (need === "pay" && status !== "LOCKED" && status !== "REVIEW") {
+    go(back, { error: t("الصرف بعد اعتماد مسير الشهر. أرسله للمراجعة ثم اعتمده.", "Salaries are paid after the month is approved. Send it for review, then approve it.") });
+  }
+  go(back, {
+    error:
+      status === "LOCKED"
+        ? t("مسير هذا الشهر مقفل. أي فرق يُسجّل تصحيحاً في شهر لاحق.", "This month's payroll is locked. Record any difference as a correction in a later month.")
+        : t(`مسير هذا الشهر ${label}. أعده إلى مسودة لتعديله.`, `This month's payroll is ${label}. Return it to draft to change it.`),
+  });
+}
+
+async function unpaidSalary(user: SessionUser, id: string) {
   const { t } = await getI18n();
   const salary = await prisma.salary.findFirst({
-    where: { id, employee: { companyId } },
+    where: { id, employee: { companyId: user.companyId } },
     include: { employee: true },
   });
   if (!salary) go("/salaries", { error: t("مسير الراتب غير موجود", "Salary record not found") });
   if (salary!.paid) go(`/salaries/${id}`, { error: t("لا يمكن تعديل راتب تم صرفه", "A paid salary cannot be changed") });
+  await guardPeriod(user, salary!.year, salary!.month, "edit", `/salaries/${id}`);
   return salary!;
 }
 
@@ -106,6 +126,7 @@ export async function createSalary(formData: FormData) {
   if (!period) go("/salaries", { error: t("الشهر غير صحيح", "Invalid month") });
   const { year, month } = period!;
   const back = salariesPath(year, month);
+  await guardPeriod(user, year, month, "edit", back);
   const employee = await prisma.employee.findFirst({
     where: { id: req(formData, "employeeId"), companyId: user.companyId },
     include: { employer: true },
@@ -134,6 +155,7 @@ export async function generatePayroll(formData: FormData) {
   if (!period) go("/salaries", { error: t("الشهر غير صحيح", "Invalid month") });
   const { year, month } = period!;
   const employerId = req(formData, "employerId");
+  await guardPeriod(user, year, month, "edit", salariesPath(year, month, employerId));
   const employees = await prisma.employee.findMany({
     where: {
       companyId: user.companyId,
@@ -175,6 +197,7 @@ export async function payAll(formData: FormData) {
   const { year, month } = period!;
   const employerId = req(formData, "employerId");
   const back = salariesPath(year, month, employerId);
+  await guardPeriod(user, year, month, "pay", back);
   const method = req(formData, "paymentMethod");
   if (!PAYMENT_LABEL[method]) go(back, { error: t("اختر طريقة الدفع", "Choose a payment method") });
   const paidAt = parseDateInput(req(formData, "paidAt")) || parseDateInput(todayInputValue());
@@ -242,7 +265,7 @@ export async function updateSalaryAdjustments(formData: FormData) {
   const user = await requirePermission("salaries.edit", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
-  const salary = await unpaidSalary(id, user.companyId);
+  const salary = await unpaidSalary(user, id);
   const amount = (key: "basicSalary" | "housingAllowance" | "transportAllowance" | "otherAllowance") =>
     formData.has(key) ? round3(Math.max(0, num(formData, key))) : salary[key];
   const components = {
@@ -287,6 +310,7 @@ export async function unpaySalary(formData: FormData) {
   const salary = await prisma.salary.findFirst({ where: { id, companyId: user.companyId } });
   if (!salary) go("/salaries", { error: t("مسير الراتب غير موجود", "Salary record not found") });
   if (!salary!.paid) go(`/salaries/${id}`);
+  await guardPeriod(user, salary!.year, salary!.month, "unpay", `/salaries/${id}`);
   await prisma.salary.update({
     where: { id },
     data: { paid: false, paidAt: null, paymentMethod: null, paymentReference: null, paidByName: null },
@@ -308,7 +332,7 @@ export async function recalculateSalary(formData: FormData) {
   const user = await requirePermission("salaries.edit", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
-  const salary = await unpaidSalary(id, user.companyId);
+  const salary = await unpaidSalary(user, id);
   const absenceDays = await countAbsenceDays(salary.employeeId, salary.year, salary.month);
   await prisma.salary.update({ where: { id }, data: { absenceDays } });
   const updated = await syncSalaryLines(prisma, id, user.company.salaryDays);
@@ -329,7 +353,7 @@ export async function deleteUnpaidSalary(formData: FormData) {
   const user = await requirePermission("salaries.delete", "/salaries");
   const { t } = await getI18n();
   const id = req(formData, "id");
-  const salary = await unpaidSalary(id, user.companyId);
+  const salary = await unpaidSalary(user, id);
   await prisma.salary.delete({ where: { id } });
   await writeAudit({
     userId: user.id,
@@ -354,6 +378,7 @@ export async function paySalary(formData: FormData) {
   });
   if (!salary) go("/salaries", { error: t("مسير الراتب غير موجود", "Salary record not found") });
   if (salary!.paid) go(`/salaries/${id}/print?doc=receipt`);
+  await guardPeriod(user, salary!.year, salary!.month, "pay", `/salaries/${id}`);
   if (salary!.netSalary < 0) go(`/salaries/${id}`, { error: t("صافي الراتب سالب. خفّض الخصومات قبل الصرف.", "Net salary is negative. Reduce deductions first.") });
   const method = req(formData, "paymentMethod");
   if (!PAYMENT_LABEL[method]) go(`/salaries/${id}`, { error: t("اختر طريقة الدفع", "Choose a payment method") });

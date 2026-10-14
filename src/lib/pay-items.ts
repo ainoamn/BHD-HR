@@ -2,6 +2,7 @@ import type { PayItem, Prisma, PrismaClient } from "@prisma/client";
 import { allowanceAmount, allowanceDue } from "./allowances";
 import { payKindDeducts } from "./constants";
 import { isOmani, spfContribution } from "./oman";
+import { canEditPeriod, periodStatus } from "./payroll-period";
 import { buildSalaryAmounts, packageGross } from "./salary";
 import { round3 } from "./utils";
 
@@ -30,10 +31,14 @@ export function scheduledAmount(item: Pick<PayItem, "kind" | "amount" | "startYe
   return round3(item.amount);
 }
 
-/** Rebuilds the allowance and pay-item lines and totals of one unpaid salary. Paid salaries are left exactly as they were paid. */
+/**
+ * Rebuilds the allowance and pay-item lines and totals of one unpaid salary. Paid salaries are left exactly as they
+ * were paid, and so are salaries of a month in review, approved or locked (src/lib/payroll-period.ts).
+ */
 export async function syncSalaryLines(db: Db, salaryId: string, salaryDays: number) {
   const found = await db.salary.findUnique({ where: { id: salaryId }, include: { company: true, employee: { select: { nationality: true } } } });
   if (!found || found.paid) return found;
+  if (!canEditPeriod(await periodStatus(found.companyId, found.year, found.month, db))) return found;
   const { company, employee, ...salary } = found;
   const key = monthKey(salary.year, salary.month);
   const items = await db.payItem.findMany({

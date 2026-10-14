@@ -11,6 +11,8 @@ import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
 import { prisma } from "@/lib/prisma";
 import { payrollIssues } from "@/lib/payroll-check";
+import { canEditPeriod, canPayPeriod, readStatus } from "@/lib/payroll-period";
+import { PayrollPeriodBar } from "@/components/payroll-period-bar";
 import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { daysLabel, money, readPeriod, round3, todayInputValue } from "@/lib/utils";
 import { createSalary, deleteUnpaidSalary, generatePayroll, payAll } from "@/server/salary-actions";
@@ -33,7 +35,8 @@ export default async function SalariesPage({
   const employerId = sp.employerId === "none" || employers.some((item) => item.id === sp.employerId) ? sp.employerId || "" : "";
   const employerFilter = employerId === "none" ? { employerId: null } : employerId ? { employerId } : {};
   const previous = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
-  const [salaries, activeCount, previousSalaries] = await Promise.all([
+  const [payrollPeriod, salaries, activeCount, previousSalaries] = await Promise.all([
+    prisma.payrollPeriod.findUnique({ where: { companyId_year_month: { companyId: user.companyId, year, month } } }),
     prisma.salary.findMany({
       where: { year, month, employee: { companyId: user.companyId }, ...employerFilter },
       include: { employee: true },
@@ -42,11 +45,14 @@ export default async function SalariesPage({
     prisma.employee.count({ where: { companyId: user.companyId, status: { in: ["ACTIVE", "VACATION"] }, ...employerFilter } }),
     prisma.salary.findMany({ where: { companyId: user.companyId, ...previous, ...employerFilter }, select: { employeeId: true, netSalary: true } }),
   ]);
+  const periodState = readStatus(payrollPeriod?.status);
+  const editable = canEditPeriod(periodState);
+  const payable = canPayPeriod(periodState, user.company.payrollApproval);
   const allow = {
-    create: can(user, "salaries.create"),
-    edit: can(user, "salaries.edit"),
-    remove: can(user, "salaries.delete"),
-    pay: can(user, "salaries.pay"),
+    create: can(user, "salaries.create") && editable,
+    edit: can(user, "salaries.edit") && editable,
+    remove: can(user, "salaries.delete") && editable,
+    pay: can(user, "salaries.pay") && payable,
   };
   const withRecord = new Set(salaries.map((salary) => salary.employeeId));
   const missing = allow.create
@@ -131,6 +137,18 @@ export default async function SalariesPage({
         ))}
       </div>
 
+      <PayrollPeriodBar
+        period={payrollPeriod}
+        year={year}
+        month={month}
+        employerId={employerId}
+        approvalRequired={user.company.payrollApproval}
+        allow={{ edit: can(user, "salaries.edit"), pay: can(user, "salaries.pay"), admin: user.role === "ADMIN" }}
+        unpaidCount={await prisma.salary.count({ where: { companyId: user.companyId, year, month, paid: false } })}
+        salaryCount={await prisma.salary.count({ where: { companyId: user.companyId, year, month } })}
+        lang={lang}
+      />
+
       {unpaid.length ? (
         <Card className="mb-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -212,7 +230,9 @@ export default async function SalariesPage({
               ) : null}
             </>
           ) : (
-            <p className="text-xs text-slate-400">{t("لا تملك صلاحية إنشاء الرواتب.", "You cannot create salaries.")}</p>
+            <p className="text-xs text-slate-400">
+              {editable ? t("لا تملك صلاحية إنشاء الرواتب.", "You cannot create salaries.") : t("المسير ليس مسودة؛ أعده إلى مسودة لإضافة رواتب.", "The payroll is not a draft; return it to draft to add salaries.")}
+            </p>
           )}
         </Card>
 
@@ -245,6 +265,12 @@ export default async function SalariesPage({
                 {t(`صرف ${unpaid.length} راتب`, `Pay ${unpaid.length} salaries`)}
               </SubmitButton>
             </form>
+          ) : unpaid.length && can(user, "salaries.pay") && !payable ? (
+            <p className="text-xs leading-5 text-amber-800">
+              {periodState === "LOCKED"
+                ? t("الشهر مقفل.", "The month is locked.")
+                : t("الصرف متاح بعد اعتماد المسير من الأعلى.", "Payment opens once the payroll is approved above.")}
+            </p>
           ) : null}
         </Card>
 

@@ -314,6 +314,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 >
                   <input className={`${fieldClass} w-full`} type="number" min="0" max="60" name="leaveWarningDays" defaultValue={company.leaveWarningDays} />
                 </Field>
+                <label className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3.5 py-3 text-sm text-slate-800 ring-1 ring-inset ring-slate-100 md:col-span-2">
+                  <input type="checkbox" name="payrollApproval" value="1" defaultChecked={company.payrollApproval} className="mt-0.5 size-4 shrink-0 accent-teal-700" />
+                  <span>
+                    <span className="block font-semibold">{t("اعتماد مسير الشهر قبل الصرف", "Approve the month's payroll before paying")}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                      {t(
+                        "يُرسل المسير للمراجعة ثم يُعتمد، ولا يُصرف قبل الاعتماد. قفل الشهر بعد الصرف متاح دائماً.",
+                        "The payroll is sent for review, then approved, and cannot be paid before approval. Locking a month after payment is always available.",
+                      )}
+                    </span>
+                  </span>
+                </label>
                 <div className="flex items-end justify-end md:col-span-2">
                   <SubmitButton className="w-full sm:w-auto">
                     <Save size={16} />

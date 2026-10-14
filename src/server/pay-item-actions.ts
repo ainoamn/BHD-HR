@@ -6,6 +6,7 @@ import { PAYMENT_LABEL, PAY_KINDS, PAY_KIND_LABEL, monthName } from "@/lib/const
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { syncEmployeeSalaries } from "@/lib/pay-items";
+import { canEditPeriod, periodStatus } from "@/lib/payroll-period";
 import { prisma } from "@/lib/prisma";
 import { clip, intValue, money, num, parseDateInput, req, round3, safeReturn, str, todayInputValue } from "@/lib/utils";
 
@@ -49,6 +50,12 @@ export async function savePayItem(formData: FormData) {
     const repeat = req(formData, "repeat");
     months = repeat === "ongoing" ? null : repeat === "months" ? intValue(formData, "monthsCount") : 1;
     if (months !== null && (months < 1 || months > 120)) fail("عدد الأشهر بين 1 و120", "Months must be between 1 and 120");
+  }
+  if (months === 1 && !canEditPeriod(await periodStatus(user.companyId, start!.year, start!.month))) {
+    fail(
+      "مسير هذا الشهر معتمد أو مقفل؛ اختر شهراً لاحقاً مسيره مسودة، أو سجّل تصحيحاً من صفحة الراتب.",
+      "That month's payroll is approved or locked; choose a later month whose payroll is a draft, or record a correction from the salary page.",
+    );
   }
   const method = req(formData, "paymentMethod");
   const data = {

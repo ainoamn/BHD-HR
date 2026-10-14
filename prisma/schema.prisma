@@ -52,6 +52,9 @@ model Company {
   stampUrl             String?
   /// Letter kinds an employee asks for from the portal that are issued at once, signed, without a person approving.
   letterAutoKinds      Json?
+  /// Salaries are paid only after the month's payroll is approved (src/lib/payroll-period.ts).
+  payrollApproval      Boolean             @default(false)
+  payrollPeriods       PayrollPeriod[]
   employees            Employee[]
   leaveRequests        LeaveRequest[]
   employeeRequests     EmployeeRequest[]
@@ -560,6 +563,28 @@ model Salary {
 
   @@unique([employeeId, year, month])
   @@unique([companyId, receiptNo])
+}
+
+/// Approval state of one company month (src/lib/payroll-period.ts); no row = DRAFT.
+model PayrollPeriod {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year        Int
+  month       Int
+  /// DRAFT, REVIEW, APPROVED or LOCKED.
+  status      String    @default("DRAFT")
+  submittedAt DateTime?
+  submittedBy String?
+  approvedAt  DateTime?
+  approvedBy  String?
+  lockedAt    DateTime?
+  lockedBy    String?
+  /// Reason given when the month was sent back or unlocked.
+  note        String?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, year, month])
 }
 
 /// Advances, bonuses, allowances, entitlements and deductions that feed monthly salaries (src/lib/pay-items.ts).
