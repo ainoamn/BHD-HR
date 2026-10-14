@@ -106,7 +106,7 @@ export function isRateLimited(error: unknown) {
   return /rate limit/i.test(String((error as { lastError?: unknown })?.lastError ?? error));
 }
 
-export const READ_DOC_TYPES = ["ID_CARD", "PASSPORT", "RESIDENCE", "DRIVING_LICENSE", "CONTRACT", "INSURANCE", "CERTIFICATE", "OTHER"] as const;
+export const READ_DOC_TYPES = ["ID_CARD", "PASSPORT", "RESIDENCE", "WORK_PERMIT", "VISA", "DRIVING_LICENSE", "CONTRACT", "INSURANCE", "CERTIFICATE", "OTHER"] as const;
 
 export type ReadDocument = {
   type: (typeof READ_DOC_TYPES)[number];
@@ -126,7 +126,7 @@ export async function aiReadDocument(data: Uint8Array, mediaType: string): Promi
     temperature: 0,
     system: [
       "You read identity and HR documents for an HR system in the Sultanate of Oman and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
-      `type is one of ${READ_DOC_TYPES.join(", ")}. An Omani citizen's national ID card is ID_CARD; a resident card / labour card issued to a non-Omani is RESIDENCE.`,
+      `type is one of ${READ_DOC_TYPES.join(", ")}. An Omani citizen's national ID card is ID_CARD; a resident card / labour card issued to a non-Omani is RESIDENCE; a Ministry of Labour work permit / labour clearance is WORK_PERMIT; an entry or employment visa is VISA.`,
       "number is the document number exactly as printed (Latin digits, no spaces). For passports use the passport number, not the personal number.",
       "Dates are YYYY-MM-DD with Gregorian dates; convert Hijri only if no Gregorian date is printed. expiry is the expiry date of the document.",
       "fullName is the holder's full name in Arabic script, nameEn in Latin script as printed. nationality is the ISO 3166 alpha-2 code (e.g. OM, IN, PK, BD, EG, PH). gender is MALE or FEMALE.",

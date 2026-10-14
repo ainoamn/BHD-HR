@@ -45,6 +45,8 @@ export const DOC_LABEL: Record<string, Bi> = {
   ID_CARD: { ar: "البطاقة الشخصية", en: "ID card" },
   PASSPORT: { ar: "جواز السفر", en: "Passport" },
   RESIDENCE: { ar: "الإقامة", en: "Residence" },
+  WORK_PERMIT: { ar: "تصريح العمل", en: "Work permit" },
+  VISA: { ar: "التأشيرة", en: "Visa" },
   DRIVING_LICENSE: { ar: "رخصة القيادة", en: "Driving licence" },
   CONTRACT: { ar: "العقد", en: "Contract" },
   INSURANCE: { ar: "التأمين", en: "Insurance" },
@@ -52,7 +54,7 @@ export const DOC_LABEL: Record<string, Bi> = {
   OTHER: { ar: "مستند آخر", en: "Other document" },
 };
 
-export const EXTRA_DOC_TYPES = ["DRIVING_LICENSE", "CONTRACT", "INSURANCE", "CERTIFICATE", "ID_CARD", "PASSPORT", "RESIDENCE", "OTHER"];
+export const EXTRA_DOC_TYPES = ["WORK_PERMIT", "VISA", "DRIVING_LICENSE", "CONTRACT", "INSURANCE", "CERTIFICATE", "ID_CARD", "PASSPORT", "RESIDENCE", "OTHER"];
 
 /** Names of the four leave types every company starts with (src/lib/hr-catalog.ts). */
 export const BALANCE_LABEL: Record<string, Bi> = {
