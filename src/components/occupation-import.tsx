@@ -5,16 +5,13 @@ import { BookOpenCheck, CircleAlert, CircleCheck, FileText, Loader2, Sparkles } 
 import { useLang } from "@/components/lang-provider";
 import { primaryBtn, secondaryBtn } from "@/components/ui";
 import { SKILL_CLASS } from "@/lib/occupation-guide";
-import {
-  importOccupationGuide,
-  previewBuiltInOccupationGuide,
-  previewOccupationGuide,
-  type OccupationPreview,
-} from "@/server/occupation-actions";
+import type { OccupationPreview } from "@/lib/occupation-preview";
+import { importOccupationGuide, previewBuiltInOccupationGuide } from "@/server/occupation-actions";
+import { previewOccupationGuide } from "@/server/occupation-pdf-actions";
 
 /**
  * Import the Ministry of Labour unified occupation guide into the job-title catalog:
- * one-click official list, or upload a newer PDF (AI / heuristics recognise it).
+ * one-click official list, or upload a newer PDF.
  */
 export function OccupationImport() {
   const { lang, t } = useLang();

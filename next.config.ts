@@ -4,19 +4,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: "/pending", destination: "/", permanent: false }];
   },
-  // pdf-parse / pdfjs must not be webpack-bundled: the worker file and Node APIs break on Vercel otherwise.
+  // Keep pdf tooling external so webpack does not mangle pdfjs; only loaded when a PDF is uploaded.
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
-  outputFileTracingIncludes: {
-    "/settings/hr": [
-      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
-      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-      "./node_modules/pdf-parse/**/*",
-    ],
-    "/*": [
-      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
-      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-    ],
-  },
   experimental: {
     // Visited and prefetched pages are reused from the client cache; every save clears it (refreshAll).
     staleTimes: {
