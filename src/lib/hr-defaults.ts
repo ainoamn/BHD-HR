@@ -1,4 +1,7 @@
-/** Built-in lists copied into each company once; the company can then edit, add or delete them in Settings. */
+/**
+ * Built-in HR catalogs copied into each company (and re-synced from Settings → «استيراد القائمة الجاهزة»).
+ * Tuned for Omani private-sector practice and Labour Law (RD 53/2023) where applicable.
+ */
 
 export const DEFAULT_DEPARTMENTS: [string, string][] = [
   ["الإدارة العليا", "Executive Management"],
@@ -8,6 +11,7 @@ export const DEFAULT_DEPARTMENTS: [string, string][] = [
   ["المشتريات", "Procurement"],
   ["المبيعات", "Sales"],
   ["التسويق", "Marketing"],
+  ["تطوير الأعمال", "Business Development"],
   ["خدمة العملاء", "Customer Service"],
   ["تقنية المعلومات", "Information Technology"],
   ["العمليات", "Operations"],
@@ -15,15 +19,18 @@ export const DEFAULT_DEPARTMENTS: [string, string][] = [
   ["الهندسة", "Engineering"],
   ["الإنتاج", "Production"],
   ["الصيانة", "Maintenance"],
-  ["الجودة", "Quality"],
+  ["الجودة", "Quality Assurance"],
   ["الصحة والسلامة والبيئة", "Health, Safety & Environment"],
+  ["الالتزام والحوكمة", "Compliance & Governance"],
   ["المخازن والمستودعات", "Warehouse & Stores"],
   ["النقل والخدمات اللوجستية", "Transport & Logistics"],
   ["الشؤون القانونية", "Legal Affairs"],
   ["العلاقات العامة", "Public Relations"],
+  ["العلاقات الحكومية", "Government Relations"],
   ["التدريب والتطوير", "Training & Development"],
   ["الأمن والحراسة", "Security"],
   ["الخدمات العامة", "General Services"],
+  ["الخدمات المنزلية", "Household Services"],
   ["المطبخ والضيافة", "Kitchen & Hospitality"],
   ["الزراعة", "Agriculture"],
 ];
@@ -189,3 +196,69 @@ export const DEFAULT_JOB_TITLES: [string, string][] = [
   ["موزع", "Distributor"],
   ["متدرب", "Trainee"],
 ];
+
+export type DefaultLeaveSeed = {
+  key: string;
+  nameAr: string;
+  nameEn: string;
+  days: number;
+  /** ONCE | YEARLY | MONTHLY */
+  cycle: "ONCE" | "YEARLY" | "MONTHLY";
+  carryCap: number | null;
+  sortOrder: number;
+};
+
+/**
+ * Leave types for Omani private sector.
+ * Keys `annual` / `sick` / `compensatory` / `other` stay fixed (attendance legacy mapping).
+ * Sick ceiling follows Labour Law tracking practice (up to 182 days/year with graded pay handled in payroll policy).
+ */
+export const DEFAULT_LEAVE_TYPES: DefaultLeaveSeed[] = [
+  { key: "annual", nameAr: "الإجازة السنوية", nameEn: "Annual leave", days: 30, cycle: "YEARLY", carryCap: 15, sortOrder: 0 },
+  { key: "sick", nameAr: "الإجازة المرضية", nameEn: "Sick leave", days: 182, cycle: "YEARLY", carryCap: null, sortOrder: 1 },
+  { key: "compensatory", nameAr: "الإجازة التعويضية", nameEn: "Compensatory leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 2 },
+  { key: "maternity", nameAr: "إجازة الأمومة", nameEn: "Maternity leave", days: 98, cycle: "ONCE", carryCap: null, sortOrder: 3 },
+  { key: "paternity", nameAr: "إجازة الأبوة", nameEn: "Paternity leave", days: 7, cycle: "ONCE", carryCap: null, sortOrder: 4 },
+  { key: "marriage", nameAr: "إجازة الزواج", nameEn: "Marriage leave", days: 3, cycle: "ONCE", carryCap: null, sortOrder: 5 },
+  { key: "bereavement", nameAr: "إجازة الوفاة", nameEn: "Bereavement leave", days: 3, cycle: "ONCE", carryCap: null, sortOrder: 6 },
+  { key: "hajj", nameAr: "إجازة الحج", nameEn: "Hajj leave", days: 14, cycle: "ONCE", carryCap: null, sortOrder: 7 },
+  { key: "emergency", nameAr: "إجازة طارئة", nameEn: "Emergency leave", days: 5, cycle: "YEARLY", carryCap: null, sortOrder: 8 },
+  { key: "exam", nameAr: "إجازة امتحانات", nameEn: "Exam leave", days: 14, cycle: "YEARLY", carryCap: null, sortOrder: 9 },
+  { key: "unpaid", nameAr: "إجازة بدون راتب", nameEn: "Unpaid leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 10 },
+  { key: "other", nameAr: "إجازات أخرى", nameEn: "Other leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 11 },
+];
+
+export type DefaultAllowanceSeed = {
+  nameAr: string;
+  nameEn: string;
+  calc: "FIXED" | "PERCENT";
+  value: number;
+  base: "BASIC" | "PACKAGE";
+  frequency: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
+  payMonth: number;
+};
+
+/**
+ * Recurring extras beyond basic / housing / transport on the employee file.
+ * Amounts stay 0 so each company sets its own figures.
+ */
+export const DEFAULT_ALLOWANCE_TYPES: DefaultAllowanceSeed[] = [
+  { nameAr: "بدل هاتف", nameEn: "Phone allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل إنترنت", nameEn: "Internet allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل وجبة", nameEn: "Meal allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل طبيعة عمل", nameEn: "Nature-of-work allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل وردية", nameEn: "Shift allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل خطر", nameEn: "Hazard allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل تمثيل", nameEn: "Representation allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل سيارة", nameEn: "Car allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل وقود", nameEn: "Fuel allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل تعليم أبناء", nameEn: "Children’s education allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "ANNUAL", payMonth: 9 },
+  { nameAr: "بدل سكن إضافي", nameEn: "Extra housing allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+  { nameAr: "بدل نقل إضافي", nameEn: "Extra transport allowance", calc: "FIXED", value: 0, base: "BASIC", frequency: "MONTHLY", payMonth: 1 },
+];
+
+/** Old department name → preferred bilingual entry (cleanup / rename). */
+export const DEPARTMENT_RENAMES: Record<string, [string, string]> = {
+  المنزل: ["الخدمات المنزلية", "Household Services"],
+  الجودة: ["الجودة", "Quality Assurance"],
+};

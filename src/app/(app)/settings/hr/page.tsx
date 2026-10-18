@@ -194,7 +194,11 @@ export default async function HrSettingsPage({
               {translateButton(list, isJobs ? jobsMissingEn : missingEn(catalog.departments))}
               <form action={importDefaults}>
                 <input type="hidden" name="list" value={list} />
-                <SubmitButton variant="secondary">{t("استيراد القائمة الجاهزة", "Import built-in list")}</SubmitButton>
+                <SubmitButton variant="secondary">
+                  {list === "departments"
+                    ? t("تنظيف وتحديث القائمة الجاهزة", "Clean & refresh built-in list")
+                    : t("استيراد القائمة الجاهزة", "Import built-in list")}
+                </SubmitButton>
               </form>
             </div>
           </div>
@@ -424,8 +428,20 @@ export default async function HrSettingsPage({
             <Card>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="font-bold">{t("أنواع الإجازات", "Leave types")}</h2>
-                {translateButton("leave", missingEn(catalog.leaveTypes))}
+                <div className="flex flex-wrap gap-2">
+                  {translateButton("leave", missingEn(catalog.leaveTypes))}
+                  <form action={importDefaults}>
+                    <input type="hidden" name="list" value="leave" />
+                    <SubmitButton variant="secondary">{t("تنظيف وتحديث القائمة الجاهزة", "Clean & refresh built-in list")}</SubmitButton>
+                  </form>
+                </div>
               </div>
+              <p className="mb-3 text-xs text-slate-500">
+                {t(
+                  "القائمة الجاهزة وفق قانون العمل العُماني والممارسات الشائعة: سنوية، مرضية، أمومة، أبوة، زواج، وفاة، حج، طارئة، امتحانات، بدون راتب…",
+                  "Built-in list follows Omani labour law and common practice: annual, sick, maternity, paternity, marriage, bereavement, Hajj, emergency, exam, unpaid…",
+                )}
+              </p>
               <ul className="divide-y divide-slate-100">
                 {catalog.leaveTypes.map((type) => {
                   const jobs = type.jobTitleIds.map((id) => leaveJobTitles.find((job) => job.id === id)).filter(Boolean);
@@ -470,8 +486,20 @@ export default async function HrSettingsPage({
             <Card>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="font-bold">{t("العلاوات", "Allowances")}</h2>
-                {translateButton("allowances", missingEn(catalog.allowanceTypes))}
+                <div className="flex flex-wrap gap-2">
+                  {translateButton("allowances", missingEn(catalog.allowanceTypes))}
+                  <form action={importDefaults}>
+                    <input type="hidden" name="list" value="allowances" />
+                    <SubmitButton variant="secondary">{t("تنظيف وتحديث القائمة الجاهزة", "Clean & refresh built-in list")}</SubmitButton>
+                  </form>
+                </div>
               </div>
+              <p className="mb-3 text-xs text-slate-500">
+                {t(
+                  "علاوات شائعة في سلطنة عُمان (القيمة صفر حتى تضبطها). بدل السكن والنقل الأساسيان يبقيان في ملف الموظف؛ هذه علاوات إضافية.",
+                  "Common Omani allowances (amount 0 until you set it). Basic housing and transport stay on the employee file; these are extras.",
+                )}
+              </p>
               {catalog.allowanceTypes.length === 0 ? <p className="text-sm text-slate-500">{t("لا توجد علاوات بعد.", "No allowances yet.")}</p> : null}
               <ul className="divide-y divide-slate-100">
                 {catalog.allowanceTypes.map((type) => {

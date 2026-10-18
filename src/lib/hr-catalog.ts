@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { cache } from "react";
-import { BALANCE_LABEL } from "./constants";
-import { DEFAULT_DEPARTMENTS, DEFAULT_JOB_TITLES } from "./hr-defaults";
+import { DEFAULT_ALLOWANCE_TYPES, DEFAULT_DEPARTMENTS, DEFAULT_JOB_TITLES, DEFAULT_LEAVE_TYPES } from "./hr-defaults";
 import { prisma } from "./prisma";
 
 const CATALOG_VERSION = 1;
@@ -30,9 +29,35 @@ async function ensureCatalog(companyId: string) {
       await tx.jobTitle.createMany({ data: DEFAULT_JOB_TITLES.map(([nameAr, nameEn]) => ({ companyId, nameAr, nameEn })), skipDuplicates: true });
       await tx.department.createMany({ data: DEFAULT_DEPARTMENTS.map(([nameAr, nameEn]) => ({ companyId, nameAr, nameEn })), skipDuplicates: true });
       await tx.leaveType.createMany({
-        data: LEGACY_LEAVE.map((item, index) => ({ companyId, key: item.key, nameAr: BALANCE_LABEL[item.key].ar, nameEn: BALANCE_LABEL[item.key].en, days: item.days, sortOrder: index })),
+        data: DEFAULT_LEAVE_TYPES.map((seed) => ({
+          companyId,
+          key: seed.key,
+          nameAr: seed.nameAr,
+          nameEn: seed.nameEn,
+          days: seed.days,
+          cycle: seed.cycle,
+          carryCap: seed.carryCap,
+          sortOrder: seed.sortOrder,
+        })),
         skipDuplicates: true,
       });
+      for (const seed of DEFAULT_ALLOWANCE_TYPES) {
+        const exists = await tx.allowanceType.findFirst({ where: { companyId, nameAr: seed.nameAr }, select: { id: true } });
+        if (!exists) {
+          await tx.allowanceType.create({
+            data: {
+              companyId,
+              nameAr: seed.nameAr,
+              nameEn: seed.nameEn,
+              calc: seed.calc,
+              value: seed.value,
+              base: seed.base,
+              frequency: seed.frequency,
+              payMonth: seed.payMonth,
+            },
+          });
+        }
+      }
 
       const employees = await tx.employee.findMany({
         where: { companyId },

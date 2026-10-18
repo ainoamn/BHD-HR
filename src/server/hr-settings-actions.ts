@@ -6,6 +6,7 @@ import { aiTranslateMany } from "@/lib/ai";
 import { ALLOWANCE_BASES, ALLOWANCE_CALCS, ALLOWANCE_FREQUENCIES } from "@/lib/allowances";
 import { writeAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
+import { syncHrCatalogDefaults } from "@/lib/hr-catalog-sync";
 import { DEFAULT_DEPARTMENTS, DEFAULT_JOB_TITLES } from "@/lib/hr-defaults";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -123,16 +124,56 @@ export async function deleteCatalogEntry(formData: FormData) {
   go(back(list), { message: t("تم الحذف", "Deleted") });
 }
 
-/** Adds back any built-in job titles or departments the company does not have. */
+/**
+ * Jobs / departments: add missing built-in rows.
+ * Leave / allowances / departments (sync): curated Oman-oriented cleanup — adds missing, fills English, tunes annual/sick.
+ */
 export async function importDefaults(formData: FormData) {
   const user = await requireAdmin(PAGE);
   const { t } = await getI18n();
-  const list: List = req(formData, "list") === "departments" ? "departments" : "jobs";
-  const source = list === "jobs" ? DEFAULT_JOB_TITLES : DEFAULT_DEPARTMENTS;
-  const data = source.map(([nameAr, nameEn]) => ({ companyId: user.companyId, nameAr, nameEn }));
-  const result = list === "jobs" ? await prisma.jobTitle.createMany({ data, skipDuplicates: true }) : await prisma.department.createMany({ data, skipDuplicates: true });
-  refreshAll();
-  go(back(list), { message: t(`أُضيف ${result.count} عنصراً من القائمة الجاهزة`, `Added ${result.count} item(s) from the built-in list`) });
+  const raw = req(formData, "list");
+  const list: List = raw === "departments" || raw === "leave" || raw === "allowances" ? raw : "jobs";
+
+  if (list === "jobs") {
+    const data = DEFAULT_JOB_TITLES.map(([nameAr, nameEn]) => ({ companyId: user.companyId, nameAr, nameEn }));
+    const result = await prisma.jobTitle.createMany({ data, skipDuplicates: true });
+    refreshAll();
+    go(back(list), { message: t(`أُضيف ${result.count} عنصراً من القائمة الجاهزة`, `Added ${result.count} item(s) from the built-in list`) });
+  }
+
+  if (list === "departments" || list === "leave" || list === "allowances") {
+    // Departments tab also runs the full sync so renames (e.g. المنزل → الخدمات المنزلية) apply.
+    const result = await syncHrCatalogDefaults(user.companyId);
+    await writeAudit({
+      userId: user.id,
+      action: "CATALOG_SYNC",
+      message: t(
+        `حدّث القوائم الجاهزة: أقسام +${result.departmentsAdded}/حدّث ${result.departmentsUpdated}، إجازات +${result.leaveAdded}/حدّث ${result.leaveUpdated}، علاوات +${result.allowancesAdded}`,
+        `Synced built-in catalogs: departments +${result.departmentsAdded}/upd ${result.departmentsUpdated}, leave +${result.leaveAdded}/upd ${result.leaveUpdated}, allowances +${result.allowancesAdded}`,
+      ),
+    });
+    refreshAll();
+    const parts =
+      list === "departments"
+        ? t(
+            `الأقسام: أُضيف ${result.departmentsAdded} وحُدّث ${result.departmentsUpdated}`,
+            `Departments: added ${result.departmentsAdded}, updated ${result.departmentsUpdated}`,
+          )
+        : list === "leave"
+          ? t(
+              `الإجازات: أُضيف ${result.leaveAdded} وحُدّث ${result.leaveUpdated}`,
+              `Leave types: added ${result.leaveAdded}, updated ${result.leaveUpdated}`,
+            )
+          : t(`العلاوات: أُضيف ${result.allowancesAdded}`, `Allowances: added ${result.allowancesAdded}`);
+    go(back(list), {
+      message: t(
+        `${parts}. (تُحدَّث الأقسام والإجازات والعلاوات معاً من القائمة الجاهزة.)`,
+        `${parts}. (Departments, leave types and allowances are refreshed together from the built-in list.)`,
+      ),
+    });
+  }
+
+  go(back("jobs"), { error: t("قائمة غير معروفة", "Unknown list") });
 }
 
 /** Fills empty English names with AI, in batches. */
