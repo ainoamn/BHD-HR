@@ -209,6 +209,7 @@ export default async function EmployeesPage({
             <thead>
               <tr>
                 <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
+                <th className="px-4 py-3 text-start">{t("الجنسية", "Nationality")}</th>
                 <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الرقم", "No.")}</th>
                 <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الكفيل", "Sponsor")}</th>
                 <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الوظيفة", "Job")}</th>
@@ -248,13 +249,15 @@ export default async function EmployeesPage({
                         <EmployeeAvatar name={name} photo={employee.photoUrl} className="size-10 rounded-full bg-teal-50 text-sm text-teal-800 ring-1 ring-inset ring-teal-100" />
                         <span className="min-w-0">
                           <span className="block truncate font-semibold text-slate-900 group-hover:text-teal-700">{name}</span>
-                          <span className="block truncate text-xs text-slate-500">
-                            <span className="tabular hidden sm:inline xl:hidden">{employee.employeeNumber} · </span>
-                            {text(nationalityName(employee.nationality, lang))}
+                          <span className="block truncate text-xs text-slate-500 xl:hidden">
+                            <span className="tabular">{employee.employeeNumber}</span>
                           </span>
                         </span>
                       </Link>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-700" data-label={t("الجنسية", "Nationality")}>
+                      {text(nationalityName(employee.nationality, lang))}
                     </td>
                     <td className="tabular hidden px-4 py-3 font-medium whitespace-nowrap text-slate-500 xl:table-cell" data-label={t("الرقم", "No.")}>
                       {employee.employeeNumber}
