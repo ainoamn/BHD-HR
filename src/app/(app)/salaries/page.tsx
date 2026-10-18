@@ -139,7 +139,7 @@ export default async function SalariesPage({
             { n: "1", label: t("راجع الغياب والإضافي", "Review absence and overtime"), href: `/attendance?year=${year}&month=${month}`, done: true },
             { n: "2", label: t("أنشئ المسير", "Generate payroll"), href: "#generate", done: salaries.length > 0 },
             { n: "3", label: t("راجع الملاحظات والحسابات", "Review issues and bank accounts"), href: "#check", done: salaries.length > 0 && !issues.some((issue) => issue.level === "danger") },
-            { n: "4", label: t("كشف الحماية الاجتماعية", "Social protection sheet"), href: `/salaries/spf?${fileQuery}`, done: salaries.length > 0 },
+            { n: "4", label: t("راجع الحماية وملف البنك", "Review social protection and the bank file"), href: `/salaries/review?${fileQuery}`, done: salaries.length > 0 && !issues.some((issue) => issue.level === "danger") },
             { n: "5", label: t("ملف البنك WPS", "Bank file (WPS)"), href: issues.some((issue) => issue.level === "danger") ? "#check" : `/salaries/wps?${fileQuery}`, done: unpaid.length === 0 && salaries.length > 0 },
             { n: "6", label: t("اعتماد وقفل الشهر", "Approve and lock the month"), href: "#period", done: periodState === "LOCKED" },
           ].map((item) => (

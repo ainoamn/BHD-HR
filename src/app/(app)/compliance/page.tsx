@@ -150,8 +150,8 @@ export default async function CompliancePage() {
             <Link href="/salaries" className="rounded-xl bg-teal-800 px-3 py-2 font-semibold text-white">
               {t("شهر الرواتب", "Payroll month")}
             </Link>
-            <Link href="/salaries/spf" className="rounded-xl px-3 py-2 font-semibold text-teal-900 ring-1 ring-inset ring-teal-200">
-              {t("ملف الحماية الاجتماعية", "Social protection file")}
+            <Link href="/salaries/review" className="rounded-xl px-3 py-2 font-semibold text-teal-900 ring-1 ring-inset ring-teal-200">
+              {t("مراجعة الحماية وملف البنك", "Review social protection and the bank file")}
             </Link>
           </>
         ) : null}
