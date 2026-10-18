@@ -419,6 +419,22 @@ textarea:focus-visible {
     display: none;
   }
 
+  .table-stack.table-tools thead {
+    display: block;
+  }
+
+  .table-stack.table-tools thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.6rem 0.75rem 0.2rem;
+  }
+
+  .table-stack.table-tools thead th {
+    display: block;
+    width: auto;
+  }
+
   .table-stack,
   .table-stack tbody,
   .table-stack tfoot,

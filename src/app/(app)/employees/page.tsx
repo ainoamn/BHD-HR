@@ -3,6 +3,7 @@ import { BookUser, ClipboardCheck, FileUp, KeyRound, Pencil, Search, UserPlus, U
 import { Flash } from "@/components/flash";
 import { SubmitButton } from "@/components/submit-button";
 import { GetForm } from "@/components/get-form";
+import { ColumnHead } from "@/components/column-head";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { EmployeeBulkBar } from "@/components/employee-bulk-bar";
 import { DeleteButton } from "@/components/row-forms";
@@ -26,7 +27,7 @@ import { deleteEmployee } from "@/server/employee-actions";
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; employerId?: string; error?: string; message?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; employerId?: string; sort?: string; dir?: string; fname?: string; fnat?: string; fno?: string; fsponsor?: string; fjob?: string; fsalary?: string; fstatus?: string; fdocs?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("employees.view");
@@ -70,6 +71,49 @@ export default async function EmployeesPage({
   const withoutAccount = allow.edit
     ? await prisma.employee.count({ where: { companyId: user.companyId, status: { not: "TERMINATED" }, account: null } })
     : 0;
+  const includes = (value: string, query?: string) => {
+    const needle = (query || "").trim().toLowerCase();
+    return !needle || value.toLowerCase().includes(needle);
+  };
+  const listed = employees
+    .filter((employee) => {
+      const name = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
+      const docs = worstExpiry([employee.idExpiry, employee.passportExpiry, employee.residenceExpiry, ...employee.documents.map((item) => item.expiryDate)], limits, lang);
+      return (
+        includes(name, sp.fname) &&
+        includes(nationalityName(employee.nationality, lang) || "", sp.fnat) &&
+        includes(employee.employeeNumber, sp.fno) &&
+        includes(employerName(employee.employer), sp.fsponsor) &&
+        includes(termText(employee.jobTitle, employee.jobTitleEn, lang) || "", sp.fjob) &&
+        includes(`${packageGross(employee)} ${money(packageGross(employee), user.company.currency)}`, sp.fsalary) &&
+        includes(pick(STATUS_LABEL[employee.status], lang, employee.status), sp.fstatus) &&
+        includes(docs.label, sp.fdocs)
+      );
+    })
+    .sort((a, b) => {
+      const sort = ["name", "nat", "no", "sponsor", "job", "salary", "status", "docs"].includes(sp.sort || "") ? sp.sort || "name" : "name";
+      const direction = sp.dir === "desc" ? -1 : 1;
+      if (sort === "salary") return (packageGross(a) - packageGross(b)) * direction;
+      if (sort === "docs") {
+        const days = (employee: typeof a) =>
+          worstExpiry([employee.idExpiry, employee.passportExpiry, employee.residenceExpiry, ...employee.documents.map((item) => item.expiryDate)], limits, lang).days;
+        return (days(a) - days(b)) * direction;
+      }
+      const label = (employee: typeof a) => {
+        if (sort === "nat") return nationalityName(employee.nationality, lang) || "";
+        if (sort === "no") return employee.employeeNumber;
+        if (sort === "sponsor") return employerName(employee.employer);
+        if (sort === "job") return termText(employee.jobTitle, employee.jobTitleEn, lang) || "";
+        if (sort === "status") return pick(STATUS_LABEL[employee.status], lang, employee.status);
+        return lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
+      };
+      return label(a).localeCompare(label(b), lang === "en" ? "en" : "ar") * direction;
+    });
+  const listParams = new URLSearchParams(employeeFilterQuery(filter).replace(/^\?/, ""));
+  for (const key of ["sort", "dir", "fname", "fnat", "fno", "fsponsor", "fjob", "fsalary", "fstatus", "fdocs"] as const) {
+    if (sp[key]) listParams.set(key, sp[key]);
+  }
+  const listQuery = listParams.toString() ? `?${listParams}` : "";
   const salaryEdit = can(user, "salaries.edit");
   const incomplete = allow.edit
     ? employees.filter(
@@ -83,7 +127,7 @@ export default async function EmployeesPage({
       <PageHeader icon={Users} title={t("الموظفون", "Employees")} description={t("سجل العمال وبيانات الراتب وحالة الوثائق.", "Staff records, salaries and document status.")}>
         {employees.length ? (
           <Link
-            href={`/employees/passport-stickers${employeeFilterQuery(filter)}`}
+            href={`/employees/passport-stickers${listQuery}`}
             className={secondaryBtn}
             title={t("ملصق بيانات كل عامل في القائمة لوضعه داخل غلاف جوازه الخلفي", "A details sticker for each worker in the list, for the inside back cover of their passport")}
           >
@@ -173,6 +217,11 @@ export default async function EmployeesPage({
                 {t("مسح", "Clear")}
               </Link>
             ) : null}
+            {sp.sort ? <input type="hidden" name="sort" value={sp.sort} /> : null}
+            {sp.dir ? <input type="hidden" name="dir" value={sp.dir} /> : null}
+            {(["fname", "fnat", "fno", "fsponsor", "fjob", "fsalary", "fstatus", "fdocs"] as const).map((key) =>
+              sp[key] ? <input key={key} type="hidden" name={key} value={sp[key]} /> : null,
+            )}
           </div>
         </GetForm>
       </Toolbar>
@@ -196,31 +245,31 @@ export default async function EmployeesPage({
         </EmptyState>
       ) : (
         <>
-        <p className="mb-2 px-1 text-xs font-medium text-slate-500">{t(`${employees.length} موظف`, `${employees.length} employee(s)`)}</p>
+        <p className="mb-2 px-1 text-xs font-medium text-slate-500">{t(`${listed.length} موظف`, `${listed.length} employee(s)`)}</p>
         <EmployeeBulkBar
-          returnTo={`/employees${employeeFilterQuery(filter)}`}
+          returnTo={`/employees${listQuery}`}
           canEdit={allow.edit}
           statuses={Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label: pick(label, lang) }))}
           employers={employers.map((employer) => ({ value: employer.id, label: employerName(employer) }))}
           schedules={schedules.map((schedule) => ({ value: schedule.id, label: lang === "en" && schedule.nameEn ? schedule.nameEn : schedule.name }))}
         />
         <div className="table-shell">
-          <table className="table-stack min-w-full text-sm">
+          <table className="table-stack table-tools min-w-full text-sm">
             <thead>
               <tr>
-                <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
-                <th className="px-4 py-3 text-start">{t("الجنسية", "Nationality")}</th>
-                <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الرقم", "No.")}</th>
-                <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الكفيل", "Sponsor")}</th>
-                <th className="hidden px-4 py-3 text-start xl:table-cell">{t("الوظيفة", "Job")}</th>
-                {allow.salaries ? <th className="px-4 py-3 text-start">{t("الراتب", "Salary")}</th> : null}
-                <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
-                {allow.docs ? <th className="px-4 py-3 text-start">{t("المستندات", "Documents")}</th> : null}
+                <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                <ColumnHead column="nat" label={t("الجنسية", "Nationality")} />
+                <ColumnHead column="no" label={t("الرقم", "No.")} className="hidden xl:table-cell" />
+                <ColumnHead column="sponsor" label={t("الكفيل", "Sponsor")} className="hidden xl:table-cell" />
+                <ColumnHead column="job" label={t("الوظيفة", "Job")} className="hidden xl:table-cell" />
+                {allow.salaries ? <ColumnHead column="salary" label={t("الراتب", "Salary")} /> : null}
+                <ColumnHead column="status" label={t("الحالة", "Status")} />
+                {allow.docs ? <ColumnHead column="docs" label={t("المستندات", "Documents")} /> : null}
                 {allow.edit || allow.remove ? <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th> : null}
               </tr>
             </thead>
             <tbody>
-              {employees.map((employee) => {
+              {listed.map((employee) => {
                 const docs = worstExpiry(
                   [employee.idExpiry, employee.passportExpiry, employee.residenceExpiry, ...employee.documents.map((item) => item.expiryDate)],
                   limits,
