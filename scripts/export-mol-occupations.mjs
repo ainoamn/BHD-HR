@@ -41,8 +41,33 @@ for (const page of pages) {
   }
 }
 
+function fixPdfArabic(value) {
+  return value.replace(/األ/g, "الأ").replace(/اإل/g, "الإ").replace(/اآ/g, "آ");
+}
+function splitMolEnglish(nameEn) {
+  const cleaned = nameEn.replace(/\t/g, " ").replace(/\s+/g, " ").trim();
+  const match = cleaned.match(/^[-–—/]\s*(.+?)\s+([A-Za-z((].*)$/);
+  if (!match) return { specialtyAr: "", nameEn: cleaned };
+  return {
+    specialtyAr: fixPdfArabic(match[1].replace(/\s+/g, " ").trim()),
+    nameEn: match[2].replace(/\s+/g, " ").trim(),
+  };
+}
+function prepare(rows) {
+  const used = new Set();
+  return rows.map((row) => {
+    const split = splitMolEnglish(row.nameEn);
+    const baseAr = fixPdfArabic(row.nameAr);
+    let nameAr = split.specialtyAr ? `${baseAr} ${split.specialtyAr}`.replace(/\s+/g, " ").trim() : baseAr;
+    if (used.has(nameAr)) nameAr = `${nameAr} (${row.code})`;
+    used.add(nameAr);
+    return { ...row, nameAr, nameEn: split.nameEn || fixPdfArabic(row.nameEn) };
+  });
+}
+
+const prepared = prepare(rows);
 const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/lib/data");
 fs.mkdirSync(outDir, { recursive: true });
 const out = path.join(outDir, "mol-occupations.json");
-fs.writeFileSync(out, JSON.stringify(rows));
-console.log("wrote", rows.length, "to", out, "bytes", fs.statSync(out).size);
+fs.writeFileSync(out, JSON.stringify(prepared));
+console.log("wrote", prepared.length, "unique names", new Set(prepared.map((r) => r.nameAr)).size, "to", out, "bytes", fs.statSync(out).size);

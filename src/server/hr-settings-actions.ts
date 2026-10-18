@@ -23,9 +23,9 @@ function back(list: List) {
 
 async function readNames(formData: FormData, list: List) {
   const { t } = await getI18n();
-  const nameAr = clip(req(formData, "nameAr"), 120);
+  const nameAr = clip(req(formData, "nameAr"), 120)?.replace(/\s+/g, " ").trim();
   if (!nameAr || nameAr.length < 2) go(back(list), { error: t("اكتب الاسم بالعربية", "Enter the Arabic name") });
-  return { nameAr: nameAr!, nameEn: clip(str(formData, "nameEn"), 120) };
+  return { nameAr: nameAr!, nameEn: clip(str(formData, "nameEn"), 120)?.replace(/\s+/g, " ").trim() || null };
 }
 
 function readJobExtras(formData: FormData) {

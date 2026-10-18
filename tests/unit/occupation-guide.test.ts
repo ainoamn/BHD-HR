@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   detectOccupationFile,
+  ensureUniqueOccupationNames,
+  finalizeOccupationRow,
+  normalizeJobNameKey,
   parseComparisonOccupations,
   parseOccupationFile,
   parseUnifiedOccupations,
+  prepareOccupationRows,
   skillClassLabel,
 } from "@/lib/occupation-guide";
 
@@ -66,5 +70,42 @@ describe("occupation guide", () => {
   it("routes parseOccupationFile by detected kind", () => {
     expect(parseOccupationFile(UNIFIED_SAMPLE).kind).toBe("UNIFIED");
     expect(parseOccupationFile(COMPARISON_SAMPLE).rows).toHaveLength(2);
+  });
+
+  it("moves Arabic specialty out of the English column so names stay unique", () => {
+    expect(
+      finalizeOccupationRow({
+        code: "2113001001",
+        nameAr: "كيميائي",
+        nameEn: "- عام General Chemist",
+        skillClass: "1",
+      }),
+    ).toMatchObject({ nameAr: "كيميائي عام", nameEn: "General Chemist" });
+    expect(
+      finalizeOccupationRow({
+        code: "1212002001",
+        nameAr: "مدير توظيف",
+        nameEn: "/ استخدام Employment Manager",
+        skillClass: "1",
+      }),
+    ).toMatchObject({ nameAr: "مدير توظيف استخدام", nameEn: "Employment Manager" });
+  });
+
+  it("appends the code when Arabic names still collide after specialty merge", () => {
+    const rows = ensureUniqueOccupationNames([
+      { code: "1", nameAr: "مفتش", nameEn: "Inspector A", skillClass: "1" },
+      { code: "2", nameAr: "مفتش", nameEn: "Inspector B", skillClass: "1" },
+    ]);
+    expect(rows.map((row) => row.nameAr)).toEqual(["مفتش", "مفتش (2)"]);
+  });
+
+  it("prepareOccupationRows yields unique Arabic names for the bundled guide sample", () => {
+    const prepared = prepareOccupationRows([
+      { code: "2113001001", nameAr: "كيميائي", nameEn: "- عام General Chemist", skillClass: "1" },
+      { code: "2113002001", nameAr: "كيميائي", nameEn: "- عضوي Organic Chemist", skillClass: "2" },
+    ]);
+    expect(new Set(prepared.map((row) => row.nameAr)).size).toBe(2);
+    expect(normalizeJobNameKey("  كيميائي  ")).toBe("كيميائي");
+    expect(normalizeJobNameKey("الأول")).toBe(normalizeJobNameKey("الاول"));
   });
 });

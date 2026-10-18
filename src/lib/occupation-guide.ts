@@ -34,6 +34,62 @@ function clean(value: string) {
   return value.replace(/\t/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** PDF text often splits الـ as اأ / اإ (e.g. األكاديمية → الأكاديمية). */
+function fixPdfArabic(value: string) {
+  return value.replace(/األ/g, "الأ").replace(/اإل/g, "الإ").replace(/اآ/g, "آ");
+}
+
+/**
+ * MoL English column often embeds the Arabic specialty: "- عام General Chemist" or "/ استخدام Employment Manager".
+ * Pull that specialty into the Arabic name so each code stays unique under @@unique([companyId, nameAr]).
+ */
+export function splitMolEnglish(nameEn: string): { specialtyAr: string; nameEn: string } {
+  const cleaned = clean(nameEn);
+  const match = cleaned.match(/^[-–—/]\s*(.+?)\s+([A-Za-z((].*)$/);
+  if (!match) return { specialtyAr: "", nameEn: cleaned };
+  return { specialtyAr: fixPdfArabic(clean(match[1])), nameEn: clean(match[2]) };
+}
+
+/** Canonical Arabic name key for duplicate detection (trim, tatweel, diacritics, alef variants). */
+export function normalizeJobNameKey(nameAr: string) {
+  return fixPdfArabic(clean(nameAr))
+    .replace(/\u0640/g, "")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي");
+}
+
+export function finalizeOccupationRow(row: OccupationRow): OccupationRow {
+  const split = splitMolEnglish(row.nameEn);
+  const baseAr = fixPdfArabic(clean(row.nameAr));
+  const nameAr = split.specialtyAr ? clean(`${baseAr} ${split.specialtyAr}`) : baseAr;
+  return {
+    code: row.code,
+    nameAr,
+    nameEn: split.nameEn || fixPdfArabic(clean(row.nameEn)),
+    skillClass: row.skillClass,
+  };
+}
+
+/** After specialty merge, any leftover identical Arabic names get the code appended so imports never violate uniqueness. */
+export function ensureUniqueOccupationNames(rows: OccupationRow[]): OccupationRow[] {
+  const used = new Set<string>();
+  const out: OccupationRow[] = [];
+  for (const row of rows) {
+    let nameAr = row.nameAr;
+    if (used.has(nameAr)) nameAr = clean(`${row.nameAr} (${row.code})`);
+    used.add(nameAr);
+    out.push({ ...row, nameAr });
+  }
+  return out;
+}
+
+/** Full pipeline for MoL rows before save: specialty → unique Arabic names. */
+export function prepareOccupationRows(rows: OccupationRow[]): OccupationRow[] {
+  return ensureUniqueOccupationNames(rows.map(finalizeOccupationRow));
+}
+
 function readClass(text: string): SkillClassCode | null {
   if (!/الفئة|Class/i.test(text)) return null;
   for (const rule of CLASS_RULES) if (rule.re.test(text)) return rule.code;
@@ -70,7 +126,7 @@ export function parseUnifiedOccupations(text: string): OccupationRow[] {
       rows.push({ code, nameAr, nameEn, skillClass: pageClass || "" });
     }
   }
-  return rows;
+  return prepareOccupationRows(rows);
 }
 
 /**
