@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { CircleAlert, CircleCheck, FileSpreadsheet, Sparkles, Upload, UserCheck } from "lucide-react";
 import { useLang } from "@/components/lang-provider";
 import { SubmitButton } from "@/components/submit-button";
@@ -15,6 +15,8 @@ export function EmployeeImport({ labels, canUpdate }: { labels: Record<string, s
   const { t } = useLang();
   const [preview, upload, pending] = useActionState<ImportPreview | null, FormData>(previewEmployeeImport, null);
   const [updateExisting, setUpdateExisting] = useState(false);
+  const [sponsorId, setSponsorId] = useState("");
+  useEffect(() => setSponsorId(""), [preview?.fileName]);
   const valid = useMemo(() => preview?.rows.filter((row) => !row.errors.length) ?? [], [preview]);
   const fresh = valid.filter((row) => !row.existing).length;
   const existing = valid.length - fresh;
@@ -100,6 +102,36 @@ export function EmployeeImport({ labels, canUpdate }: { labels: Record<string, s
             </div>
           ) : null}
 
+          {preview.needsSponsor ? (
+            <div className="space-y-2 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-950 ring-1 ring-inset ring-sky-200" role="status">
+              <p>
+                {t(
+                  "ملاحظة: الملف لا يحتوي على اسم كفيل. هل تريد اختيار كفيل لتسجيل بيانات العمال باسمه؟",
+                  "Note: this file has no sponsor name. Do you want to choose a sponsor and register the workers under that name?",
+                )}
+              </p>
+              {preview.sponsors?.length ? (
+                <label className="block max-w-md space-y-1">
+                  <span className="text-xs font-semibold">{t("الكفيل", "Sponsor")}</span>
+                  <select value={sponsorId} onChange={(event) => setSponsorId(event.target.value)} className={fieldClass}>
+                    <option value="">{t("بدون كفيل — أكمل لاحقاً", "No sponsor — complete later")}</option>
+                    {preview.sponsors.map((sponsor) => (
+                      <option key={sponsor.id} value={sponsor.id}>
+                        {sponsor.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <p>
+                  <Link href="/employers" className="font-semibold underline">
+                    {t("لا يوجد كفيل في دفتر العناوين. أضف كفيلاً أولاً.", "There is no sponsor in the address book. Add one first.")}
+                  </Link>
+                </p>
+              )}
+            </div>
+          ) : null}
+
           <div className="max-h-[60vh] overflow-auto rounded-xl ring-1 ring-inset ring-slate-200">
             <table className="w-full min-w-[820px] text-sm">
               <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
@@ -152,6 +184,7 @@ export function EmployeeImport({ labels, canUpdate }: { labels: Record<string, s
             <form action={importEmployees}>
               <input type="hidden" name="payload" value={JSON.stringify(valid.filter((row) => updateExisting || !row.existing).map((row) => row.values))} />
               {updateExisting ? <input type="hidden" name="updateExisting" value="on" /> : null}
+              {sponsorId ? <input type="hidden" name="sponsorId" value={sponsorId} /> : null}
               <SubmitButton
                 pendingLabel={t("جارٍ الحفظ...", "Saving...")}
                 confirm={

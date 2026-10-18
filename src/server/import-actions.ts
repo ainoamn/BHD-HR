@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
 import { IMPORT_COLUMNS, MAX_IMPORT_ROWS, checkRow, findHeaderRow, headerKeys, parseCsv, readTable, type ImportRow, type ImportValues } from "@/lib/employee-import";
 import { findExistingEmployees, intakeContext, saveIntake } from "@/lib/employee-intake";
+import { prisma } from "@/lib/prisma";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { aiOpen, fitsLimit, limitMessage } from "@/lib/subscription";
@@ -20,6 +21,9 @@ export type ImportPreview = {
   tooMany?: boolean;
   error?: string;
   fileName?: string;
+  /** No sponsor column in the file; the user may assign one sponsor to every row. */
+  needsSponsor?: boolean;
+  sponsors?: { id: string; name: string }[];
 };
 
 function cellText(value: ExcelJS.CellValue): string {
@@ -80,7 +84,7 @@ async function aiKeys(header: string[], body: string[][], keys: (string | null)[
 /** Step 1: reads the uploaded file and returns every row checked, without saving anything. */
 export async function previewEmployeeImport(_previous: ImportPreview | null, formData: FormData): Promise<ImportPreview> {
   const user = await requirePermission("employees.create", "/employees");
-  const { t } = await getI18n();
+  const { lang, t } = await getI18n();
   const file = formData.get("file");
   if (!(file instanceof File) || !file.size) return { rows: [], ignored: [], error: t("اختر ملف Excel أو CSV", "Choose an Excel or CSV file") };
   if (file.size > MAX_FILE) return { rows: [], ignored: [], error: t("الملف أكبر من 5 ميجابايت", "The file is larger than 5 MB") };
@@ -116,7 +120,15 @@ export async function previewEmployeeImport(_previous: ImportPreview | null, for
     result.rows.map((row) => row.values),
   );
   result.rows.forEach((row, index) => (row.existing = existing[index]));
-  return { rows: result.rows, ignored: result.ignored, aiColumns, tooMany: result.tooMany, fileName: file.name };
+  const needsSponsor =
+    result.rows.length > 0 && result.rows.every((row) => !row.values.employerName?.trim() && !row.values.employerNameEn?.trim() && !row.values.employerIdNumber?.trim());
+  const sponsors = needsSponsor
+    ? (await prisma.employer.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true }, orderBy: { name: "asc" } })).map((item) => ({
+        id: item.id,
+        name: lang === "en" && item.nameEn ? item.nameEn : item.name,
+      }))
+    : [];
+  return { rows: result.rows, ignored: result.ignored, aiColumns, tooMany: result.tooMany, fileName: file.name, needsSponsor, sponsors };
 }
 
 /**
@@ -157,13 +169,21 @@ export async function importEmployees(formData: FormData) {
   }
   const since = Date.now() - 1000;
   const ctx = await intakeContext(user);
+  const chosenId = String(formData.get("sponsorId") || "");
+  const chosen = chosenId ? ctx.employers.find((item) => item.id === chosenId) : undefined;
   let created = 0;
   let updated = 0;
   const sponsors = new Set<string>();
   const done = new Set<string>();
   for (const item of update ? valid : fresh) {
     if (item.existing && done.has(item.existing.id)) continue;
-    const result = await saveIntake(ctx, item.row.values, item.existing?.id ?? null);
+    const values = { ...item.row.values };
+    if (chosen && !values.employerName?.trim() && !values.employerNameEn?.trim() && !values.employerIdNumber?.trim()) {
+      values.employerName = chosen.name;
+      if (chosen.nameEn) values.employerNameEn = chosen.nameEn;
+      if (chosen.idNumber) values.employerIdNumber = chosen.idNumber;
+    }
+    const result = await saveIntake(ctx, values, item.existing?.id ?? null);
     done.add(result.employee.id);
     if (result.created) created += 1;
     else updated += 1;
