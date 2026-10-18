@@ -5,7 +5,7 @@ import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { MultiCheck } from "@/components/multi-check";
 import { DeleteButton } from "@/components/row-forms";
-import { OccupationImport } from "@/components/occupation-import";
+import { OccupationImportLazy } from "@/components/occupation-import-lazy";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, fieldClass, secondaryBtn } from "@/components/ui";
 import { ALLOWANCE_BASES, ALLOWANCE_CALCS, ALLOWANCE_FREQUENCIES, describeAllowance } from "@/lib/allowances";
@@ -163,7 +163,7 @@ export default async function HrSettingsPage({
       ) : null;
     return (
       <>
-        {isJobs ? <OccupationImport /> : null}
+        {isJobs ? <OccupationImportLazy /> : null}
         <Card className="space-y-3">
           <h2 className="font-bold">{isJobs ? t("إضافة مسمى وظيفي", "Add a job title") : t("إضافة قسم", "Add a department")}</h2>
           <form action={saveCatalogEntry} className="grid grid-cols-1 gap-3">
