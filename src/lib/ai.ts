@@ -230,6 +230,7 @@ export const LABOUR_FIELDS = [
   "workPermitExpiry",
   "jobTitle",
   "jobTitleEn",
+  "arrivalDate",
   "joiningDate",
   "contractEnd",
   "basicSalary",
@@ -251,6 +252,7 @@ const LABOUR_DATES = new Set([
   "residenceExpiry",
   "visaExpiry",
   "workPermitExpiry",
+  "arrivalDate",
   "joiningDate",
   "contractEnd",
 ]);
@@ -267,12 +269,19 @@ export async function aiReadLabourFile(data: Uint8Array, mediaType: string): Pro
     temperature: 0,
     providerOptions: { gateway: { models: VISION_FALLBACKS } },
     system: [
-      "You read documents issued by the Ministry of Labour of the Sultanate of Oman (worker data printouts, labour cards, work permits / labour clearances, lists of an establishment's workers, employment contracts) for an HR system, and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
+      "You read documents issued by the Ministry of Labour of the Sultanate of Oman (worker data printouts / Registering Worker Details, labour cards, work permits / labour clearances, lists of an establishment's workers, employment contracts) for an HR system, and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
       "Return one entry in workers per worker on the document (a list may have many; read every row).",
       "fullName: the worker's name in Arabic script; nameEn: in Latin script as printed. nationality: ISO 3166 alpha-2 code (OM, IN, PK, BD, NP, LK, PH, EG...). gender: MALE or FEMALE.",
-      "idNumber: the worker's civil number / resident card number; idExpiry: its expiry. passportNumber / passportExpiry: the passport. residenceNumber / residenceExpiry: the residence / residency card when printed separately from the civil number. visaNumber / visaExpiry: the entry or employment visa when printed. workPermitNumber: the work permit / labour card / clearance number; workPermitExpiry: its expiry.",
-      "jobTitle: the occupation in Arabic, jobTitleEn in English. joiningDate: start of employment or registration; contractEnd: end of contract. basicSalary: the monthly basic wage in Omani rials as a plain number; housingAllowance and transportAllowance when printed. address: the worker's address in Oman when printed.",
-      "employerName: the employer / sponsor / establishment name in Arabic (or as printed), employerNameEn in English; employerIdNumber: its commercial registration (CR) or, for an individual sponsor, civil number; employerKind: COMPANY for a company or establishment, PERSON for an individual sponsor, else empty.",
+      "CRITICAL — keep each printed date in its own field; never copy a date from one labelled box into another:",
+      "idNumber / idExpiry: only the civil number / personal card (الرقم المدني / البطاقة الشخصية) and its own expiry. Do NOT put visa or work-permit expiry here.",
+      "residenceNumber / residenceExpiry: only إقامة / residence / resident card when that label is printed. Do NOT put تأشيرة or تصريح مزاولة العمل expiry into residenceExpiry.",
+      "visaNumber / visaExpiry: only التأشيرة / Visa / entry visa (تاريخ انتهاء التأشيرة).",
+      "workPermitNumber / workPermitExpiry: only تصريح العمل / تصريح مزاولة العمل / labour card / clearance (تاريخ انتهاء التصريح).",
+      "passportNumber / passportExpiry: passport only.",
+      "arrivalDate: تاريخ الوصول / Date of arrival / Arrival date only — never put this in joiningDate.",
+      "joiningDate: only تاريخ الالتحاق / تاريخ المباشرة / تاريخ بدء العمل / Date of joining / Employment start. If the form only shows تاريخ الوصول and not a joining date, leave joiningDate empty.",
+      "contractEnd: end of contract when printed. jobTitle Arabic, jobTitleEn English. basicSalary / housingAllowance / transportAllowance as plain Omani-rial numbers. address when printed.",
+      "employerName Arabic (or as printed), employerNameEn English; employerIdNumber CR or individual civil number; employerKind COMPANY or PERSON.",
       "Dates are YYYY-MM-DD (Gregorian; convert Hijri only if no Gregorian date is printed). Numbers in Latin digits without spaces. title: the document's title as printed.",
       `Reply with JSON only: {"title":"","workers":[{${LABOUR_FIELDS.map((key) => `"${key}":""`).join(",")}}]}`,
     ].join(" "),
@@ -315,10 +324,22 @@ export function normalizeLabourWorker(item: Record<string, unknown>): LabourWork
     else value = value.replace(/\s+/g, " ").slice(0, 150);
     worker[key] = value;
   }
-  // On MoL files the expatriate's civil / resident-card number is often only printed once: keep it on the residence fields too.
+  // Expatriate civil number is often printed once — copy the number only, never visa/permit dates onto residence/ID.
   if (worker.nationality && worker.nationality !== "OM") {
     if (!worker.residenceNumber && worker.idNumber) worker.residenceNumber = worker.idNumber;
-    if (!worker.residenceExpiry && worker.idExpiry) worker.residenceExpiry = worker.idExpiry;
+  }
+  // If the model put the visa or work-permit expiry onto the civil/residence fields, move/clear it.
+  if (worker.visaExpiry) {
+    if (worker.idExpiry === worker.visaExpiry) worker.idExpiry = "";
+    if (worker.residenceExpiry === worker.visaExpiry) worker.residenceExpiry = "";
+  }
+  if (worker.workPermitExpiry) {
+    if (worker.idExpiry === worker.workPermitExpiry) worker.idExpiry = "";
+    if (worker.residenceExpiry === worker.workPermitExpiry) worker.residenceExpiry = "";
+  }
+  // Arrival must never become joining; if both were filled with the same day, keep arrival only.
+  if (worker.arrivalDate && worker.joiningDate && worker.arrivalDate === worker.joiningDate) {
+    worker.joiningDate = "";
   }
   return worker;
 }

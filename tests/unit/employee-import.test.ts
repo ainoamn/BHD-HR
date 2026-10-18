@@ -152,7 +152,7 @@ describe("labour file values", () => {
       transportAllowance: "",
       idNumber: "123456",
       residenceNumber: "123456",
-      residenceExpiry: "2028-02-29",
+      residenceExpiry: "",
       visaNumber: "V991",
       visaExpiry: "2029-06-15",
       address: "مسقط",
@@ -177,6 +177,28 @@ describe("labour file values", () => {
       residenceExpiry: "2027-05-01",
     });
     expect(worker).toMatchObject({ residenceNumber: "R-222", residenceExpiry: "2027-05-01" });
+  });
+
+  it("does not copy civil ID expiry onto residence, and strips visa/permit dates misfiled as ID expiry", () => {
+    const worker = normalizeLabourWorker({
+      fullName: "Worker",
+      nationality: "IN",
+      idNumber: "128210261",
+      idExpiry: "2024-10-22",
+      visaExpiry: "2024-10-22",
+      workPermitExpiry: "2027-01-18",
+      arrivalDate: "2025-01-19",
+      joiningDate: "2025-01-19",
+    });
+    expect(worker).toMatchObject({
+      residenceNumber: "128210261",
+      residenceExpiry: "",
+      idExpiry: "",
+      visaExpiry: "2024-10-22",
+      workPermitExpiry: "2027-01-18",
+      arrivalDate: "2025-01-19",
+      joiningDate: "",
+    });
   });
 });
 

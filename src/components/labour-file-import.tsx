@@ -39,6 +39,7 @@ const FIELDS: { key: string; type?: "date" | "nationality" | "gender" | "kind" |
   { key: "workPermitExpiry", type: "date" },
   { key: "jobTitle" },
   { key: "jobTitleEn" },
+  { key: "arrivalDate", type: "date" },
   { key: "joiningDate", type: "date" },
   { key: "contractEnd", type: "date" },
   { key: "basicSalary", type: "number" },

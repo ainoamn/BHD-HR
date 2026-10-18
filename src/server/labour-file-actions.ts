@@ -46,10 +46,20 @@ function cleanWorker(raw: Record<string, unknown>) {
   for (const key of LABOUR_FIELDS) values[key] = typeof raw[key] === "string" ? (raw[key] as string) : "";
   if (!values.fullName.trim() && values.nameEn.trim()) values.fullName = values.nameEn;
   const row = checkRow(values, 0);
-  // Expatriate civil / resident-card number on MoL files is often printed once: keep it on residence too.
+  // Expatriate civil number is often printed once — copy the number only (never visa/permit expiry onto residence/ID).
   if (row.values.nationality && row.values.nationality !== "OM") {
     if (!row.values.residenceNumber && row.values.idNumber) row.values.residenceNumber = row.values.idNumber;
-    if (!row.values.residenceExpiry && row.values.idExpiry) row.values.residenceExpiry = row.values.idExpiry;
+  }
+  if (row.values.visaExpiry) {
+    if (row.values.idExpiry === row.values.visaExpiry) row.values.idExpiry = "";
+    if (row.values.residenceExpiry === row.values.visaExpiry) row.values.residenceExpiry = "";
+  }
+  if (row.values.workPermitExpiry) {
+    if (row.values.idExpiry === row.values.workPermitExpiry) row.values.idExpiry = "";
+    if (row.values.residenceExpiry === row.values.workPermitExpiry) row.values.residenceExpiry = "";
+  }
+  if (row.values.arrivalDate && row.values.joiningDate && row.values.arrivalDate === row.values.joiningDate) {
+    row.values.joiningDate = "";
   }
   return row;
 }
