@@ -2,20 +2,58 @@
 
 import { writeAudit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth";
+import { BUILTIN_OCCUPATION_META } from "@/lib/data/mol-occupations-meta";
 import { refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
-import type { OccupationRow } from "@/lib/occupation-guide";
-import { decodeOccupationRows, occupationPreviewFromRows, type OccupationPreview } from "@/lib/occupation-preview";
+import { skillClassLabel, type OccupationRow } from "@/lib/occupation-guide";
+import {
+  decodeOccupationRows,
+  normalizeOccupationRows,
+  occupationKindLabel,
+  type OccupationPreview,
+} from "@/lib/occupation-preview";
 import { prisma } from "@/lib/prisma";
 
 export type OccupationImportResult = { added?: number; updated?: number; total?: number; error?: string; message?: string };
 
-/** Built-in MoL unified guide (March 2026) — no PDF / pdf-parse involved. */
+/** Instant preview from lightweight meta — never loads the 4k-row JSON until save. */
 export async function previewBuiltInOccupationGuide(): Promise<OccupationPreview> {
   await requireAdmin("/settings/hr?tab=jobs");
   const { lang, t } = await getI18n();
-  const { BUILTIN_OCCUPATIONS } = await import("@/lib/data/mol-occupations");
-  return occupationPreviewFromRows(BUILTIN_OCCUPATIONS, "UNIFIED", lang, t, { builtin: true, withPayload: false });
+  return {
+    kind: "UNIFIED",
+    kindLabel: occupationKindLabel("UNIFIED", t),
+    total: BUILTIN_OCCUPATION_META.total,
+    byClass: { ...BUILTIN_OCCUPATION_META.byClass },
+    sample: BUILTIN_OCCUPATION_META.sample.map((row) => ({
+      code: row.code,
+      nameAr: row.nameAr,
+      nameEn: row.nameEn,
+      classLabel: skillClassLabel(row.skillClass, lang) || "—",
+    })),
+    builtin: true,
+  };
+}
+
+async function loadDraftRows(companyId: string, draftId: string): Promise<OccupationRow[] | null> {
+  if (!draftId.startsWith("occ-draft-") || draftId.includes("/") || draftId.includes("\\")) return null;
+  const file = await prisma.storedFile.findFirst({
+    where: { companyId, name: draftId, mime: "application/json" },
+    select: { data: true },
+  });
+  if (!file) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(file.data).toString("utf8"));
+    if (!Array.isArray(parsed)) return null;
+    return normalizeOccupationRows(parsed);
+  } catch {
+    return null;
+  }
+}
+
+async function clearDraft(companyId: string, draftId: string) {
+  if (!draftId.startsWith("occ-draft-")) return;
+  await prisma.storedFile.deleteMany({ where: { companyId, name: draftId } });
 }
 
 async function saveOccupationRows(
@@ -60,28 +98,28 @@ async function saveOccupationRows(
 
   let added = 0;
   let updated = 0;
-  const chunk = 200;
-  for (let i = 0; i < toCreate.length; i += chunk) {
-    const batch = toCreate.slice(i, i + chunk);
-    const result = await prisma.jobTitle.createMany({ data: batch, skipDuplicates: true });
-    added += result.count;
+
+  if (toCreate.length) {
+    // One round-trip for the full create set (Postgres handles ~4k rows fine).
+    const result = await prisma.jobTitle.createMany({ data: toCreate, skipDuplicates: true });
+    added = result.count;
   }
+
+  const chunk = 40;
   for (let i = 0; i < toUpdate.length; i += chunk) {
     const batch = toUpdate.slice(i, i + chunk);
-    await prisma.$transaction([
-      ...batch.map((row) =>
+    await Promise.all(
+      batch.flatMap((row) => [
         prisma.jobTitle.update({
           where: { id: row.id },
           data: { nameAr: row.nameAr, nameEn: row.nameEn, code: row.code, skillClass: row.skillClass },
         }),
-      ),
-      ...batch.map((row) =>
         prisma.employee.updateMany({
           where: { companyId, jobTitleId: row.id },
           data: { jobTitle: row.nameAr, jobTitleEn: row.nameEn, jobCode: row.code, jobClass: row.skillClass },
         }),
-      ),
-    ]);
+      ]),
+    );
     updated += batch.length;
   }
 
@@ -105,7 +143,7 @@ async function saveOccupationRows(
   };
 }
 
-/** Saves occupations from a PDF preview payload, or the bundled official guide when `builtin=1`. */
+/** Saves occupations from a PDF draft, legacy payload, or the bundled official guide when `builtin=1`. */
 export async function importOccupationGuide(formData: FormData): Promise<OccupationImportResult> {
   const user = await requireAdmin("/settings/hr?tab=jobs");
   const { t } = await getI18n();
@@ -113,6 +151,18 @@ export async function importOccupationGuide(formData: FormData): Promise<Occupat
     const { BUILTIN_OCCUPATIONS } = await import("@/lib/data/mol-occupations");
     return saveOccupationRows(user.companyId, user.id, BUILTIN_OCCUPATIONS, t);
   }
+
+  const draftId = String(formData.get("draftId") || "").trim();
+  if (draftId) {
+    const rows = await loadDraftRows(user.companyId, draftId);
+    if (!rows?.length) return { error: t("انتهت صلاحية معاينة الملف. ارفع الملف مجدداً.", "The file preview expired. Upload the file again.") };
+    try {
+      return await saveOccupationRows(user.companyId, user.id, rows, t);
+    } finally {
+      await clearDraft(user.companyId, draftId);
+    }
+  }
+
   const rows = decodeOccupationRows(String(formData.get("payload") || ""));
   if (!rows?.length) return { error: t("لا توجد مهن للحفظ. أعد قراءة الملف.", "No occupations to save. Read the file again.") };
   return saveOccupationRows(user.companyId, user.id, rows, t);

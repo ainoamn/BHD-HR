@@ -5,12 +5,14 @@ import { requireAdmin } from "@/lib/auth";
 import { getI18n } from "@/lib/lang";
 import { detectOccupationFile, parseOccupationFile } from "@/lib/occupation-guide";
 import { occupationPreviewFromRows, type OccupationPreview } from "@/lib/occupation-preview";
+import { prisma } from "@/lib/prisma";
 import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 
 const MAX_FILE = 4 * 1024 * 1024;
 
 /**
  * Optional PDF upload path only. Kept separate so HR settings (built-in import) never loads pdf-parse.
+ * Parsed rows stay in StoredFile; the client only receives a draft id + sample stats.
  */
 export async function previewOccupationGuide(formData: FormData): Promise<OccupationPreview> {
   const user = await requireAdmin("/settings/hr?tab=jobs");
@@ -58,5 +60,25 @@ export async function previewOccupationGuide(formData: FormData): Promise<Occupa
   }
 
   const { kind: parsedKind, rows } = parseOccupationFile(text, kind);
-  return occupationPreviewFromRows(rows, parsedKind, lang, t);
+  if (!rows.length) {
+    return occupationPreviewFromRows(rows, parsedKind, lang, t, { withPayload: false });
+  }
+
+  const draftId = `occ-draft-${user.companyId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+  const bytes = Buffer.from(JSON.stringify(rows), "utf8");
+  // Drop older drafts for this company so Bytes storage does not grow unbounded.
+  await prisma.storedFile.deleteMany({
+    where: { companyId: user.companyId, name: { startsWith: `occ-draft-${user.companyId.slice(0, 8)}-` } },
+  });
+  await prisma.storedFile.create({
+    data: {
+      companyId: user.companyId,
+      name: draftId,
+      mime: "application/json",
+      size: bytes.length,
+      data: bytes,
+    },
+  });
+
+  return occupationPreviewFromRows(rows, parsedKind, lang, t, { withPayload: false, draftId });
 }

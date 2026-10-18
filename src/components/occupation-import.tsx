@@ -51,19 +51,24 @@ export function OccupationImport() {
   }
 
   async function save() {
-    if (!preview?.builtin && !preview?.payload) return;
+    if (!preview?.builtin && !preview?.draftId && !preview?.payload) return;
     setBusy("save");
     setResult(null);
     const form = new FormData();
     if (preview.builtin) form.append("builtin", "1");
+    else if (preview.draftId) form.append("draftId", preview.draftId);
     else form.append("payload", preview.payload!);
     try {
       const next = await importOccupationGuide(form);
-      setResult(next);
-      if (!next.error) setPreview(null);
+      if (next.error) {
+        setResult(next);
+        return;
+      }
+      // Hard navigate so the browser does not soft-refresh thousands of list rows in place.
+      const message = next.message || t("تم الاستيراد", "Imported");
+      window.location.assign(`/settings/hr?tab=jobs&message=${encodeURIComponent(message)}`);
     } catch {
       setResult({ error: t("انقطع الاتصال. أعد المحاولة.", "Connection lost. Try again.") });
-    } finally {
       setBusy(null);
     }
   }
@@ -80,8 +85,8 @@ export function OccupationImport() {
           <h3 className="font-bold text-slate-900">{t("الدليل الموحد لتصنيف المهن", "Unified occupation classification")}</h3>
           <p className="text-sm text-slate-600">
             {t(
-              "استورد دليل وزارة العمل الرسمي بنقرة (رمز المهنة، الاسمين، والفئة)، أو ارفع PDF أحدث إن صدر تحديث.",
-              "Import the official Ministry of Labour guide in one click (code, both names, and class), or upload a newer PDF if one is released.",
+              "استورد دليل وزارة العمل الرسمي بنقرة (رمز المهنة، الاسمين، والفئة)، أو ارفع PDF أحدث إن صدر تحديث. المعاينة فورية؛ تحليل PDF قد يستغرق ثوانٍ على الخادم.",
+              "Import the official Ministry of Labour guide in one click (code, both names, and class), or upload a newer PDF if one is released. Preview is instant; PDF analysis may take a few seconds on the server.",
             )}
           </p>
         </div>
@@ -91,7 +96,7 @@ export function OccupationImport() {
         <button type="button" className={primaryBtn} disabled={busy !== null} onClick={() => void loadBuiltIn()}>
           {busy === "builtin" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
           {busy === "builtin"
-            ? t("جارٍ تحميل الدليل…", "Loading the guide…")
+            ? t("جارٍ التحضير…", "Preparing…")
             : t("استيراد الدليل الرسمي (وزارة العمل)", "Import the official guide (MoL)")}
         </button>
       </div>
@@ -99,9 +104,9 @@ export function OccupationImport() {
       <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-surface px-4 py-6 text-center transition hover:border-teal-500">
         {busy === "read" ? <Loader2 size={24} className="animate-spin text-teal-700" /> : <FileText size={24} className="text-teal-700" />}
         <span className="text-sm font-semibold text-slate-800">
-          {busy === "read" ? t("جارٍ قراءة الملف…", "Reading the file…") : t("أو ارفع ملف PDF محدّث", "Or upload an updated PDF")}
+          {busy === "read" ? t("جارٍ تحليل الملف على الخادم…", "Analysing the file on the server…") : t("أو ارفع ملف PDF محدّث", "Or upload an updated PDF")}
         </span>
-        <span className="text-xs text-slate-500">{t("حتى 4 ميغابايت", "Up to 4 MB")}</span>
+        <span className="text-xs text-slate-500">{t("حتى 4 ميغابايت — يُفضّل الدليل الرسمي أعلاه إن لم يتغيّر الملف", "Up to 4 MB — prefer the official guide above unless the file changed")}</span>
         <input
           type="file"
           accept=".pdf,application/pdf"

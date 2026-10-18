@@ -77,15 +77,25 @@ async function ensureCatalog(companyId: string) {
   );
 }
 
-export const getHrCatalog = cache(async (companyId: string) => {
+export const getHrCatalog = cache(async (companyId: string, opts?: { jobTitles?: boolean }) => {
   await ensureCatalog(companyId);
-  const [jobTitles, departments, leaveTypes, allowanceTypes] = await Promise.all([
-    prisma.jobTitle.findMany({ where: { companyId }, orderBy: { nameAr: "asc" } }),
+  const wantJobs = opts?.jobTitles !== false;
+  const [jobTitles, jobTitleCount, departments, leaveTypes, allowanceTypes] = await Promise.all([
+    wantJobs
+      ? prisma.jobTitle.findMany({ where: { companyId }, orderBy: { nameAr: "asc" } })
+      : Promise.resolve([] as Awaited<ReturnType<typeof prisma.jobTitle.findMany>>),
+    wantJobs ? Promise.resolve(0) : prisma.jobTitle.count({ where: { companyId } }),
     prisma.department.findMany({ where: { companyId }, orderBy: { nameAr: "asc" } }),
     prisma.leaveType.findMany({ where: { companyId }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
     prisma.allowanceType.findMany({ where: { companyId }, orderBy: { createdAt: "asc" } }),
   ]);
-  return { jobTitles, departments, leaveTypes, allowanceTypes };
+  return {
+    jobTitles,
+    jobTitleCount: wantJobs ? jobTitles.length : jobTitleCount,
+    departments,
+    leaveTypes,
+    allowanceTypes,
+  };
 });
 
-export const getLeaveTypes = async (companyId: string) => (await getHrCatalog(companyId)).leaveTypes;
+export const getLeaveTypes = async (companyId: string) => (await getHrCatalog(companyId, { jobTitles: false })).leaveTypes;

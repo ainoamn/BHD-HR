@@ -5,7 +5,7 @@ import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { MultiCheck } from "@/components/multi-check";
 import { DeleteButton } from "@/components/row-forms";
-import { OccupationImportLazy } from "@/components/occupation-import-lazy";
+import { OccupationImport } from "@/components/occupation-import";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, fieldClass, secondaryBtn } from "@/components/ui";
 import { ALLOWANCE_BASES, ALLOWANCE_CALCS, ALLOWANCE_FREQUENCIES, describeAllowance } from "@/lib/allowances";
@@ -32,16 +32,26 @@ import {
 
 const TABS = ["jobs", "departments", "leave", "allowances"] as const;
 type Tab = (typeof TABS)[number];
+const JOB_PAGE_SIZE = 50;
+/** MultiCheck with thousands of boxes freezes the leave tab — force “all jobs” UX instead. */
+const LEAVE_JOB_PICK_LIMIT = 200;
 
-export default async function HrSettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; error?: string; message?: string }> }) {
+export default async function HrSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; q?: string; page?: string; error?: string; message?: string }>;
+}) {
   const sp = await searchParams;
   const user = await requireAdmin();
   const { lang, t } = await getI18n();
   const tab: Tab = (TABS as readonly string[]).includes(sp.tab || "") ? (sp.tab as Tab) : "jobs";
-  const catalog = await getHrCatalog(user.companyId);
+  // Skip loading thousands of job rows into the page — jobs tab paginates in the DB; leave tab only loads titles when few enough to pick.
+  const catalog = await getHrCatalog(user.companyId, { jobTitles: false });
   const currency = user.company.currency;
   const query = normalizeSearchText(sp.q || "");
   const queryDigits = (sp.q || "").replace(/\s+/g, "");
+  const rawQuery = (sp.q || "").trim();
+  const pageNum = Math.max(1, Number.parseInt(sp.page || "1", 10) || 1);
   const matches = (item: { nameAr: string; nameEn: string | null; code?: string | null }) => {
     if (!query) return true;
     if (normalizeSearchText(item.nameAr).includes(query) || normalizeSearchText(item.nameEn || "").includes(query)) return true;
@@ -49,18 +59,56 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
     return false;
   };
   const name = (item: { nameAr: string; nameEn: string | null }) => termText(item.nameAr, item.nameEn, lang) || item.nameAr;
+  const tooManyJobsForPick = catalog.jobTitleCount > LEAVE_JOB_PICK_LIMIT;
 
-  const [jobCounts, departmentCounts, allowanceCounts] = await Promise.all([
-    prisma.employee.groupBy({ by: ["jobTitleId"], where: { companyId: user.companyId, jobTitleId: { not: null } }, _count: true }),
-    prisma.employee.groupBy({ by: ["departmentId"], where: { companyId: user.companyId, departmentId: { not: null } }, _count: true }),
-    prisma.employeeAllowance.groupBy({ by: ["allowanceTypeId"], where: { companyId: user.companyId }, _count: true }),
+  const jobSearchWhere = {
+    companyId: user.companyId,
+    ...(rawQuery
+      ? {
+          OR: [
+            { nameAr: { contains: rawQuery, mode: "insensitive" as const } },
+            { nameEn: { contains: rawQuery, mode: "insensitive" as const } },
+            ...(queryDigits ? [{ code: { contains: queryDigits } }] : []),
+          ],
+        }
+      : {}),
+  };
+
+  const jobsFilteredCount = tab === "jobs" ? await prisma.jobTitle.count({ where: jobSearchWhere }) : 0;
+  const jobsPageCount = Math.max(1, Math.ceil(jobsFilteredCount / JOB_PAGE_SIZE));
+  const jobsSafePage = Math.min(pageNum, jobsPageCount);
+
+  const [jobCounts, departmentCounts, allowanceCounts, jobsPageRows, jobsMissingEn, leaveJobTitles] = await Promise.all([
+    tab === "jobs"
+      ? prisma.employee.groupBy({ by: ["jobTitleId"], where: { companyId: user.companyId, jobTitleId: { not: null } }, _count: true })
+      : Promise.resolve([] as { jobTitleId: string | null; _count: number }[]),
+    tab === "departments"
+      ? prisma.employee.groupBy({ by: ["departmentId"], where: { companyId: user.companyId, departmentId: { not: null } }, _count: true })
+      : Promise.resolve([] as { departmentId: string | null; _count: number }[]),
+    tab === "allowances"
+      ? prisma.employeeAllowance.groupBy({ by: ["allowanceTypeId"], where: { companyId: user.companyId }, _count: true })
+      : Promise.resolve([] as { allowanceTypeId: string; _count: number }[]),
+    tab === "jobs"
+      ? prisma.jobTitle.findMany({
+          where: jobSearchWhere,
+          orderBy: { nameAr: "asc" },
+          skip: (jobsSafePage - 1) * JOB_PAGE_SIZE,
+          take: JOB_PAGE_SIZE,
+        })
+      : Promise.resolve([]),
+    tab === "jobs"
+      ? prisma.jobTitle.count({ where: { companyId: user.companyId, OR: [{ nameEn: null }, { nameEn: "" }] } })
+      : Promise.resolve(0),
+    tab === "leave" && !tooManyJobsForPick
+      ? prisma.jobTitle.findMany({ where: { companyId: user.companyId }, orderBy: { nameAr: "asc" } })
+      : Promise.resolve([]),
   ]);
   const jobUse = new Map(jobCounts.map((row) => [row.jobTitleId, row._count]));
   const departmentUse = new Map(departmentCounts.map((row) => [row.departmentId, row._count]));
   const allowanceUse = new Map(allowanceCounts.map((row) => [row.allowanceTypeId, row._count]));
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: "jobs", label: t("المسميات الوظيفية", "Job titles"), count: catalog.jobTitles.length },
+    { id: "jobs", label: t("المسميات الوظيفية", "Job titles"), count: catalog.jobTitleCount },
     { id: "departments", label: t("الأقسام", "Departments"), count: catalog.departments.length },
     { id: "leave", label: t("أنواع الإجازات", "Leave types"), count: catalog.leaveTypes.length },
     { id: "allowances", label: t("العلاوات", "Allowances"), count: catalog.allowanceTypes.length },
@@ -79,11 +127,24 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
   const missingEn = (list: { nameEn: string | null }[]) => list.filter((item) => !item.nameEn?.trim()).length;
 
   const catalogTab = (list: "jobs" | "departments") => {
-    const rows = list === "jobs" ? catalog.jobTitles : catalog.departments;
-    const usage = list === "jobs" ? jobUse : departmentUse;
-    const shown = rows.filter(matches);
-    const jobFields = (row?: (typeof catalog.jobTitles)[number]) =>
-      list === "jobs" ? (
+    const isJobs = list === "jobs";
+    const rows = isJobs ? jobsPageRows : catalog.departments.filter(matches);
+    const usage = isJobs ? jobUse : departmentUse;
+    const totalRows = isJobs ? catalog.jobTitleCount : catalog.departments.length;
+    const filteredCount = isJobs ? jobsFilteredCount : rows.length;
+    const pageCount = isJobs ? jobsPageCount : 1;
+    const safePage = isJobs ? jobsSafePage : 1;
+    const pageSize = JOB_PAGE_SIZE;
+    const listHref = (nextPage: number) => {
+      const params = new URLSearchParams();
+      params.set("tab", list);
+      if (sp.q) params.set("q", sp.q);
+      if (nextPage > 1) params.set("page", String(nextPage));
+      return `/settings/hr?${params.toString()}`;
+    };
+    type JobRow = (typeof jobsPageRows)[number];
+    const jobFields = (row?: JobRow) =>
+      isJobs ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Field label={t("رمز المهنة", "Occupation code")} hint={t("من دليل وزارة العمل", "From the MoL guide")}>
             <input className={`${fieldClass} w-full`} name="code" dir="ltr" inputMode="numeric" defaultValue={row?.code || ""} placeholder="1120001001" maxLength={20} />
@@ -102,9 +163,9 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
       ) : null;
     return (
       <>
-        {list === "jobs" ? <OccupationImportLazy /> : null}
+        {isJobs ? <OccupationImport /> : null}
         <Card className="space-y-3">
-          <h2 className="font-bold">{list === "jobs" ? t("إضافة مسمى وظيفي", "Add a job title") : t("إضافة قسم", "Add a department")}</h2>
+          <h2 className="font-bold">{isJobs ? t("إضافة مسمى وظيفي", "Add a job title") : t("إضافة قسم", "Add a department")}</h2>
           <form action={saveCatalogEntry} className="grid grid-cols-1 gap-3">
             <input type="hidden" name="list" value={list} />
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -125,23 +186,30 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
                 className={`${fieldClass} w-0 min-w-0 flex-1`}
                 name="q"
                 defaultValue={sp.q || ""}
-                placeholder={list === "jobs" ? t("ابحث بالاسم أو رمز المهنة…", "Search by name or occupation code…") : t("ابحث بالعربية أو الإنجليزية…", "Search in Arabic or English…")}
+                placeholder={isJobs ? t("ابحث بالاسم أو رمز المهنة…", "Search by name or occupation code…") : t("ابحث بالعربية أو الإنجليزية…", "Search in Arabic or English…")}
               />
               <button className={secondaryBtn}>{t("بحث", "Search")}</button>
             </GetForm>
             <div className="flex flex-wrap gap-2">
-              {translateButton(list, missingEn(rows))}
+              {translateButton(list, isJobs ? jobsMissingEn : missingEn(catalog.departments))}
               <form action={importDefaults}>
                 <input type="hidden" name="list" value={list} />
                 <SubmitButton variant="secondary">{t("استيراد القائمة الجاهزة", "Import built-in list")}</SubmitButton>
               </form>
             </div>
           </div>
-          <p className="mb-2 text-xs text-slate-500">{t(`${shown.length} من ${rows.length}`, `${shown.length} of ${rows.length}`)}</p>
+          <p className="mb-2 text-xs text-slate-500">
+            {isJobs && filteredCount > JOB_PAGE_SIZE
+              ? t(
+                  `عرض ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filteredCount)} من ${filteredCount} (الإجمالي ${totalRows})`,
+                  `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filteredCount)} of ${filteredCount} (total ${totalRows})`,
+                )
+              : t(`${filteredCount} من ${totalRows}`, `${filteredCount} of ${totalRows}`)}
+          </p>
           <ul className="divide-y divide-slate-100">
-            {shown.map((row) => {
+            {rows.map((row) => {
               const used = usage.get(row.id) || 0;
-              const job = list === "jobs" ? (row as (typeof catalog.jobTitles)[number]) : null;
+              const job = isJobs ? (row as JobRow) : null;
               return (
                 <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-2.5">
                   <div className="min-w-0">
@@ -177,12 +245,31 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
               );
             })}
           </ul>
+          {isJobs && pageCount > 1 ? (
+            <nav className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-sm" aria-label={t("صفحات القائمة", "List pages")}>
+              {safePage > 1 ? (
+                <Link href={listHref(safePage - 1)} className={secondaryBtn}>
+                  {t("السابق", "Previous")}
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="text-slate-500">{t(`صفحة ${safePage} من ${pageCount}`, `Page ${safePage} of ${pageCount}`)}</span>
+              {safePage < pageCount ? (
+                <Link href={listHref(safePage + 1)} className={secondaryBtn}>
+                  {t("التالي", "Next")}
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          ) : null}
         </Card>
       </>
     );
   };
 
-  const jobOptions = catalog.jobTitles.map((job) => ({ value: job.id, label: name(job), hint: lang === "en" ? job.nameAr : job.nameEn }));
+  const jobOptions = leaveJobTitles.map((job) => ({ value: job.id, label: name(job), hint: lang === "en" ? job.nameAr : job.nameEn }));
   const leaveForm = (type?: (typeof catalog.leaveTypes)[number]) => (
     <form action={saveLeaveType} className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {type ? <input type="hidden" name="id" value={type.id} /> : null}
@@ -208,14 +295,25 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
       <fieldset className="min-w-0 space-y-2 md:col-span-2">
         <legend className="text-sm font-medium text-slate-700">{t("مشمولة لـ", "Applies to")}</legend>
         <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name="scope" value="all" defaultChecked={type ? type.allJobs : true} className="accent-teal-700" />
+          <input type="radio" name="scope" value="all" defaultChecked={type ? type.allJobs || tooManyJobsForPick : true} className="accent-teal-700" />
           {t("كل الوظائف", "All jobs")}
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name="scope" value="selected" defaultChecked={type ? !type.allJobs : false} className="accent-teal-700" />
-          {t("مسميات وظيفية محددة فقط (اخترها أدناه)", "Selected job titles only (choose below)")}
-        </label>
-        <MultiCheck name="jobTitleIds" options={jobOptions} defaultValues={type?.jobTitleIds || []} />
+        {tooManyJobsForPick ? (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+            {t(
+              `لديك ${catalog.jobTitleCount} مسمى وظيفي — اختيار المسميات واحداً واحداً يبطئ الصفحة. اجعل الإجازة لكل الوظائف (المعتاد بعد استيراد دليل وزارة العمل).`,
+              `You have ${catalog.jobTitleCount} job titles — picking them one-by-one freezes the page. Apply leave to all jobs (normal after importing the MoL guide).`,
+            )}
+          </p>
+        ) : (
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="radio" name="scope" value="selected" defaultChecked={type ? !type.allJobs : false} className="accent-teal-700" />
+              {t("مسميات وظيفية محددة فقط (اخترها أدناه)", "Selected job titles only (choose below)")}
+            </label>
+            <MultiCheck name="jobTitleIds" options={jobOptions} defaultValues={type?.jobTitleIds || []} />
+          </>
+        )}
       </fieldset>
       <div className="md:col-span-2">
         <SubmitButton>{type ? t("حفظ التعديل", "Save changes") : t("إضافة نوع الإجازة", "Add leave type")}</SubmitButton>
@@ -330,7 +428,7 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
               </div>
               <ul className="divide-y divide-slate-100">
                 {catalog.leaveTypes.map((type) => {
-                  const jobs = type.jobTitleIds.map((id) => catalog.jobTitles.find((job) => job.id === id)).filter(Boolean);
+                  const jobs = type.jobTitleIds.map((id) => leaveJobTitles.find((job) => job.id === id)).filter(Boolean);
                   return (
                     <li key={type.id} className="space-y-2 py-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
