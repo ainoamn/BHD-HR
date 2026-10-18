@@ -5,15 +5,20 @@ import { BookOpenCheck, CircleAlert, CircleCheck, FileText, Loader2, Sparkles } 
 import { useLang } from "@/components/lang-provider";
 import { primaryBtn, secondaryBtn } from "@/components/ui";
 import { SKILL_CLASS } from "@/lib/occupation-guide";
-import { importOccupationGuide, previewOccupationGuide, type OccupationPreview } from "@/server/occupation-actions";
+import {
+  importOccupationGuide,
+  previewBuiltInOccupationGuide,
+  previewOccupationGuide,
+  type OccupationPreview,
+} from "@/server/occupation-actions";
 
 /**
- * Upload the Ministry of Labour unified occupation PDF → AI/heuristics recognise it → preview → import
- * into the company's job-title catalog with codes, both names and skill class.
+ * Import the Ministry of Labour unified occupation guide into the job-title catalog:
+ * one-click official list, or upload a newer PDF (AI / heuristics recognise it).
  */
 export function OccupationImport() {
   const { lang, t } = useLang();
-  const [busy, setBusy] = useState<"read" | "save" | null>(null);
+  const [busy, setBusy] = useState<"read" | "builtin" | "save" | null>(null);
   const [preview, setPreview] = useState<OccupationPreview | null>(null);
   const [result, setResult] = useState<{ message?: string; error?: string } | null>(null);
 
@@ -34,12 +39,27 @@ export function OccupationImport() {
     }
   }
 
+  async function loadBuiltIn() {
+    setBusy("builtin");
+    setResult(null);
+    setPreview(null);
+    try {
+      const next = await previewBuiltInOccupationGuide();
+      setPreview(next);
+    } catch {
+      setPreview({ error: t("انقطع الاتصال. أعد المحاولة.", "Connection lost. Try again.") });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function save() {
-    if (!preview?.payload) return;
+    if (!preview?.builtin && !preview?.payload) return;
     setBusy("save");
     setResult(null);
     const form = new FormData();
-    form.append("payload", preview.payload);
+    if (preview.builtin) form.append("builtin", "1");
+    else form.append("payload", preview.payload!);
     try {
       const next = await importOccupationGuide(form);
       setResult(next);
@@ -51,9 +71,7 @@ export function OccupationImport() {
     }
   }
 
-  const classEntries = preview?.byClass
-    ? Object.entries(preview.byClass).sort(([a], [b]) => a.localeCompare(b))
-    : [];
+  const classEntries = preview?.byClass ? Object.entries(preview.byClass).sort(([a], [b]) => a.localeCompare(b)) : [];
 
   return (
     <div className="space-y-3 rounded-2xl border border-teal-200 bg-teal-50/40 p-4">
@@ -65,17 +83,26 @@ export function OccupationImport() {
           <h3 className="font-bold text-slate-900">{t("الدليل الموحد لتصنيف المهن", "Unified occupation classification")}</h3>
           <p className="text-sm text-slate-600">
             {t(
-              "ارفع ملف PDF الصادر من وزارة العمل. يتعرّف النظام عليه بالذكاء الاصطناعي ويضيف كل المهن بالعربي والإنجليزي مع رمز المهنة والفئة.",
-              "Upload the Ministry of Labour PDF. The system recognises it with AI and adds every occupation in Arabic and English with its code and class.",
+              "استورد دليل وزارة العمل الرسمي بنقرة (رمز المهنة، الاسمين، والفئة)، أو ارفع PDF أحدث إن صدر تحديث.",
+              "Import the official Ministry of Labour guide in one click (code, both names, and class), or upload a newer PDF if one is released.",
             )}
           </p>
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={primaryBtn} disabled={busy !== null} onClick={() => void loadBuiltIn()}>
+          {busy === "builtin" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+          {busy === "builtin"
+            ? t("جارٍ تحميل الدليل…", "Loading the guide…")
+            : t("استيراد الدليل الرسمي (وزارة العمل)", "Import the official guide (MoL)")}
+        </button>
+      </div>
+
       <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-surface px-4 py-6 text-center transition hover:border-teal-500">
         {busy === "read" ? <Loader2 size={24} className="animate-spin text-teal-700" /> : <FileText size={24} className="text-teal-700" />}
         <span className="text-sm font-semibold text-slate-800">
-          {busy === "read" ? t("الذكاء الاصطناعي يقرأ الملف…", "AI is reading the file…") : t("اختر ملف تصنيف المهن (PDF)", "Choose the occupation classification PDF")}
+          {busy === "read" ? t("جارٍ قراءة الملف…", "Reading the file…") : t("أو ارفع ملف PDF محدّث", "Or upload an updated PDF")}
         </span>
         <span className="text-xs text-slate-500">{t("حتى 4 ميغابايت", "Up to 4 MB")}</span>
         <input
@@ -109,7 +136,12 @@ export function OccupationImport() {
               ? " — " +
                 classEntries
                   .map(([code, count]) => {
-                    const label = code === "none" ? t("بلا فئة", "No class") : lang === "en" ? SKILL_CLASS[code as keyof typeof SKILL_CLASS]?.en || code : SKILL_CLASS[code as keyof typeof SKILL_CLASS]?.ar || code;
+                    const label =
+                      code === "none"
+                        ? t("بلا فئة", "No class")
+                        : lang === "en"
+                          ? SKILL_CLASS[code as keyof typeof SKILL_CLASS]?.en || code
+                          : SKILL_CLASS[code as keyof typeof SKILL_CLASS]?.ar || code;
                     return `${label}: ${count}`;
                   })
                   .join(" · ")

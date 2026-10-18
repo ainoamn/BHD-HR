@@ -27,6 +27,8 @@ export type OccupationPreview = {
   sample?: { code: string; nameAr: string; nameEn: string; classLabel: string }[];
   /** Base64 of the parsed JSON rows so save does not re-read the PDF. */
   payload?: string;
+  /** Use the bundled MoL guide on save (no large payload round-trip). */
+  builtin?: boolean;
   error?: string;
 };
 
@@ -74,7 +76,16 @@ export async function previewOccupationGuide(formData: FormData): Promise<Occupa
     ({ text } = await pdfText(new Uint8Array(await file.arrayBuffer())));
   } catch (error) {
     console.error("occupation PDF read failed", error);
-    return { error: t("تعذرت قراءة ملف PDF. تأكد أنه غير محمي بكلمة مرور.", "Could not read the PDF. Check that it is not password-protected.") };
+    const detail = error instanceof Error ? error.message : String(error);
+    const password = /password|encrypted|نمستخد/i.test(detail);
+    return {
+      error: password
+        ? t("الملف محمي بكلمة مرور. أزل الحماية ثم أعد الرفع، أو استخدم «استيراد الدليل الرسمي» أدناه.", "The file is password-protected. Remove the password and try again, or use “Import the official guide” below.")
+        : t(
+            "تعذرت قراءة ملف PDF على الخادم. استخدم زر «استيراد الدليل الرسمي» (نفس دليل وزارة العمل)، أو أعد المحاولة بعد لحظات.",
+            "Could not read the PDF on the server. Use “Import the official guide” (the same MoL guide), or try again shortly.",
+          ),
+    };
   }
   if (!text.trim()) return { error: t("الملف بلا نص قابل للقراءة", "The file has no readable text") };
 
@@ -85,24 +96,33 @@ export async function previewOccupationGuide(formData: FormData): Promise<Occupa
       kind = await aiDetectOccupationFile(text);
     } catch (error) {
       console.error("occupation AI detect failed", error);
-      return { error: t("تعذر التعرّف على نوع الملف بالذكاء الاصطناعي. جرّب ملف الدليل الموحد.", "AI could not recognise the file. Try the unified classification PDF.") };
+      return { error: t("تعذر التعرّف على نوع الملف بالذكاء الاصطناعي. جرّب ملف الدليل الموحد أو «استيراد الدليل الرسمي».", "AI could not recognise the file. Try the unified classification PDF or “Import the official guide”.") };
     }
   }
 
   const { kind: parsedKind, rows } = parseOccupationFile(text, kind);
+  return previewFromRows(rows, parsedKind, lang, t);
+}
+
+function previewFromRows(
+  rows: OccupationRow[],
+  kind: OccupationFileKind,
+  lang: "ar" | "en",
+  t: (ar: string, en: string) => string,
+  options?: { builtin?: boolean; withPayload?: boolean },
+): OccupationPreview {
   if (!rows.length) {
     return {
       error: t(
-        "لم يُعثر على مهن في الملف. ارفع «الدليل الموحد لتصنيف المهن» من وزارة العمل (رمز المهنة والاسمين والفئة).",
-        "No occupations found. Upload the Ministry of Labour unified occupation classification (code, both names, and class).",
+        "لم يُعثر على مهن في الملف. ارفع «الدليل الموحد لتصنيف المهن» من وزارة العمل، أو استخدم «استيراد الدليل الرسمي».",
+        "No occupations found. Upload the Ministry of Labour unified classification, or use “Import the official guide”.",
       ),
     };
   }
-
   const stats = occupationStats(rows);
   return {
-    kind: parsedKind,
-    kindLabel: kindLabel(parsedKind, t),
+    kind,
+    kindLabel: kindLabel(kind, t),
     total: stats.total,
     byClass: stats.byClass,
     sample: rows.slice(0, 8).map((row) => ({
@@ -111,21 +131,29 @@ export async function previewOccupationGuide(formData: FormData): Promise<Occupa
       nameEn: row.nameEn,
       classLabel: skillClassLabel(row.skillClass, lang) || "—",
     })),
-    payload: encodeRows(rows),
+    builtin: options?.builtin,
+    payload: options?.withPayload === false ? undefined : encodeRows(rows),
   };
+}
+
+/** Built-in MoL unified guide (March 2026) shipped with the app — no PDF upload needed. */
+export async function previewBuiltInOccupationGuide(): Promise<OccupationPreview> {
+  await requireAdmin("/settings/hr?tab=jobs");
+  const { lang, t } = await getI18n();
+  const { BUILTIN_OCCUPATIONS } = await import("@/lib/data/mol-occupations");
+  return previewFromRows(BUILTIN_OCCUPATIONS, "UNIFIED", lang, t, { builtin: true, withPayload: false });
 }
 
 export type OccupationImportResult = { added?: number; updated?: number; total?: number; error?: string; message?: string };
 
-/** Saves the occupations from a previous preview into the company's job-title catalog (match by code, else by Arabic name). */
-export async function importOccupationGuide(formData: FormData): Promise<OccupationImportResult> {
-  const user = await requireAdmin("/settings/hr?tab=jobs");
-  const { t } = await getI18n();
-  const rows = decodeRows(String(formData.get("payload") || ""));
-  if (!rows?.length) return { error: t("لا توجد مهن للحفظ. أعد قراءة الملف.", "No occupations to save. Read the file again.") };
-
+async function saveOccupationRows(
+  companyId: string,
+  userId: string,
+  rows: OccupationRow[],
+  t: (ar: string, en: string) => string,
+): Promise<OccupationImportResult> {
   const existing = await prisma.jobTitle.findMany({
-    where: { companyId: user.companyId },
+    where: { companyId },
     select: { id: true, code: true, nameAr: true, nameEn: true, skillClass: true },
   });
   const byCode = new Map(existing.filter((row) => row.code).map((row) => [row.code!, row]));
@@ -154,11 +182,8 @@ export async function importOccupationGuide(formData: FormData): Promise<Occupat
       byCode.set(row.code, { ...sameName, code: row.code });
       continue;
     }
-    if (sameName?.code && sameName.code !== row.code) {
-      // Same Arabic title already linked to another MoL code — keep a distinct title with the code suffix avoided; skip duplicate name.
-      continue;
-    }
-    toCreate.push({ companyId: user.companyId, code: row.code, nameAr, nameEn, skillClass });
+    if (sameName?.code && sameName.code !== row.code) continue;
+    toCreate.push({ companyId, code: row.code, nameAr, nameEn, skillClass });
   }
 
   let added = 0;
@@ -180,7 +205,7 @@ export async function importOccupationGuide(formData: FormData): Promise<Occupat
       ),
       ...batch.map((row) =>
         prisma.employee.updateMany({
-          where: { companyId: user.companyId, jobTitleId: row.id },
+          where: { companyId, jobTitleId: row.id },
           data: { jobTitle: row.nameAr, jobTitleEn: row.nameEn, jobCode: row.code, jobClass: row.skillClass },
         }),
       ),
@@ -189,7 +214,7 @@ export async function importOccupationGuide(formData: FormData): Promise<Occupat
   }
 
   await writeAudit({
-    userId: user.id,
+    userId,
     action: "OCCUPATION_IMPORT",
     message: t(
       `استورد دليل المهن: أُضيف ${added} وحُدّث ${updated} من أصل ${rows.length}`,
@@ -206,4 +231,17 @@ export async function importOccupationGuide(formData: FormData): Promise<Occupat
       `Imported: added ${added} and updated ${updated} (of ${rows.length} in the file).`,
     ),
   };
+}
+
+/** Saves the occupations from a previous PDF preview into the company's job-title catalog. */
+export async function importOccupationGuide(formData: FormData): Promise<OccupationImportResult> {
+  const user = await requireAdmin("/settings/hr?tab=jobs");
+  const { t } = await getI18n();
+  if (String(formData.get("builtin") || "") === "1") {
+    const { BUILTIN_OCCUPATIONS } = await import("@/lib/data/mol-occupations");
+    return saveOccupationRows(user.companyId, user.id, BUILTIN_OCCUPATIONS, t);
+  }
+  const rows = decodeRows(String(formData.get("payload") || ""));
+  if (!rows?.length) return { error: t("لا توجد مهن للحفظ. أعد قراءة الملف.", "No occupations to save. Read the file again.") };
+  return saveOccupationRows(user.companyId, user.id, rows, t);
 }
