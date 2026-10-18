@@ -259,50 +259,61 @@ const LABOUR_DATES = new Set([
 const LABOUR_MONEY = new Set(["basicSalary", "housingAllowance", "transportAllowance"]);
 const LABOUR_NUMBERS = new Set(["idNumber", "passportNumber", "residenceNumber", "visaNumber", "workPermitNumber", "employerIdNumber"]);
 
+export type LabourFileReadResult = {
+  title: string;
+  formKind: import("@/lib/mol-labour-forms").MolLabourFormKind;
+  workers: LabourWorker[];
+};
+
 /**
- * Workers printed on an Omani Ministry of Labour document (worker data, labour card, work permit / clearance,
- * a list of an establishment's workers, an employment contract). Nothing is guessed: unclear fields are empty.
+ * Workers printed on official MoL e-services printouts (Registering Worker Details, work permit,
+ * labour card, establishment list, contract, renewal) — Omanis and expatriates. Nothing is guessed.
  */
-export async function aiReadLabourFile(data: Uint8Array, mediaType: string): Promise<{ title: string; workers: LabourWorker[] } | null> {
+export async function aiReadLabourFile(data: Uint8Array, mediaType: string): Promise<LabourFileReadResult | null> {
+  const { applyMolLabourWorkerRules, detectMolLabourForm } = await import("@/lib/mol-labour-forms");
   const { text } = await generateText({
     model: VISION_MODEL,
     temperature: 0,
     providerOptions: { gateway: { models: VISION_FALLBACKS } },
     system: [
-      "You read documents issued by the Ministry of Labour of the Sultanate of Oman (worker data printouts / Registering Worker Details, labour cards, work permits / labour clearances, lists of an establishment's workers, employment contracts) for an HR system, and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
-      "Return one entry in workers per worker on the document (a list may have many; read every row).",
-      "fullName: the worker's name in Arabic script; nameEn: in Latin script as printed. nationality: ISO 3166 alpha-2 code (OM, IN, PK, BD, NP, LK, PH, EG...). gender: MALE or FEMALE.",
-      "CRITICAL — keep each printed date in its own field; never copy a date from one labelled box into another:",
-      "idNumber / idExpiry: only the civil number / personal card (الرقم المدني / البطاقة الشخصية) and its own expiry. Do NOT put visa or work-permit expiry here.",
-      "residenceNumber / residenceExpiry: only إقامة / residence / resident card when that label is printed. Do NOT put تأشيرة or تصريح مزاولة العمل expiry into residenceExpiry.",
-      "visaNumber / visaExpiry: only التأشيرة / Visa / entry visa (تاريخ انتهاء التأشيرة).",
-      "workPermitNumber / workPermitExpiry: only تصريح العمل / تصريح مزاولة العمل / labour card / clearance (تاريخ انتهاء التصريح).",
-      "passportNumber / passportExpiry: passport only.",
-      "arrivalDate: تاريخ الوصول / Date of arrival / Arrival date only — never put this in joiningDate.",
-      "joiningDate: only تاريخ الالتحاق / تاريخ المباشرة / تاريخ بدء العمل / Date of joining / Employment start. If the form only shows تاريخ الوصول and not a joining date, leave joiningDate empty.",
-      "contractEnd: end of contract when printed. jobTitle Arabic, jobTitleEn English. basicSalary / housingAllowance / transportAllowance as plain Omani-rial numbers. address when printed.",
-      "employerName Arabic (or as printed), employerNameEn English; employerIdNumber CR or individual civil number; employerKind COMPANY or PERSON.",
-      "Dates are YYYY-MM-DD (Gregorian; convert Hijri only if no Gregorian date is printed). Numbers in Latin digits without spaces. title: the document's title as printed.",
-      `Reply with JSON only: {"title":"","workers":[{${LABOUR_FIELDS.map((key) => `"${key}":""`).join(",")}}]}`,
+      "You read official printouts from the Ministry of Labour of Oman e-services portal (mol.gov.om) for an HR system: تسجيل بيانات العامل (Registering Worker Details) for establishments or individuals, تصريح مزاولة العمل (work permit / labour clearance), بطاقة العمل (labour card), قائمة عمال المنشأة (worker list), عقد عمل (employment contract), تجديد بيانات القوى العاملة (renewal). Copy printed data exactly. Never guess.",
+      "formKind must be one of: REGISTER_WORKER, WORK_PERMIT, LABOUR_CARD, WORKER_LIST, CONTRACT, RENEWAL, UNKNOWN.",
+      "Return one entry in workers per person on the document (lists may have many rows — read every worker).",
+      "Omani nationals (nationality OM): fill civil ID (idNumber/idExpiry), passport if printed, job, salary, employer, joiningDate. Leave residence, visa, workPermit and arrivalDate empty.",
+      "Expatriates: fill civil/resident number, passport, residence, visa, work permit, arrivalDate and joiningDate from their labelled boxes only.",
+      "fullName Arabic; nameEn Latin. nationality ISO 3166 alpha-2 (OM, IN, PK, BD…). gender MALE or FEMALE.",
+      "CRITICAL — each printed date stays in its labelled field only:",
+      "idNumber/idExpiry = الرقم المدني / البطاقة الشخصية only. residenceNumber/residenceExpiry = إقامة only. visaNumber/visaExpiry = التأشيرة only. workPermitNumber/workPermitExpiry = تصريح مزاولة العمل / labour clearance only. passport = passport only.",
+      "arrivalDate = تاريخ الوصول only (never joiningDate). joiningDate = تاريخ الالتحاق / المباشرة / بدء العمل only; if only arrival is printed, leave joiningDate empty.",
+      "employerName / employerNameEn / employerIdNumber (CR or individual civil no) / employerKind COMPANY|PERSON. Money as plain Omani-rial numbers.",
+      "Dates YYYY-MM-DD Gregorian. title = document title as printed.",
+      `Reply with JSON only: {"title":"","formKind":"REGISTER_WORKER","workers":[{${LABOUR_FIELDS.map((key) => `"${key}":""`).join(",")}}]}`,
     ].join(" "),
     messages: [
       {
         role: "user",
         content: [
-          { type: "text", text: "Read this Ministry of Labour document." },
+          { type: "text", text: "Read this Ministry of Labour portal document and extract every worker." },
           { type: "file", data, mediaType },
         ],
       },
     ],
   });
-  const parsed = parseJson<{ title?: unknown; workers?: unknown }>(text, "{");
+  const parsed = parseJson<{ title?: unknown; formKind?: unknown; workers?: unknown }>(text, "{");
   if (!parsed || !Array.isArray(parsed.workers)) return null;
+  const title = typeof parsed.title === "string" ? parsed.title.trim().slice(0, 150) : "";
+  const aiKind = typeof parsed.formKind === "string" ? parsed.formKind.toUpperCase() : "";
+  const known = ["REGISTER_WORKER", "WORK_PERMIT", "LABOUR_CARD", "WORKER_LIST", "CONTRACT", "RENEWAL", "UNKNOWN"] as const;
+  const formKind =
+    known.includes(aiKind as (typeof known)[number]) && aiKind !== "UNKNOWN"
+      ? (aiKind as (typeof known)[number])
+      : detectMolLabourForm(`${title}\n${aiKind}`);
   const workers = parsed.workers
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
     .slice(0, 50)
-    .map((item) => normalizeLabourWorker(item))
+    .map((item) => applyMolLabourWorkerRules(normalizeLabourWorker(item)))
     .filter((worker) => worker.fullName || worker.nameEn);
-  return { title: typeof parsed.title === "string" ? parsed.title.trim().slice(0, 150) : "", workers };
+  return { title, formKind, workers };
 }
 
 /** Trims the AI's values and drops what does not fit: malformed dates, codes and amounts become empty. */
@@ -341,6 +352,7 @@ export function normalizeLabourWorker(item: Record<string, unknown>): LabourWork
   if (worker.arrivalDate && worker.joiningDate && worker.arrivalDate === worker.joiningDate) {
     worker.joiningDate = "";
   }
+  // Final Omani/expat cleanup runs in applyMolLabourWorkerRules after this.
   return worker;
 }
 

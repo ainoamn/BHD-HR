@@ -15,6 +15,8 @@ type Item = {
   file: File;
   status: "waiting" | "reading" | "read" | "error" | "saving" | "saved";
   title?: string;
+  formKindLabel?: string;
+  summary?: { omani: number; expat: number; unknown: number; total: number };
   workers: Worker[];
   error?: string;
   result?: LabourSaveResult;
@@ -74,7 +76,14 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
     try {
       const result = await readLabourFile(form);
       if (result.error || !result.workers) patch(item.key, { status: "error", error: result.error });
-      else patch(item.key, { status: "read", title: result.title, workers: result.workers.map((worker) => ({ ...worker, update: false, skip: false })) });
+      else
+        patch(item.key, {
+          status: "read",
+          title: result.title,
+          formKindLabel: result.formKindLabel,
+          summary: result.summary,
+          workers: result.workers.map((worker) => ({ ...worker, update: false, skip: false })),
+        });
     } catch {
       patch(item.key, { status: "error", error: t("انقطع الاتصال. أعد المحاولة.", "Connection lost. Try again.") });
     }
@@ -135,8 +144,15 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
     <div className="space-y-4">
       <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/60 px-4 py-8 text-center transition hover:border-teal-500">
         <FileText size={28} className="text-teal-700" />
-        <span className="text-sm font-semibold text-slate-800">{t("اختر ملفات العمال (PDF أو صور) — يمكنك اختيار عدة ملفات", "Choose worker files (PDF or images) — several at once")}</span>
-        <span className="text-xs text-slate-500">{t("حتى 4 ميغابايت للملف، و20 ملفاً في المرة", "Up to 4 MB each, 20 files at a time")}</span>
+        <span className="text-sm font-semibold text-slate-800">
+          {t("اختر مستندات بوابة وزارة العمل (PDF أو صور) — عدة ملفات دفعة واحدة", "Choose Ministry of Labour portal documents (PDF or images) — several files at once")}
+        </span>
+        <span className="text-xs text-slate-500">
+          {t(
+            "تسجيل بيانات العامل، تصريح مزاولة العمل، بطاقة العمل، قائمة عمال، عقد، تجديد — عمانيون ووافدون · حتى 4 ميغابايت و20 ملفاً",
+            "Registering worker details, work permit, labour card, worker list, contract, renewal — Omanis and expatriates · up to 4 MB and 20 files",
+          )}
+        </span>
         <input
           type="file"
           multiple
@@ -164,6 +180,7 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
             <FileText size={18} className="shrink-0 text-teal-700" />
             <span className="min-w-0 flex-1 break-all text-sm font-semibold text-slate-800">
               {item.file.name}
+              {item.formKindLabel ? <span className="ms-2 rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-semibold text-teal-800 ring-1 ring-inset ring-teal-200">{item.formKindLabel}</span> : null}
               {item.title ? <span className="ms-2 font-normal text-slate-500">— {item.title}</span> : null}
             </span>
             {item.status === "waiting" || item.status === "reading" ? (
@@ -194,6 +211,15 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
                   {t("إعادة المحاولة", "Retry")}
                 </button>
               ) : null}
+            </p>
+          ) : null}
+
+          {item.summary && item.status === "read" ? (
+            <p className="text-xs text-slate-600">
+              {t(`${item.summary.total} عامل`, `${item.summary.total} worker(s)`)}
+              {item.summary.omani ? ` · ${t(`${item.summary.omani} عماني`, `${item.summary.omani} Omani`)}` : ""}
+              {item.summary.expat ? ` · ${t(`${item.summary.expat} وافد`, `${item.summary.expat} expatriate(s)`)}` : ""}
+              {item.summary.unknown ? ` · ${t(`${item.summary.unknown} بلا جنسية`, `${item.summary.unknown} without nationality`)}` : ""}
             </p>
           ) : null}
 

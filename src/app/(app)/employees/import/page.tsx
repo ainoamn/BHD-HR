@@ -51,8 +51,8 @@ export default async function ImportEmployeesPage({ searchParams }: { searchPara
           <>
             <p className="text-sm text-slate-600">
               {t(
-                "بيانات العامل، بطاقة العمل، ترخيص العمل، أو قائمة عمال المنشأة: يستخرج الذكاء الاصطناعي الاسم والجنسية والرقم المدني والجواز والإقامة والتأشيرة والمهنة وتصريح العمل والراتب والبدلات والعنوان والكفيل. تُحفظ كلها في ملف الموظف. راجع ما قُرئ قبل الحفظ.",
-                "Worker data, labour card, work permit, or an establishment's worker list: AI extracts the name, nationality, civil and passport numbers, residence, visa, occupation, work permit, salary, allowances, address and sponsor — all kept on the employee's file. Check what was read before saving.",
+                "مستندات بوابة وزارة العمل الرسمية: تسجيل بيانات العامل، تصريح مزاولة العمل، بطاقة العمل، قائمة عمال المنشأة، عقد العمل، تجديد بيانات القوى العاملة. يتعرّف النظام على نوع المستند ويستخرج بيانات العمانيين والوافدين دفعة واحدة (هوية، جواز، إقامة، تأشيرة، تصريح، راتب، كفيل…). راجع قبل الحفظ.",
+                "Official Ministry of Labour portal printouts: registering worker details, work permit, labour card, establishment worker list, employment contract, workforce renewal. The system recognises the form type and extracts Omani and expatriate data in bulk (ID, passport, residence, visa, permit, salary, sponsor…). Review before saving.",
               )}
             </p>
             <LabourFileImport labels={labels} canUpdate={canUpdate} canAddSponsor={can(user, "employers.create")} />

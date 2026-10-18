@@ -1,6 +1,6 @@
 "use server";
 
-import { aiReadLabourFile, isRateLimited, LABOUR_FIELDS } from "@/lib/ai";
+import { aiReadLabourFile, isRateLimited, LABOUR_FIELDS, type LabourWorker } from "@/lib/ai";
 import { writeAudit } from "@/lib/audit";
 import { can, getSessionUser } from "@/lib/auth";
 import { profileGaps, type GapKey } from "@/lib/employee-gaps";
@@ -8,6 +8,7 @@ import { checkRow, type ExistingEmployee, type ImportValues } from "@/lib/employ
 import { attachLabourFile, findExistingEmployees, intakeContext, saveIntake } from "@/lib/employee-intake";
 import { refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
+import { applyMolLabourWorkerRules, molLabourFormLabel, summarizeMolWorkers, type MolLabourFormKind } from "@/lib/mol-labour-forms";
 import { prisma } from "@/lib/prisma";
 import { aiLockedMessage, aiOpen, fitsLimit, limitMessage } from "@/lib/subscription";
 import { saveUpload } from "@/lib/uploads";
@@ -23,7 +24,14 @@ export type LabourWorkerRead = {
   sponsor: { id: string; name: string } | null;
 };
 
-export type LabourFileRead = { title?: string; workers?: LabourWorkerRead[]; error?: string };
+export type LabourFileRead = {
+  title?: string;
+  formKind?: MolLabourFormKind;
+  formKindLabel?: string;
+  summary?: { omani: number; expat: number; unknown: number; total: number };
+  workers?: LabourWorkerRead[];
+  error?: string;
+};
 
 async function intakeUser() {
   const { t } = await getI18n();
@@ -40,16 +48,12 @@ function checkFile(file: FormDataEntryValue | null, t: (ar: string, en: string) 
   return null;
 }
 
-/** Cleans the read or edited values the same way as a spreadsheet row. */
+/** Cleans the read or edited values the same way as a spreadsheet row, then applies MoL Omani/expat rules. */
 function cleanWorker(raw: Record<string, unknown>) {
   const values: ImportValues = {};
   for (const key of LABOUR_FIELDS) values[key] = typeof raw[key] === "string" ? (raw[key] as string) : "";
   if (!values.fullName.trim() && values.nameEn.trim()) values.fullName = values.nameEn;
   const row = checkRow(values, 0);
-  // Expatriate civil number is often printed once — copy the number only (never visa/permit expiry onto residence/ID).
-  if (row.values.nationality && row.values.nationality !== "OM") {
-    if (!row.values.residenceNumber && row.values.idNumber) row.values.residenceNumber = row.values.idNumber;
-  }
   if (row.values.visaExpiry) {
     if (row.values.idExpiry === row.values.visaExpiry) row.values.idExpiry = "";
     if (row.values.residenceExpiry === row.values.visaExpiry) row.values.residenceExpiry = "";
@@ -61,6 +65,8 @@ function cleanWorker(raw: Record<string, unknown>) {
   if (row.values.arrivalDate && row.values.joiningDate && row.values.arrivalDate === row.values.joiningDate) {
     row.values.joiningDate = "";
   }
+  const cleaned = applyMolLabourWorkerRules(row.values as LabourWorker);
+  row.values = cleaned;
   return row;
 }
 
@@ -86,8 +92,14 @@ export async function readLabourFile(formData: FormData): Promise<LabourFileRead
     };
   }
   if (!read?.workers.length) {
-    return { error: t("لم يُعثر على بيانات عامل في الملف. تأكد أنه ملف العامل من وزارة العمل وأنه واضح.", "No worker data was found. Check that it is a clear Ministry of Labour worker file.") };
+    return {
+      error: t(
+        "لم يُعثر على بيانات عامل في الملف. ارفع مستنداً واضحاً من بوابة وزارة العمل: تسجيل بيانات العامل، تصريح مزاولة العمل، بطاقة العمل، قائمة عمال، عقد، أو تجديد.",
+        "No worker data was found. Upload a clear Ministry of Labour portal printout: registering worker details, work permit, labour card, worker list, contract, or renewal.",
+      ),
+    };
   }
+  const { lang } = await getI18n();
   const rows = read.workers.map((worker) => cleanWorker(worker));
   const existing = await findExistingEmployees(
     user.companyId,
@@ -102,7 +114,13 @@ export async function readLabourFile(formData: FormData): Promise<LabourFileRead
       employers.find((item) => [name, nameEn].some((label) => label && (plain(item.name) === plain(label) || plain(item.nameEn) === plain(label))));
     return { values: row.values, errors: row.errors, existing: existing[index], sponsor: match ? { id: match.id, name: match.name } : null };
   });
-  return { title: read.title, workers };
+  return {
+    title: read.title,
+    formKind: read.formKind,
+    formKindLabel: molLabourFormLabel(read.formKind, lang),
+    summary: summarizeMolWorkers(workers.map((worker) => worker.values)),
+    workers,
+  };
 }
 
 export type LabourSaveResult = {
