@@ -4,6 +4,7 @@ import { BilingualFields } from "@/components/bilingual-fields";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { MultiCheck } from "@/components/multi-check";
+import { OccupationImport } from "@/components/occupation-import";
 import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, Field, PageHeader, fieldClass, secondaryBtn } from "@/components/ui";
@@ -14,6 +15,7 @@ import { getHrCatalog } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { LEAVE_CYCLES, LEAVE_CYCLE_LABEL, readCycle } from "@/lib/leave";
 import { getI18n } from "@/lib/lang";
+import { SKILL_CLASS, skillClassLabel } from "@/lib/occupation-guide";
 import { normalizeSearchText } from "@/lib/search";
 import { prisma } from "@/lib/prisma";
 import { cn, daysLabel } from "@/lib/utils";
@@ -39,8 +41,13 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
   const catalog = await getHrCatalog(user.companyId);
   const currency = user.company.currency;
   const query = normalizeSearchText(sp.q || "");
-  const matches = (item: { nameAr: string; nameEn: string | null }) =>
-    !query || normalizeSearchText(item.nameAr).includes(query) || normalizeSearchText(item.nameEn || "").includes(query);
+  const queryDigits = (sp.q || "").replace(/\s+/g, "");
+  const matches = (item: { nameAr: string; nameEn: string | null; code?: string | null }) => {
+    if (!query) return true;
+    if (normalizeSearchText(item.nameAr).includes(query) || normalizeSearchText(item.nameEn || "").includes(query)) return true;
+    if (item.code && (normalizeSearchText(item.code).includes(query) || (/^\d+$/.test(queryDigits) && item.code.includes(queryDigits)))) return true;
+    return false;
+  };
   const name = (item: { nameAr: string; nameEn: string | null }) => termText(item.nameAr, item.nameEn, lang) || item.nameAr;
 
   const [jobCounts, departmentCounts, allowanceCounts] = await Promise.all([
@@ -75,14 +82,36 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
     const rows = list === "jobs" ? catalog.jobTitles : catalog.departments;
     const usage = list === "jobs" ? jobUse : departmentUse;
     const shown = rows.filter(matches);
+    const jobFields = (row?: (typeof catalog.jobTitles)[number]) =>
+      list === "jobs" ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Field label={t("رمز المهنة", "Occupation code")} hint={t("من دليل وزارة العمل", "From the MoL guide")}>
+            <input className={`${fieldClass} w-full`} name="code" dir="ltr" inputMode="numeric" defaultValue={row?.code || ""} placeholder="1120001001" maxLength={20} />
+          </Field>
+          <Field label={t("فئة المهنة", "Occupation class")}>
+            <select className={`${fieldClass} w-full`} name="skillClass" defaultValue={row?.skillClass || ""}>
+              <option value="">—</option>
+              {Object.entries(SKILL_CLASS).map(([code, labels]) => (
+                <option key={code} value={code}>
+                  {labels[lang]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      ) : null;
     return (
       <>
+        {list === "jobs" ? <OccupationImport /> : null}
         <Card className="space-y-3">
           <h2 className="font-bold">{list === "jobs" ? t("إضافة مسمى وظيفي", "Add a job title") : t("إضافة قسم", "Add a department")}</h2>
-          <form action={saveCatalogEntry} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <form action={saveCatalogEntry} className="grid grid-cols-1 gap-3">
             <input type="hidden" name="list" value={list} />
-            <BilingualFields arName="nameAr" enName="nameEn" arLabel={t("الاسم بالعربية", "Arabic name")} enLabel={t("الاسم بالإنجليزية", "English name")} required />
-            <SubmitButton>{t("إضافة", "Add")}</SubmitButton>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+              <BilingualFields arName="nameAr" enName="nameEn" arLabel={t("الاسم بالعربية", "Arabic name")} enLabel={t("الاسم بالإنجليزية", "English name")} required />
+              <SubmitButton>{t("إضافة", "Add")}</SubmitButton>
+            </div>
+            {jobFields()}
           </form>
           <p className="text-xs text-slate-500">
             {t("اكتب الاسم بلغة واحدة فتُكتب الأخرى تلقائياً بالذكاء الاصطناعي.", "Type the name in one language and AI fills in the other.")}
@@ -92,7 +121,12 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <GetForm className="flex min-w-0 flex-1 basis-60 gap-2">
               <input type="hidden" name="tab" value={list} />
-              <input className={`${fieldClass} w-0 min-w-0 flex-1`} name="q" defaultValue={sp.q || ""} placeholder={t("ابحث بالعربية أو الإنجليزية…", "Search in Arabic or English…")} />
+              <input
+                className={`${fieldClass} w-0 min-w-0 flex-1`}
+                name="q"
+                defaultValue={sp.q || ""}
+                placeholder={list === "jobs" ? t("ابحث بالاسم أو رمز المهنة…", "Search by name or occupation code…") : t("ابحث بالعربية أو الإنجليزية…", "Search in Arabic or English…")}
+              />
               <button className={secondaryBtn}>{t("بحث", "Search")}</button>
             </GetForm>
             <div className="flex flex-wrap gap-2">
@@ -107,6 +141,7 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
           <ul className="divide-y divide-slate-100">
             {shown.map((row) => {
               const used = usage.get(row.id) || 0;
+              const job = list === "jobs" ? (row as (typeof catalog.jobTitles)[number]) : null;
               return (
                 <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-2.5">
                   <div className="min-w-0">
@@ -114,15 +149,23 @@ export default async function HrSettingsPage({ searchParams }: { searchParams: P
                     <p className={cn("text-sm", row.nameEn ? "text-slate-500" : "text-amber-700")} dir="ltr">
                       {row.nameEn || t("لا توجد ترجمة إنجليزية", "No English name")}
                     </p>
+                    {job?.code || job?.skillClass ? (
+                      <p className="mt-0.5 text-xs text-slate-500" dir="ltr">
+                        {job.code ? <span className="font-mono">{job.code}</span> : null}
+                        {job.code && job.skillClass ? " · " : null}
+                        {job.skillClass ? skillClassLabel(job.skillClass, lang) : null}
+                      </p>
+                    ) : null}
                     {used ? <p className="text-xs text-teal-800">{t(`${used} موظف`, `${used} employee(s)`)}</p> : null}
                   </div>
                   <div className="flex flex-wrap items-start gap-3">
                     <details className="group">
                       <summary className="inline-flex cursor-pointer list-none items-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 group-open:bg-slate-100 group-open:text-slate-600">{t("تعديل", "Edit")}</summary>
-                      <form action={saveCatalogEntry} className="mt-2 grid w-72 max-w-[80vw] grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                      <form action={saveCatalogEntry} className="mt-2 grid w-80 max-w-[80vw] grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
                         <input type="hidden" name="list" value={list} />
                         <input type="hidden" name="id" value={row.id} />
                         <BilingualFields arName="nameAr" enName="nameEn" arLabel={t("بالعربية", "Arabic")} enLabel={t("بالإنجليزية", "English")} arDefault={row.nameAr} enDefault={row.nameEn} required compact />
+                        {jobFields(job || undefined)}
                         <SubmitButton variant="secondary">{t("حفظ", "Save")}</SubmitButton>
                       </form>
                     </details>

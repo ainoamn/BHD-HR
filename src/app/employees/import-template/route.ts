@@ -55,6 +55,8 @@ export async function GET(request: Request) {
     employerName: t("اسم الكفيل أو المنشأة؛ إن لم يكن مسجلاً يُفتح كفيل جديد تلقائياً", "Sponsor or establishment name; a new sponsor is opened automatically if not on record"),
     employerIdNumber: t("السجل التجاري للشركة أو الرقم المدني للكفيل الفرد", "The company's CR number, or the individual sponsor's civil number"),
     workPermitNumber: t("يُحفظ ضمن وثائق الموظف كتصريح عمل مع تاريخ انتهائه", "Kept in the employee's documents as a work permit with its expiry"),
+    visaNumber: t("يُحفظ ضمن وثائق الموظف كتأشيرة مع تاريخ انتهائها", "Kept in the employee's documents as a visa with its expiry"),
+    address: t("عنوان العامل في السلطنة إن وُجد في الملف", "The worker's address in Oman when printed on the file"),
   };
   for (const column of columns) {
     help.addRow({ name: `${column.ar} / ${column.en}${column.required ? " *" : ""}`, hint: columnHints[column.key] ?? hints[column.kind] });

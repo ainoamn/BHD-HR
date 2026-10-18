@@ -9,6 +9,9 @@ describe("headers", () => {
     expect(matchHeader("Full Name")).toBe("fullName");
     expect(matchHeader("انتهاء الجواز / Passport expiry")).toBe("passportExpiry");
     expect(matchHeader("passportNumber")).toBe("passportNumber");
+    expect(matchHeader("رقم التأشيرة")).toBe("visaNumber");
+    expect(matchHeader("رقم بطاقة الاقامة")).toBe("residenceNumber");
+    expect(matchHeader("عنوان العامل")).toBe("address");
     expect(matchHeader("ملاحظة")).toBeNull();
   });
 });
@@ -129,12 +132,51 @@ describe("labour file values", () => {
       dateOfBirth: "1990-13-01",
       idExpiry: "2028-02-29",
       basicSalary: "OMR 325.500",
+      housingAllowance: "OMR 50",
+      transportAllowance: "bad",
       idNumber: "12 34 56",
+      visaNumber: "V 99 1",
+      visaExpiry: "2029-06-15",
+      address: "  مسقط  ",
       employerKind: "company",
       jobTitle: 7,
     });
-    expect(worker).toMatchObject({ fullName: "عامل تجريبي", nationality: "IN", gender: "MALE", dateOfBirth: "", idExpiry: "2028-02-29", basicSalary: "325.5", idNumber: "123456", employerKind: "COMPANY", jobTitle: "7" });
+    expect(worker).toMatchObject({
+      fullName: "عامل تجريبي",
+      nationality: "IN",
+      gender: "MALE",
+      dateOfBirth: "",
+      idExpiry: "2028-02-29",
+      basicSalary: "325.5",
+      housingAllowance: "50",
+      transportAllowance: "",
+      idNumber: "123456",
+      residenceNumber: "123456",
+      residenceExpiry: "2028-02-29",
+      visaNumber: "V991",
+      visaExpiry: "2029-06-15",
+      address: "مسقط",
+      employerKind: "COMPANY",
+      jobTitle: "7",
+    });
     expect(worker.passportNumber).toBe("");
+  });
+
+  it("does not copy the civil number onto residence for Omanis", () => {
+    const worker = normalizeLabourWorker({ fullName: "مواطن", nationality: "OM", idNumber: "111", idExpiry: "2030-01-01" });
+    expect(worker).toMatchObject({ residenceNumber: "", residenceExpiry: "", idNumber: "111" });
+  });
+
+  it("keeps an explicit residence number over the civil number", () => {
+    const worker = normalizeLabourWorker({
+      fullName: "Worker",
+      nationality: "PK",
+      idNumber: "111",
+      idExpiry: "2030-01-01",
+      residenceNumber: "R-222",
+      residenceExpiry: "2027-05-01",
+    });
+    expect(worker).toMatchObject({ residenceNumber: "R-222", residenceExpiry: "2027-05-01" });
   });
 });
 

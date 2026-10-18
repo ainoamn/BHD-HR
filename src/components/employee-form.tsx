@@ -64,9 +64,19 @@ export async function EmployeeForm({
     nationalities.push({ value: nationalityValue, label: nationalityValue, hint: "" });
   }
   const other = lang === "en" ? "ar" : "en";
-  const catalogOptions = (list: { id: string; nameAr: string; nameEn: string | null }[]) =>
+  const catalogOptions = (list: { id: string; nameAr: string; nameEn: string | null; code?: string | null; skillClass?: string | null }[], withCode = false) =>
     list
-      .map((item) => ({ value: item.id, label: termText(item.nameAr, item.nameEn, lang) || item.nameAr, hint: other === "en" ? item.nameEn : item.nameAr }))
+      .map((item) => {
+        const label = termText(item.nameAr, item.nameEn, lang) || item.nameAr;
+        const otherName = other === "en" ? item.nameEn : item.nameAr;
+        const codeHint = withCode && item.code ? item.code : null;
+        return {
+          value: item.id,
+          label: codeHint ? `${label} (${codeHint})` : label,
+          hint: [codeHint, otherName].filter(Boolean).join(" · ") || null,
+          keywords: [item.code, item.nameAr, item.nameEn, item.skillClass].filter(Boolean).join(" "),
+        };
+      })
       .sort((a, b) => a.label.localeCompare(b.label, lang));
   const overrides = leaveOverrides(employee?.leaveDays);
   const manageLink = (tab: string, label: string) =>
@@ -208,9 +218,10 @@ export async function EmployeeForm({
             </div>
             <SearchSelect
               name="jobTitleId"
-              options={catalogOptions(catalog.jobTitles)}
+              options={catalogOptions(catalog.jobTitles, true)}
               defaultValue={employee?.jobTitleId || ""}
               emptyLabel={t("غير محدد", "Not set")}
+              placeholder={t("ابحث بالاسم أو رمز المهنة…", "Search by name or occupation code…")}
               ariaLabel={t("المسمى الوظيفي", "Job title")}
             />
           </div>

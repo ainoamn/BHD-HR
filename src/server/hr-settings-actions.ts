@@ -28,6 +28,13 @@ async function readNames(formData: FormData, list: List) {
   return { nameAr: nameAr!, nameEn: clip(str(formData, "nameEn"), 120) };
 }
 
+function readJobExtras(formData: FormData) {
+  const raw = (clip(str(formData, "code"), 20) || "").replace(/\s+/g, "");
+  const skill = str(formData, "skillClass") || "";
+  const skillClass = ["1", "2", "3", "4", "5"].includes(skill) ? skill : null;
+  return { code: /^\d{4,12}$/.test(raw) ? raw : null, skillClass };
+}
+
 function isDuplicate(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
@@ -40,6 +47,7 @@ export async function saveCatalogEntry(formData: FormData) {
   const list: List = req(formData, "list") === "departments" ? "departments" : "jobs";
   const id = req(formData, "id");
   const names = await readNames(formData, list);
+  const extras = list === "jobs" ? readJobExtras(formData) : null;
   const isJob = list === "jobs";
   const label = isJob ? t("المسمى الوظيفي", "Job title") : t("القسم", "Department");
   try {
@@ -51,8 +59,11 @@ export async function saveCatalogEntry(formData: FormData) {
       await prisma.$transaction(
         isJob
           ? [
-              prisma.jobTitle.update({ where: { id }, data: names }),
-              prisma.employee.updateMany({ where: { jobTitleId: id, companyId: user.companyId }, data: { jobTitle: names.nameAr, jobTitleEn: names.nameEn } }),
+              prisma.jobTitle.update({ where: { id }, data: { ...names, ...extras! } }),
+              prisma.employee.updateMany({
+                where: { jobTitleId: id, companyId: user.companyId },
+                data: { jobTitle: names.nameAr, jobTitleEn: names.nameEn, jobCode: extras!.code, jobClass: extras!.skillClass },
+              }),
             ]
           : [
               prisma.department.update({ where: { id }, data: names }),
@@ -61,12 +72,19 @@ export async function saveCatalogEntry(formData: FormData) {
       );
       await writeAudit({ userId: user.id, action: "CATALOG_UPDATE", message: t(`عدّل ${label}: ${existing!.nameAr} ← ${names.nameAr}`, `Updated ${label}: ${existing!.nameAr} → ${names.nameAr}`) });
     } else {
-      if (isJob) await prisma.jobTitle.create({ data: { ...names, companyId: user.companyId } });
+      if (isJob) await prisma.jobTitle.create({ data: { ...names, ...extras!, companyId: user.companyId } });
       else await prisma.department.create({ data: { ...names, companyId: user.companyId } });
       await writeAudit({ userId: user.id, action: "CATALOG_CREATE", message: t(`أضاف ${label}: ${names.nameAr}`, `Added ${label}: ${names.nameAr}`) });
     }
   } catch (error) {
-    if (isDuplicate(error)) go(back(list), { error: t(`«${names.nameAr}» موجود مسبقاً`, `"${names.nameAr}" already exists`) });
+    if (isDuplicate(error)) {
+      go(back(list), {
+        error: t(
+          extras?.code ? `الاسم أو رمز المهنة «${extras.code}» موجود مسبقاً` : `«${names.nameAr}» موجود مسبقاً`,
+          extras?.code ? `The name or occupation code "${extras.code}" already exists` : `"${names.nameAr}" already exists`,
+        ),
+      });
+    }
     throw error;
   }
   refreshAll();

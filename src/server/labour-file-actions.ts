@@ -45,7 +45,13 @@ function cleanWorker(raw: Record<string, unknown>) {
   const values: ImportValues = {};
   for (const key of LABOUR_FIELDS) values[key] = typeof raw[key] === "string" ? (raw[key] as string) : "";
   if (!values.fullName.trim() && values.nameEn.trim()) values.fullName = values.nameEn;
-  return checkRow(values, 0);
+  const row = checkRow(values, 0);
+  // Expatriate civil / resident-card number on MoL files is often printed once: keep it on residence too.
+  if (row.values.nationality && row.values.nationality !== "OM") {
+    if (!row.values.residenceNumber && row.values.idNumber) row.values.residenceNumber = row.values.idNumber;
+    if (!row.values.residenceExpiry && row.values.idExpiry) row.values.residenceExpiry = row.values.idExpiry;
+  }
+  return row;
 }
 
 /** Reads a Ministry of Labour file with AI; nothing is saved. Each worker on it comes back checked against the company's records. */

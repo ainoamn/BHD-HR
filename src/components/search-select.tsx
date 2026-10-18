@@ -6,7 +6,13 @@ import { normalizeSearchText as normalizeSearch } from "@/lib/search";
 import { useLang } from "./lang-provider";
 import { fieldClass } from "./ui";
 
-export type SelectOption = { value: string; label: string; hint?: string | null };
+export type SelectOption = {
+  value: string;
+  label: string;
+  hint?: string | null;
+  /** Extra text matched by search (e.g. occupation code) but not shown as the main label. */
+  keywords?: string | null;
+};
 
 /** Dispatch on the hidden input (`detail` = option value) to change the selection from outside, e.g. after reading a scan. */
 export const SEARCH_SELECT_SET = "searchselect:set";
@@ -56,10 +62,21 @@ export function SearchSelect({
 
   const filtered = useMemo(() => {
     const needle = normalizeSearch(query);
+    const digits = query.replace(/\s+/g, "");
     const matches = needle
-      ? options.filter((option) => normalizeSearch(option.label).includes(needle) || (option.hint && normalizeSearch(option.hint).includes(needle)))
+      ? options.filter((option) => {
+          if (normalizeSearch(option.label).includes(needle)) return true;
+          if (option.hint && normalizeSearch(option.hint).includes(needle)) return true;
+          if (option.keywords && normalizeSearch(option.keywords).includes(needle)) return true;
+          // Occupation codes: typing the first digits finds the job (e.g. 1120 → 1120001001).
+          if (/^\d+$/.test(digits) && option.keywords) {
+            const code = option.keywords.replace(/\s+/g, "");
+            if (code.startsWith(digits) || code.includes(digits)) return true;
+          }
+          return false;
+        })
       : options;
-    return emptyLabel && !needle ? [{ value: "", label: emptyLabel }, ...matches] : matches;
+    return emptyLabel && !needle ? [{ value: "", label: emptyLabel, hint: null, keywords: null }, ...matches] : matches;
   }, [options, query, emptyLabel]);
 
   useEffect(() => {

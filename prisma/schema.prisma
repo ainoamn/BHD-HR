@@ -376,6 +376,9 @@ model Employee {
   /// Names copied from the chosen JobTitle / Department so lists and prints need no join.
   jobTitle           String?
   jobTitleEn         String?
+  /// MoL occupation code and skill class copied from JobTitle when assigned.
+  jobCode            String?
+  jobClass           String?
   jobTitleId         String?
   jobTitleRef        JobTitle?           @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
   department         String?
@@ -435,6 +438,10 @@ model JobTitle {
   company       Company    @relation(fields: [companyId], references: [id])
   nameAr        String
   nameEn        String?
+  /// Ministry of Labour unified occupation code (رمز المهنة), e.g. 1120001001.
+  code          String?
+  /// Skill / fee class from the MoL guide: "1" | "2" | "3" (الفئة الأولى / الثانية / الثالثة).
+  skillClass    String?
   /// Bilingual job description (src/lib/job-description.ts), drafted by AI and edited by HR; shared by everyone with this title.
   description   Json?
   descriptionAt DateTime?
@@ -443,6 +450,8 @@ model JobTitle {
   createdAt     DateTime   @default(now())
 
   @@unique([companyId, nameAr])
+  @@unique([companyId, code])
+  @@index([companyId, code])
 }
 
 model Department {

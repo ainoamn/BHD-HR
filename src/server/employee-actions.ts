@@ -33,6 +33,8 @@ function jobFields(formData: FormData, catalog: Catalog) {
     jobTitleId: job?.id ?? null,
     jobTitle: job?.nameAr ?? null,
     jobTitleEn: job?.nameEn ?? null,
+    jobCode: job?.code ?? null,
+    jobClass: job?.skillClass ?? null,
     departmentId: department?.id ?? null,
     department: department?.nameAr ?? null,
     departmentEn: department?.nameEn ?? null,

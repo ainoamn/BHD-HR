@@ -300,13 +300,13 @@ export const HELP_TOPICS: HelpTopic[] = [
     ),
     steps: [
       b("الموظفون ← «إضافة دفعة (Excel / PDF)».", "Employees → “Bulk add (Excel / PDF)”."),
-      b("ملفات وزارة العمل: اختر ملفاً أو أكثر (PDF أو صور). يقرأ الذكاء الاصطناعي كل عامل: الاسم، الجنسية، الرقم المدني، الجواز، المهنة، تصريح العمل، الكفيل.", "Ministry of Labour files: choose one or more (PDF or images). AI reads each worker: name, nationality, civil number, passport, occupation, work permit, sponsor."),
+      b("ملفات وزارة العمل: اختر ملفاً أو أكثر (PDF أو صور). يقرأ الذكاء الاصطناعي كل عامل: الاسم، الجنسية، الرقم المدني، الجواز، الإقامة، التأشيرة، المهنة، تصريح العمل، الراتب والبدلات، العنوان، والكفيل — وتُحفظ كلها في ملف الموظف.", "Ministry of Labour files: choose one or more (PDF or images). AI reads each worker: name, nationality, civil number, passport, residence, visa, occupation, work permit, salary and allowances, address and sponsor — all kept on the employee's file."),
       b("راجع البطاقة وعدّل ما يلزم. إن كان العامل مسجلاً يظهر تنبيه برابط ملفه: يُرفق الملف به دون تغيير بياناته، ويمكنك اختيار «حدّث بياناته أيضاً». ثم «حفظ الموظف» أو «حفظ الكل».", "Check each card and edit as needed. A worker already on record shows a warning with a link to their file: the file is attached without changing their data, or tick “Also update their data”. Then “Save employee” or “Save all”."),
       b("Excel: نزّل القالب أو ارفع قائمة العمال المصدّرة من بوابة الوزارة كما هي، ثم «فحص الملف». الصفوف المسجلة مسبقاً تظهر بلون مميز مع خيار «تحديث بيانات الموظفين الموجودين».", "Excel: download the template, or upload the worker list exported from the ministry portal as it is, then “Check file”. Rows already on record are highlighted, with the option “Update existing employees”."),
       b("بعد الحفظ تظهر البيانات الناقصة لكل موظف مع زر «أكمل».", "After saving, each employee's missing details are listed with a “Complete” button."),
     ],
     tips: [
-      b("الكفيل غير المسجل يُفتح تلقائياً باسمه ورقم سجله أو رقمه المدني، والموظف يُربط به. وتصريح العمل يُحفظ في وثائق الموظف مع تاريخ انتهائه.", "A sponsor not on record is opened automatically with its name and CR or civil number, and the employee is linked. The work permit is kept in the employee's documents with its expiry."),
+      b("الكفيل غير المسجل يُفتح تلقائياً باسمه ورقم سجله أو رقمه المدني، والموظف يُربط به. وتصريح العمل والتأشيرة يُحفظان في وثائق الموظف مع تاريخ انتهائهما. وللوافد، إن طُبع الرقم المدني مرة واحدة فقط يُنسخ أيضاً إلى رقم الإقامة.", "A sponsor not on record is opened automatically with its name and CR or civil number, and the employee is linked. The work permit and visa are kept in the employee's documents with their expiry. For an expatriate, a civil number printed only once is also kept as the residence number."),
       b("ملف وزارة العمل نفسه يُحفظ تلقائياً في مستندات الموظف باسم «مرفق بيانات وزارة العمل» (تبويب المستندات في ملفه). الملف الذي فيه عدة عمال يُرفق بكل واحد منهم. قراءة PDF تحتاج باقة تشمل الذكاء الاصطناعي.", "The ministry file itself is kept automatically in the employee's documents as “Ministry of Labour data attachment” (Documents tab of their file). A file listing several workers is attached to each of them. Reading PDFs needs a plan with AI."),
       b("التواريخ تُقبل بصيغة 2026-10-14 أو 14/10/2026 أو تاريخ Excel. حتى 500 صف في ملف Excel و20 ملف PDF في المرة.", "Dates may be 2026-10-14, 14/10/2026 or an Excel date. Up to 500 rows per Excel file and 20 PDFs at a time."),
     ],
@@ -858,14 +858,14 @@ export const HELP_TOPICS: HelpTopic[] = [
     shots: [{ file: "settings-hr", caption: b("تبويبات الموارد البشرية", "The HR tabs") }],
     steps: [
       b("الإعدادات ← «الموارد البشرية».", "Settings → “HR”."),
-      b("المسميات والأقسام: قوائم جاهزة؛ أضف أو عدّل (يتحدث عند كل موظف) أو احذف غير المستخدم.", "Job titles and departments: ready lists; add, edit (updates every employee) or delete unused ones."),
+      b("المسميات والأقسام: قوائم جاهزة؛ أضف أو عدّل (يتحدث عند كل موظف) أو احذف غير المستخدم. وللمسميات: ارفع PDF الدليل الموحد لتصنيف المهن من وزارة العمل فيتعرّف عليه النظام ويضيف كل المهن بالعربي والإنجليزي مع رمز المهنة والفئة؛ وابحث عن المسمى في ملف الموظف بالاسم أو بأول أرقام الرمز.", "Job titles and departments: ready lists; add, edit (updates every employee) or delete unused ones. For titles: upload the Ministry of Labour unified occupation classification PDF — the system recognises it and adds every occupation in Arabic and English with its code and class; search a title on the employee form by name or the first digits of the code."),
       b("أنواع الإجازات: الاسم، الأيام المستحقة، ولكل الوظائف أو لمسميات محددة.", "Leave types: name, days per year, and for all jobs or chosen titles."),
       b("وطريقة الاستحقاق: «رصيد ثابت»، أو «كامل الرصيد مع بداية كل سنة»، أو «يُكتسب شهرياً» (الأيام ÷ 12 كل شهر). وللسنوية والشهرية «حد الترحيل»: ما يزيد عنه من رصيد السنة يسقط في نهايتها، ويظهر المرحَّل والساقط في ملف الموظف.", "And how it is earned: “Fixed balance”, “Full balance every calendar year” or “Earned monthly” (days ÷ 12 each month). Yearly and monthly types take a “carry-over cap”: anything above it is forfeited at year end, and the carried and forfeited days show in the employee file."),
       b("العلاوات: مبلغ أو نسبة، شهرية أو ربعية أو سنوية، مع «إضافتها الآن لكل الموظفين».", "Allowances: amount or percentage, monthly, quarterly or yearly, with “Add to all employees now”."),
     ],
     tips: [b("اكتب الاسم بلغة واحدة فتكمل الأخرى تلقائياً.", "Type a name in one language and the other is filled in.")],
     related: ["add-employee", "settings"],
-    keywords: "مسميات أقسام أنواع الإجازات علاوات job titles departments leave types allowances",
+    keywords: "مسميات أقسام أنواع الإجازات علاوات دليل مهن تصنيف رمز المهنة فئة وزارة العمل job titles departments leave types allowances occupation classification code class ministry",
   },
   {
     slug: "roles",

@@ -41,8 +41,34 @@ export const IMPORT_COLUMNS: { key: string; ar: string; en: string; kind: Kind; 
   { key: "idExpiry", ar: "انتهاء البطاقة", en: "ID expiry", kind: "date", aliases: ["تاريخ انتهاء البطاقة", "انتهاء البطاقة الشخصية", "تاريخ انتهاء البطاقة الشخصية", "Civil ID expiry", "ID expiry date", "Card expiry"] },
   { key: "passportNumber", ar: "رقم الجواز", en: "Passport number", kind: "text", aliases: ["رقم جواز السفر", "جواز السفر", "Passport No", "Passport"] },
   { key: "passportExpiry", ar: "انتهاء الجواز", en: "Passport expiry", kind: "date", aliases: ["تاريخ انتهاء الجواز", "انتهاء جواز السفر", "تاريخ انتهاء جواز السفر", "Passport expiry date"] },
-  { key: "residenceNumber", ar: "رقم الإقامة", en: "Residence number", kind: "text", aliases: ["Residence No", "Residence permit number"] },
-  { key: "residenceExpiry", ar: "انتهاء الإقامة", en: "Residence expiry", kind: "date", aliases: ["تاريخ انتهاء الاقامة", "Residence expiry date"] },
+  {
+    key: "residenceNumber",
+    ar: "رقم الإقامة",
+    en: "Residence number",
+    kind: "text",
+    aliases: ["رقم بطاقة الاقامة", "رقم بطاقة المقيم", "رقم الاقامة", "Residence No", "Residence permit number", "Resident card number", "Residency number"],
+  },
+  {
+    key: "residenceExpiry",
+    ar: "انتهاء الإقامة",
+    en: "Residence expiry",
+    kind: "date",
+    aliases: ["تاريخ انتهاء الاقامة", "انتهاء بطاقة الاقامة", "انتهاء بطاقة المقيم", "Residence expiry date", "Resident card expiry", "Residency expiry"],
+  },
+  {
+    key: "visaNumber",
+    ar: "رقم التأشيرة",
+    en: "Visa number",
+    kind: "text",
+    aliases: ["رقم التاشيرة", "رقم تاشيرة العمل", "رقم تاشيرة الدخول", "Visa No", "Visa", "Entry visa number", "Employment visa number"],
+  },
+  {
+    key: "visaExpiry",
+    ar: "انتهاء التأشيرة",
+    en: "Visa expiry",
+    kind: "date",
+    aliases: ["تاريخ انتهاء التاشيرة", "انتهاء التاشيرة", "Visa expiry date", "Visa validity"],
+  },
   {
     key: "workPermitNumber",
     ar: "رقم تصريح العمل",
@@ -69,11 +95,18 @@ export const IMPORT_COLUMNS: { key: string; ar: string; en: string; kind: Kind; 
   },
   { key: "contractEnd", ar: "نهاية العقد", en: "Contract end", kind: "date", aliases: ["تاريخ انتهاء العقد", "انتهاء العقد", "Contract expiry", "Contract end date"] },
   { key: "basicSalary", ar: "الراتب الأساسي", en: "Basic salary", kind: "money", salary: true, aliases: ["الراتب", "الاجر", "الاجر الاساسي", "Salary", "Basic", "Wage", "Basic wage"] },
-  { key: "housingAllowance", ar: "بدل السكن", en: "Housing allowance", kind: "money", salary: true, aliases: ["Housing"] },
-  { key: "transportAllowance", ar: "بدل النقل", en: "Transport allowance", kind: "money", salary: true, aliases: ["بدل المواصلات", "Transport"] },
+  { key: "housingAllowance", ar: "بدل السكن", en: "Housing allowance", kind: "money", salary: true, aliases: ["بدل السكن الشهري", "Housing", "Housing allowance"] },
+  { key: "transportAllowance", ar: "بدل النقل", en: "Transport allowance", kind: "money", salary: true, aliases: ["بدل المواصلات", "بدل النقل الشهري", "Transport", "Transport allowance"] },
   { key: "otherAllowance", ar: "بدلات أخرى", en: "Other allowances", kind: "money", salary: true },
   { key: "bankBic", ar: "البنك", en: "Bank", kind: "bank", salary: true, aliases: ["اسم البنك", "Bank name"] },
   { key: "bankAccount", ar: "رقم الحساب", en: "Account number", kind: "account", salary: true, aliases: ["رقم الحساب البنكي", "Account No", "IBAN"] },
+  {
+    key: "address",
+    ar: "العنوان",
+    en: "Address",
+    kind: "text",
+    aliases: ["عنوان العامل", "عنوان السكن", "مكان الاقامة", "العنوان في السلطنة", "Address in Oman", "Residential address", "Worker address"],
+  },
   {
     key: "employerName",
     ar: "الكفيل",
@@ -149,7 +182,7 @@ function readBank(value: string) {
   return bank ? bank.bic : null;
 }
 
-const LONG_TEXT = new Set(["fullName", "nameEn", "employerName", "employerNameEn"]);
+const LONG_TEXT = new Set(["fullName", "nameEn", "employerName", "employerNameEn", "address"]);
 
 /** COMPANY or PERSON from "شركة", "فرد", "Individual"...; "" when the text says neither. */
 export function readEmployerKind(value: string) {

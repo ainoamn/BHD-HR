@@ -165,6 +165,28 @@ export async function aiReadDocument(data: Uint8Array, mediaType: string): Promi
 }
 
 /**
+ * Recognises a Ministry of Labour occupation-classification PDF from a text sample when the heuristic parser
+ * is unsure: UNIFIED = the bilingual guide with codes and skill classes; COMPARISON = old→new code mapping.
+ */
+export async function aiDetectOccupationFile(sample: string): Promise<"UNIFIED" | "COMPARISON" | "UNKNOWN"> {
+  const { text } = await generateText({
+    model: MODEL,
+    temperature: 0,
+    system: [
+      "You classify PDF text from the Ministry of Labour of Oman about occupations.",
+      'Reply with JSON only: {"kind":"UNIFIED"} or {"kind":"COMPARISON"} or {"kind":"UNKNOWN"}.',
+      "UNIFIED: the unified occupation classification with occupation code, Arabic name, English name, and skill class (First/Second/Third Class).",
+      "COMPARISON: a mapping from old occupation codes to new ones.",
+      "UNKNOWN: anything else.",
+    ].join(" "),
+    prompt: sample.slice(0, 6000),
+  });
+  const parsed = parseJson<{ kind?: unknown }>(text, "{");
+  const kind = typeof parsed?.kind === "string" ? parsed.kind.toUpperCase() : "";
+  return kind === "UNIFIED" || kind === "COMPARISON" ? kind : "UNKNOWN";
+}
+
+/**
  * Which field each spreadsheet column holds, from its header and a few sample values; `fields` lists the keys
  * the import knows. Unrecognised columns come back as null.
  */
@@ -200,6 +222,10 @@ export const LABOUR_FIELDS = [
   "idExpiry",
   "passportNumber",
   "passportExpiry",
+  "residenceNumber",
+  "residenceExpiry",
+  "visaNumber",
+  "visaExpiry",
   "workPermitNumber",
   "workPermitExpiry",
   "jobTitle",
@@ -207,6 +233,9 @@ export const LABOUR_FIELDS = [
   "joiningDate",
   "contractEnd",
   "basicSalary",
+  "housingAllowance",
+  "transportAllowance",
+  "address",
   "employerName",
   "employerNameEn",
   "employerIdNumber",
@@ -215,7 +244,18 @@ export const LABOUR_FIELDS = [
 
 export type LabourWorker = Record<(typeof LABOUR_FIELDS)[number], string>;
 
-const LABOUR_DATES = new Set(["dateOfBirth", "idExpiry", "passportExpiry", "workPermitExpiry", "joiningDate", "contractEnd"]);
+const LABOUR_DATES = new Set([
+  "dateOfBirth",
+  "idExpiry",
+  "passportExpiry",
+  "residenceExpiry",
+  "visaExpiry",
+  "workPermitExpiry",
+  "joiningDate",
+  "contractEnd",
+]);
+const LABOUR_MONEY = new Set(["basicSalary", "housingAllowance", "transportAllowance"]);
+const LABOUR_NUMBERS = new Set(["idNumber", "passportNumber", "residenceNumber", "visaNumber", "workPermitNumber", "employerIdNumber"]);
 
 /**
  * Workers printed on an Omani Ministry of Labour document (worker data, labour card, work permit / clearance,
@@ -230,8 +270,8 @@ export async function aiReadLabourFile(data: Uint8Array, mediaType: string): Pro
       "You read documents issued by the Ministry of Labour of the Sultanate of Oman (worker data printouts, labour cards, work permits / labour clearances, lists of an establishment's workers, employment contracts) for an HR system, and copy the printed data exactly. Never guess: leave a field empty when it is not clearly printed.",
       "Return one entry in workers per worker on the document (a list may have many; read every row).",
       "fullName: the worker's name in Arabic script; nameEn: in Latin script as printed. nationality: ISO 3166 alpha-2 code (OM, IN, PK, BD, NP, LK, PH, EG...). gender: MALE or FEMALE.",
-      "idNumber: the worker's civil number / resident card number; idExpiry: its expiry. passportNumber / passportExpiry: the passport. workPermitNumber: the work permit / labour card / clearance number; workPermitExpiry: its expiry.",
-      "jobTitle: the occupation in Arabic, jobTitleEn in English. joiningDate: start of employment or registration; contractEnd: end of contract. basicSalary: the monthly basic wage in Omani rials as a plain number.",
+      "idNumber: the worker's civil number / resident card number; idExpiry: its expiry. passportNumber / passportExpiry: the passport. residenceNumber / residenceExpiry: the residence / residency card when printed separately from the civil number. visaNumber / visaExpiry: the entry or employment visa when printed. workPermitNumber: the work permit / labour card / clearance number; workPermitExpiry: its expiry.",
+      "jobTitle: the occupation in Arabic, jobTitleEn in English. joiningDate: start of employment or registration; contractEnd: end of contract. basicSalary: the monthly basic wage in Omani rials as a plain number; housingAllowance and transportAllowance when printed. address: the worker's address in Oman when printed.",
       "employerName: the employer / sponsor / establishment name in Arabic (or as printed), employerNameEn in English; employerIdNumber: its commercial registration (CR) or, for an individual sponsor, civil number; employerKind: COMPANY for a company or establishment, PERSON for an individual sponsor, else empty.",
       "Dates are YYYY-MM-DD (Gregorian; convert Hijri only if no Gregorian date is printed). Numbers in Latin digits without spaces. title: the document's title as printed.",
       `Reply with JSON only: {"title":"","workers":[{${LABOUR_FIELDS.map((key) => `"${key}":""`).join(",")}}]}`,
@@ -268,12 +308,17 @@ export function normalizeLabourWorker(item: Record<string, unknown>): LabourWork
       value = value.toUpperCase();
       const allowed = key === "gender" ? ["MALE", "FEMALE"] : ["COMPANY", "PERSON"];
       if (!allowed.includes(value)) value = "";
-    } else if (key === "basicSalary") {
+    } else if (LABOUR_MONEY.has(key)) {
       const amount = Number(value.replace(/[^\d.]/g, ""));
       value = value && Number.isFinite(amount) && amount > 0 && amount < 1_000_000 ? String(amount) : "";
-    } else if (["idNumber", "passportNumber", "workPermitNumber", "employerIdNumber"].includes(key)) value = value.replace(/\s+/g, "").slice(0, 40);
+    } else if (LABOUR_NUMBERS.has(key)) value = value.replace(/\s+/g, "").slice(0, 40);
     else value = value.replace(/\s+/g, " ").slice(0, 150);
     worker[key] = value;
+  }
+  // On MoL files the expatriate's civil / resident-card number is often only printed once: keep it on the residence fields too.
+  if (worker.nationality && worker.nationality !== "OM") {
+    if (!worker.residenceNumber && worker.idNumber) worker.residenceNumber = worker.idNumber;
+    if (!worker.residenceExpiry && worker.idExpiry) worker.residenceExpiry = worker.idExpiry;
   }
   return worker;
 }

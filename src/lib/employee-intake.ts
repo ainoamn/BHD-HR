@@ -136,15 +136,30 @@ async function findOrCreate<T extends { id: string; nameAr: string; nameEn: stri
 }
 
 const DATE_FIELDS = ["dateOfBirth", "idExpiry", "passportExpiry", "residenceExpiry", "joiningDate", "contractEnd"] as const;
-const TEXT_FIELDS = ["fullName", "nameEn", "nationality", "gender", "phone", "email", "idNumber", "passportNumber", "residenceNumber"] as const;
+const TEXT_FIELDS = ["fullName", "nameEn", "nationality", "gender", "phone", "email", "address", "idNumber", "passportNumber", "residenceNumber"] as const;
 const MONEY_FIELDS = ["basicSalary", "housingAllowance", "transportAllowance", "otherAllowance"] as const;
+
+/** Creates or updates a typed document (work permit, visa…) by number; empty values never clear an existing field. */
+async function upsertTypedDocument(employeeId: string, type: string, documentNo: string | null, expiryDate: Date | null) {
+  if (!documentNo && !expiryDate) return;
+  const docs = await prisma.employeeDocument.findMany({ where: { employeeId, type }, orderBy: { createdAt: "desc" } });
+  const same = docs.find((doc) => (documentNo ? upper(doc.documentNo ?? "") === upper(documentNo) : !doc.documentNo)) ?? (documentNo ? undefined : docs[0]);
+  if (same) {
+    const data: { documentNo?: string; expiryDate?: Date } = {};
+    if (documentNo && !same.documentNo) data.documentNo = documentNo;
+    if (expiryDate) data.expiryDate = expiryDate;
+    if (Object.keys(data).length) await prisma.employeeDocument.update({ where: { id: same.id }, data });
+  } else {
+    await prisma.employeeDocument.create({ data: { employeeId, type, documentNo, expiryDate } });
+  }
+}
 
 export type IntakeResult = { employee: Employee; created: boolean; sponsor: { name: string; created: boolean } | null };
 
 /**
  * Creates the employee, or updates `existingId` with the values the row has (empty values never clear a field).
- * A work permit number or expiry is kept as a WORK_PERMIT document; `file` (a stored /files/ URL) is attached to it,
- * or kept as its own document when the file has no permit data.
+ * A work permit or visa number/expiry is kept as a WORK_PERMIT / VISA document. `file` (a stored /files/ URL) is
+ * attached as the Ministry of Labour data attachment (MOL_FILE).
  */
 export async function saveIntake(ctx: IntakeContext, values: ImportValues, existingId: string | null, file?: { url: string; note: string }): Promise<IntakeResult> {
   const job = await findOrCreate(ctx.jobs, values.jobTitle, values.jobTitleEn, (nameAr, nameEn) => prisma.jobTitle.create({ data: { companyId: ctx.companyId, nameAr, nameEn } }));
@@ -158,7 +173,7 @@ export async function saveIntake(ctx: IntakeContext, values: ImportValues, exist
     if (values.bankBic) data.bankBic = values.bankBic;
     if (values.bankAccount) data.bankAccount = values.bankAccount;
   }
-  if (job) Object.assign(data, { jobTitleId: job.id, jobTitle: job.nameAr, jobTitleEn: job.nameEn });
+  if (job) Object.assign(data, { jobTitleId: job.id, jobTitle: job.nameAr, jobTitleEn: job.nameEn, jobCode: job.code ?? null, jobClass: job.skillClass ?? null });
   if (department) Object.assign(data, { departmentId: department.id, department: department.nameAr, departmentEn: department.nameEn });
   if (sponsor.employer) data.employerId = sponsor.employer.id;
 

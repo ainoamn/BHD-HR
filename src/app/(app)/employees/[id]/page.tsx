@@ -43,6 +43,7 @@ import { describeExpiry, worstExpiry } from "@/lib/expiry";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
+import { skillClassLabel } from "@/lib/occupation-guide";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import {
   attendanceChoiceOf,
@@ -235,6 +236,8 @@ export default async function EmployeePage({
   const otherName = lang === "en" ? employee.fullName : employee.nameEn;
   const secondName = otherName && otherName.trim().toLowerCase() !== displayName.trim().toLowerCase() ? otherName : null;
   const jobTitle = termText(employee.jobTitle, employee.jobTitleEn, lang);
+  const jobClass = skillClassLabel(employee.jobClass, lang);
+  const jobMeta = [employee.jobCode, jobClass].filter(Boolean).join(" · ");
   const department = termText(employee.department, employee.departmentEn, lang);
   const base = `/employees/${employee.id}`;
   const origin = await requestOrigin();
@@ -361,6 +364,7 @@ export default async function EmployeePage({
             <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200">
               <BriefcaseBusiness size={13} className="text-slate-400" />
               {jobTitle}
+              {jobMeta ? <span className="font-mono text-[11px] text-slate-500" dir="ltr">{jobMeta}</span> : null}
             </span>
           ) : null}
           {department ? <span className="inline-flex items-center rounded-full bg-surface px-3 py-1 text-slate-700 ring-1 ring-slate-200">{department}</span> : null}
@@ -588,7 +592,25 @@ export default async function EmployeePage({
                       )
                     }
                   />
-                  <Info label={t("المسمى الوظيفي", "Job title")} value={text(jobTitle)} />
+                  <Info
+                    label={t("المسمى الوظيفي", "Job title")}
+                    value={
+                      jobTitle ? (
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span>{jobTitle}</span>
+                          {jobMeta ? (
+                            <span className="text-xs font-normal text-slate-500" dir="ltr">
+                              {employee.jobCode ? `${t("رمز المهنة", "Code")}: ${employee.jobCode}` : null}
+                              {employee.jobCode && jobClass ? " · " : null}
+                              {jobClass || null}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        "—"
+                      )
+                    }
+                  />
                   <Info label={t("القسم", "Department")} value={text(department)} />
                   <Info
                     label={t("المدير المباشر", "Direct manager")}

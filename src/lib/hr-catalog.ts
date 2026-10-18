@@ -52,7 +52,7 @@ async function ensureCatalog(companyId: string) {
             job = await tx.jobTitle.create({ data: { companyId, nameAr: jobText } });
             jobTitles.push(job);
           }
-          Object.assign(data, { jobTitleId: job.id, jobTitle: job.nameAr, jobTitleEn: job.nameEn });
+          Object.assign(data, { jobTitleId: job.id, jobTitle: job.nameAr, jobTitleEn: job.nameEn, jobCode: job.code ?? null, jobClass: job.skillClass ?? null });
         }
         const departmentText = employee.department?.trim();
         if (departmentText) {
