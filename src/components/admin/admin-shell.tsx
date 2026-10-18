@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Activity, ArrowRight, Building2, CreditCard, Crown, History, LayoutDashboard, Layers, Menu, Search, Settings2, Users, X } from "lucide-react";
+import { GetForm } from "@/components/get-form";
 import { useLang } from "@/components/lang-provider";
 import { cn } from "@/lib/utils";
 
@@ -159,7 +160,7 @@ export function AdminShell({ adminName, adminEmail, pendingPayments, tools, chil
               {pendingPayments ? <span className="absolute top-1.5 end-1.5 size-2.5 rounded-full bg-gold-400 ring-2 ring-sand-50" /> : null}
             </button>
             <p className="min-w-0 flex-1 truncate text-[0.95rem] font-bold text-slate-900 md:hidden">{current ? t(current.ar, current.en) : t("إدارة المنصة", "Platform admin")}</p>
-            <form action="/admin/search" className="relative hidden min-w-0 max-w-md flex-1 md:block" role="search">
+            <GetForm action="/admin/search" role="search" className="relative hidden min-w-0 max-w-md flex-1 md:block">
               <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 name="q"
@@ -168,7 +169,7 @@ export function AdminShell({ adminName, adminEmail, pendingPayments, tools, chil
                 placeholder={t("ابحث عن شركة، مستخدم، إيصال…", "Find a company, user, receipt…")}
                 aria-label={t("بحث في المنصة", "Search the platform")}
               />
-            </form>
+            </GetForm>
             <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Link href="/admin/search" aria-label={t("بحث", "Search")} className="flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-surface text-slate-600 shadow-card md:hidden">
                 <Search size={17} />

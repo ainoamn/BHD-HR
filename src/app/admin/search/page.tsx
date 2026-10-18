@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, CreditCard, Search, Users } from "lucide-react";
 import { Monogram } from "@/components/admin/admin-ui";
+import { GetForm } from "@/components/get-form";
 import { Card, PageHeader, SectionTitle, ToneBadge, fieldClass, primaryBtn } from "@/components/ui";
 import { getI18n } from "@/lib/lang";
 import { receiptNumber } from "@/lib/platform";
@@ -42,7 +43,7 @@ export default async function AdminSearch({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-5">
       <PageHeader icon={Search} title={t("بحث في المنصة", "Search the platform")} description={t("ابحث عن شركة (الاسم، السجل التجاري، البريد، الهاتف، IP)، أو مستخدم، أو إيصال (INV-000123 أو مرجع التحويل).", "Find a company (name, CR, email, phone, IP), a user, or a receipt (INV-000123 or transfer reference).")} />
-      <form action="/admin/search" className="flex gap-2" role="search">
+      <GetForm action="/admin/search" className="flex gap-2" role="search">
         <label className="relative min-w-0 flex-1">
           <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input name="q" type="search" defaultValue={q} autoFocus className={`${fieldClass} w-full ps-9`} placeholder={t("اكتب للبحث…", "Type to search…")} aria-label={t("بحث", "Search")} />
@@ -50,7 +51,7 @@ export default async function AdminSearch({ searchParams }: { searchParams: Prom
         <button type="submit" className={primaryBtn}>
           {t("بحث", "Search")}
         </button>
-      </form>
+      </GetForm>
 
       {q ? <p className="text-sm text-slate-500">{t(`${found} نتيجة لـ «${q}»`, `${found} result(s) for “${q}”`)}</p> : null}
 

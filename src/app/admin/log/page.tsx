@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { History, Search } from "lucide-react";
 import { FilterChips, Pager } from "@/components/admin/admin-ui";
+import { GetForm } from "@/components/get-form";
 import { Card, EmptyState, PageHeader, Toolbar, fieldClass, secondaryBtn } from "@/components/ui";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
@@ -60,7 +61,7 @@ export default async function AdminLog({ searchParams }: { searchParams: Promise
     <div className="space-y-5">
       <PageHeader icon={History} title={t("سجل الإدارة", "Admin log")} description={t("كل ما فعله مديرو المنصة وطلبات الدفع الواردة، مع عنوان IP.", "Everything platform admins did and incoming payment requests, with IP address.")} />
       <Toolbar className="space-y-3">
-        <form className="flex gap-2" action="/admin/log">
+        <GetForm className="flex gap-2" action="/admin/log">
           {group ? <input type="hidden" name="group" value={group} /> : null}
           <label className="relative min-w-0 flex-1">
             <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -69,7 +70,7 @@ export default async function AdminLog({ searchParams }: { searchParams: Promise
           <button type="submit" className={secondaryBtn}>
             {t("بحث", "Search")}
           </button>
-        </form>
+        </GetForm>
         <FilterChips items={chips} label={t("نوع الإجراء", "Action type")} />
       </Toolbar>
 

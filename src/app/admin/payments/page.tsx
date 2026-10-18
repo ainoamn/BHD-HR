@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { AlertTriangle, Banknote, CircleX, CreditCard, Hourglass, Search } from "lucide-react";
 import { CellLabel, FilterChips, Pager, Row, RowList } from "@/components/admin/admin-ui";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { SubmitButton } from "@/components/submit-button";
 import { EmptyState, PageHeader, Stat, ToneBadge, Toolbar, fieldClass, secondaryBtn } from "@/components/ui";
 import { cardPaymentsReady, thawaniConfig } from "@/lib/billing";
@@ -110,7 +111,7 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
       </p>
 
       <Toolbar className="space-y-3">
-        <form className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]" action="/admin/payments">
+        <GetForm className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]" action="/admin/payments">
           {status ? <input type="hidden" name="status" value={status} /> : null}
           <label className="relative min-w-0">
             <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -128,7 +129,7 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
           <button type="submit" className={secondaryBtn}>
             {t("تطبيق", "Apply")}
           </button>
-        </form>
+        </GetForm>
         <FilterChips items={chips} label={t("تصفية حسب الحالة", "Filter by status")} />
       </Toolbar>
 

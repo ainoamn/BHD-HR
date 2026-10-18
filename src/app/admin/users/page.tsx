@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { Search, Users } from "lucide-react";
 import { CellLabel, FilterChips, Monogram, Pager, Row, RowList } from "@/components/admin/admin-ui";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { SubmitButton } from "@/components/submit-button";
 import { EmptyState, PageHeader, ToneBadge, Toolbar, fieldClass, secondaryBtn } from "@/components/ui";
 import { pick } from "@/lib/i18n";
@@ -86,7 +87,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
       <PageHeader icon={Users} title={t("المستخدمون", "Users")} description={t("كل حسابات الدخول على المنصة، وأدوارها في كل شركة على حدة.", "Every sign-in account on the platform, and its role in each company separately.")} />
       <Flash error={sp.error} message={sp.message} />
       <Toolbar className="space-y-3">
-        <form className="flex gap-2" action="/admin/users">
+        <GetForm className="flex gap-2" action="/admin/users">
           {kind ? <input type="hidden" name="kind" value={kind} /> : null}
           <label className="relative min-w-0 flex-1">
             <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -95,7 +96,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
           <button type="submit" className={secondaryBtn}>
             {t("بحث", "Search")}
           </button>
-        </form>
+        </GetForm>
         <FilterChips items={chips} label={t("نوع الحساب", "Account type")} />
       </Toolbar>
 
