@@ -53,6 +53,30 @@ describe("rows", () => {
   });
 });
 
+describe("work permit register", () => {
+  it("reads the Ministry work-permit Excel headers and skips cancelled permits", () => {
+    const header = ["رقم ترخيص مزاولة العمل", "الرقم المدني", "اسم العامل الوافد", "جواز السفر", "رقم التأشيرة", "رمز المهنة", "اسم المهنة", "تاريخ الإصدار", "تاريخ الإنتهاء", "تاريخ الإصدار", "منقول", "حالة ترخيص مزاولة العمل"];
+    const { rows, missingName } = readTable([
+      header,
+      ["12841555", "125267376", "مد شاون خان", "a00697803", "68630208", "9412001001", "عامل تنظيف - أدوات مطبخ", "26-04-2022", "23-05-2028", "", "غير منقول", "نشط"],
+      ["12119318", "83517116", "ستيندرا سينغ", "r0483091", "3393399", "8143013", "سائق عموم اليات الطرق", "26-03-2019", "25-03-2021", "", "غير منقول", "تم الإلغاء"],
+    ]);
+    expect(missingName).toBe(false);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].errors).toEqual([]);
+    expect(rows[0].values).toMatchObject({
+      fullName: "مد شاون خان",
+      idNumber: "125267376",
+      passportNumber: "a00697803",
+      visaNumber: "68630208",
+      jobCode: "9412001001",
+      jobTitle: "عامل تنظيف - أدوات مطبخ",
+      workPermitNumber: "12841555",
+      workPermitExpiry: "2028-05-23",
+    });
+  });
+});
+
 describe("ministry of labour sheets", () => {
   it("finds the header below title rows and reads the ministry's column names", () => {
     const { rows, missingName } = readTable([

@@ -163,18 +163,26 @@ export type IntakeResult = { employee: Employee; created: boolean; sponsor: { na
  */
 export async function saveIntake(ctx: IntakeContext, values: ImportValues, existingId: string | null, file?: { url: string; note: string }): Promise<IntakeResult> {
   const titled = values.jobTitle?.trim() || values.jobTitleEn?.trim() || "";
-  const catalogJob = titled
-    ? ctx.jobs.find(
-        (entry) =>
-          (entry.code && plain(entry.code) === plain(titled)) ||
-          plain(entry.nameAr) === plain(titled) ||
-          plain(entry.nameEn) === plain(titled) ||
-          (values.jobTitleEn && plain(entry.nameEn) === plain(values.jobTitleEn)),
-      )
+  const occupationCode = values.jobCode?.trim();
+  const catalogJob = occupationCode
+    ? ctx.jobs.find((entry) => entry.code && plain(entry.code) === plain(occupationCode))
     : undefined;
-  const job =
+  const namedJob =
     catalogJob ??
-    (await findOrCreate(ctx.jobs, values.jobTitle, values.jobTitleEn, (nameAr, nameEn) => prisma.jobTitle.create({ data: { companyId: ctx.companyId, nameAr, nameEn } })));
+    (titled
+      ? ctx.jobs.find(
+          (entry) =>
+            (entry.code && plain(entry.code) === plain(titled)) ||
+            plain(entry.nameAr) === plain(titled) ||
+            plain(entry.nameEn) === plain(titled) ||
+            (values.jobTitleEn && plain(entry.nameEn) === plain(values.jobTitleEn)),
+        )
+      : undefined);
+  const job =
+    namedJob ??
+    (await findOrCreate(ctx.jobs, values.jobTitle, values.jobTitleEn, (nameAr, nameEn) =>
+      prisma.jobTitle.create({ data: { companyId: ctx.companyId, nameAr, nameEn, code: occupationCode ? occupationCode.slice(0, 40) : null } }),
+    ));
   const department = await findOrCreate(ctx.departments, values.department, undefined, (nameAr) => prisma.department.create({ data: { companyId: ctx.companyId, nameAr } }));
   const sponsor = await resolveSponsor(ctx, values);
   const data: Prisma.EmployeeUncheckedUpdateInput = {};

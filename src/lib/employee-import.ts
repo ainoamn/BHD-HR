@@ -23,7 +23,7 @@ export const IMPORT_COLUMNS: { key: string; ar: string; en: string; kind: Kind; 
     en: "Full name",
     kind: "text",
     required: true,
-    aliases: ["اسم العامل", "اسم الموظف", "الاسم", "الاسم بالعربي", "الاسم بالعربية", "الاسم العربي", "Worker name", "Employee name", "Name", "Arabic name", "Name Arabic"],
+    aliases: ["اسم العامل", "اسم العامل الوافد", "اسم العامل العماني", "اسم الوافد", "اسم الموظف", "الاسم", "الاسم بالعربي", "الاسم بالعربية", "الاسم العربي", "Worker name", "Employee name", "Name", "Arabic name", "Name Arabic"],
   },
   { key: "nameEn", ar: "الاسم بالإنجليزية", en: "Name in English", kind: "text", aliases: ["الاسم بالانجليزي", "الاسم الانجليزي", "English name", "Name English", "Worker name English"] },
   { key: "nationality", ar: "الجنسية", en: "Nationality", kind: "nationality", aliases: ["البلد", "Country"] },
@@ -80,16 +80,18 @@ export const IMPORT_COLUMNS: { key: string; ar: string; en: string; kind: Kind; 
     ar: "رقم تصريح العمل",
     en: "Work permit number",
     kind: "text",
-    aliases: ["رقم ترخيص العمل", "رقم الترخيص", "رقم بطاقة العمل", "رقم بطاقة العمل للعامل", "Work permit No", "Labour card number", "Labour card No", "Labor card number", "Permit number", "Permit No"],
+    aliases: ["رقم ترخيص العمل", "رقم ترخيص مزاولة العمل", "رقم الترخيص", "رقم بطاقة العمل", "رقم بطاقة العمل للعامل", "Work permit No", "Labour card number", "Labour card No", "Labor card number", "Permit number", "Permit No"],
   },
   {
     key: "workPermitExpiry",
     ar: "انتهاء تصريح العمل",
     en: "Work permit expiry",
     kind: "date",
-    aliases: ["تاريخ انتهاء تصريح العمل", "تاريخ انتهاء الترخيص", "انتهاء الترخيص", "تاريخ انتهاء بطاقة العمل", "Labour card expiry", "Labor card expiry", "Permit expiry", "Permit expiry date", "Work permit expiry date"],
+    aliases: ["تاريخ انتهاء تصريح العمل", "تاريخ انتهاء الترخيص", "انتهاء الترخيص", "تاريخ انتهاء بطاقة العمل", "تاريخ الانتهاء", "تاريخ إنتهاء الترخيص", "Labour card expiry", "Labor card expiry", "Permit expiry", "Permit expiry date", "Work permit expiry date"],
   },
-  { key: "jobTitle", ar: "المسمى الوظيفي", en: "Job title", kind: "text", aliases: ["المهنة", "الوظيفة", "المسمى", "Occupation", "Profession", "Designation", "Position", "Job"] },
+  { key: "jobTitle", ar: "المسمى الوظيفي", en: "Job title", kind: "text", aliases: ["المهنة", "اسم المهنة", "الوظيفة", "المسمى", "Occupation", "Profession", "Designation", "Position", "Job"] },
+  { key: "jobCode", ar: "رمز المهنة", en: "Occupation code", kind: "text", aliases: ["رمز المهنه", "كود المهنة", "Occupation code", "Job code", "Profession code"] },
+  { key: "permitStatus", ar: "حالة الترخيص", en: "Permit status", kind: "text", aliases: ["حالة ترخيص مزاولة العمل", "حالة تصريح العمل", "Permit status", "Licence status"] },
   { key: "jobTitleEn", ar: "المسمى بالإنجليزية", en: "Job title in English", kind: "text", aliases: ["المهنة بالانجليزي", "Occupation English", "Profession English"] },
   { key: "department", ar: "القسم", en: "Department", kind: "text", aliases: ["الادارة", "Dept"] },
   {
@@ -147,14 +149,32 @@ const HEADER_MAP = new Map<string, string>(
   IMPORT_COLUMNS.flatMap((column) => [column.key, column.ar, column.en, ...(column.aliases ?? [])].map((name) => [normal(name), column.key] as [string, string])),
 );
 
-/** The column a header names; "الاسم الكامل / Full name" style headers match either half. */
+/** The column a header names; "الاسم الكامل / Full name" style headers match either half. A longer known heading also matches when the sheet adds words ("اسم العامل الوافد"). */
 export function matchHeader(header: string) {
   const parts = [header, ...header.split(/[/|]/)].map((part) => normal(part)).filter(Boolean);
   for (const part of parts) {
     const key = HEADER_MAP.get(part);
     if (key) return key;
   }
-  return null;
+  let best: { key: string; length: number } | null = null;
+  for (const part of parts) {
+    for (const [alias, key] of HEADER_MAP) {
+      if (alias.length < 8) continue;
+      if (part.startsWith(alias) || (alias.startsWith(part) && part.length >= 8)) {
+        if (!best || alias.length > best.length) best = { key, length: alias.length };
+      }
+    }
+  }
+  return best?.key ?? null;
+}
+
+/** Cancelled or expired permit rows in a Ministry register are not new employees. */
+export function isClosedPermit(status: string) {
+  const text = normal(status);
+  if (!text) return false;
+  if (/غيرنشط|غيرفعال|inactive/.test(text)) return true;
+  if (/نشط|ساري|فعال|active|valid/.test(text)) return false;
+  return /الغاء|ملغ|منته|مرفوض|متوقف|cancelled|canceled|expired/.test(text);
 }
 
 /** A spreadsheet date: a real date, an Excel serial number, YYYY-MM-DD or DD/MM/YYYY. "" when unreadable. */
@@ -328,6 +348,7 @@ export function readTable(table: string[][], options: { headerRow?: number; keys
       if (Object.values(raw).filter((value) => value.trim()).length <= 1) return;
       if (raw.nameEn?.trim()) raw.fullName = raw.nameEn;
     }
+    if (isClosedPermit(raw.permitStatus || "")) return;
     const row = checkRow(raw, headerRow + index + 2);
     for (const key of ["idNumber", "passportNumber", "workPermitNumber"]) {
       const value = row.values[key]?.toUpperCase();
