@@ -2,6 +2,7 @@ import type { Salary } from "@prisma/client";
 import { makeT, type Lang } from "./i18n";
 import { totalDeductions, totalEarnings } from "./salary";
 import { round3 } from "./utils";
+import { wpsBankIssues } from "./wps-bank";
 
 export type PayrollIssue = { level: "danger" | "warning" | "info"; text: string; href?: string; salaryId?: string };
 
@@ -17,6 +18,7 @@ export function payrollIssues(input: {
   previousNet: Map<string, number>;
   liveAbsence: Map<string, number>;
   withoutRecord: number;
+  payer?: { bankAccount: string | null; bankBic: string | null };
   lang: Lang;
 }): PayrollIssue[] {
   const t = makeT(input.lang);
@@ -45,9 +47,39 @@ export function payrollIssues(input: {
       add("warning", t(`الغياب تغيّر بعد إنشاء المسير (${salary.absenceDays} ← ${live}). افتحه واضغط إعادة الاحتساب`, `absence changed after the record was made (${salary.absenceDays} → ${live}). Open it and recalculate`));
     }
   }
-  const noBank = unpaid.filter((salary) => !salary.employee.bankAccount || !salary.employee.bankBic).length;
-  if (noBank) {
-    issues.push({ level: "info", text: t(`${noBank} موظف بلا بنك أو رقم حساب؛ لن يدخلوا ملف WPS. أضفها من «تعديل البيانات» ← الراتب.`, `${noBank} employee(s) have no bank or account number and will be left out of the WPS file. Add them under Edit → Salary.`) });
+  const bank = wpsBankIssues(
+    unpaid.map((salary) => ({
+      employeeId: salary.employeeId,
+      name: input.lang === "en" && salary.employeeNameEn ? salary.employeeNameEn : salary.employeeName,
+      account: salary.employee.bankAccount,
+      bic: salary.employee.bankBic,
+    })),
+    input.payer ?? { bankAccount: null, bankBic: null },
+  );
+  for (const item of bank) {
+    if (item.code === "payer") {
+      issues.push({
+        level: "danger",
+        href: "/settings",
+        text: t("حساب المنشأة أو رمز البنك ناقص أو غير صالح، وملف WPS يحتاجهما في رأس الملف.", "The company account or bank code is missing or invalid. The WPS file needs both in its header."),
+      });
+    } else if (item.code === "duplicate") {
+      issues.push({
+        level: "danger",
+        href: item.employeeId ? `/employees?q=${encodeURIComponent(item.name || "")}` : undefined,
+        text: t(`${item.name}: رقم الحساب مكرر مع موظف آخر ولن يُقبل في WPS.`, `${item.name}: account number is shared with another employee and will be rejected by WPS.`),
+      });
+    } else if (item.code === "format") {
+      issues.push({
+        level: "warning",
+        text: t(`${item.name}: رقم الحساب أو رمز البنك لا يطابق الطول المتوقع.`, `${item.name}: account number or bank code is not a valid length.`),
+      });
+    } else {
+      issues.push({
+        level: "info",
+        text: t(`${item.name}: بلا بنك أو رقم حساب؛ لن يدخل ملف WPS.`, `${item.name}: no bank or account, so they will be left out of the WPS file.`),
+      });
+    }
   }
   if (input.withoutRecord) {
     issues.push({ level: "info", text: t(`${input.withoutRecord} موظف نشط بلا مسير لهذا الشهر`, `${input.withoutRecord} active employee(s) have no record this month`) });

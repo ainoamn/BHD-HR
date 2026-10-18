@@ -26,6 +26,7 @@ import {
   Menu,
   MoreHorizontal,
   Network,
+  Flag,
   PieChart,
   Receipt,
   ScrollText,
@@ -81,6 +82,7 @@ const GROUPS: { ar: string; en: string; items: NavItem[] }[] = [
       { href: "/expenses", ar: "المصروفات", en: "Expenses", icon: Receipt },
       { href: "/analytics", ar: "لوحة المالك", en: "Owner analytics", icon: ChartNoAxesCombined, short: { ar: "التحليلات", en: "Analytics" } },
       { href: "/reports", ar: "التقارير", en: "Reports", icon: PieChart },
+      { href: "/compliance", ar: "الامتثال والتجديدات", en: "Compliance", icon: Flag, short: { ar: "الامتثال", en: "Compliance" } },
     ],
   },
   {

@@ -78,6 +78,7 @@ export default async function SalariesPage({
     previousNet: new Map(previousSalaries.map((row) => [row.employeeId, row.netSalary])),
     liveAbsence: liveDays,
     withoutRecord: activeWithout,
+    payer: { bankAccount: user.company.bankAccount, bankBic: user.company.bankBic },
     lang,
   });
   const spfTotals = {
@@ -131,12 +132,39 @@ export default async function SalariesPage({
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
 
+      <Card className="mb-4">
+        <h2 className="mb-3 text-sm font-bold text-slate-900">{t("معالج شهر الرواتب", "Payroll month")}</h2>
+        <ol className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { n: "1", label: t("راجع الغياب والإضافي", "Review absence and overtime"), href: `/attendance?year=${year}&month=${month}`, done: true },
+            { n: "2", label: t("أنشئ المسير", "Generate payroll"), href: "#generate", done: salaries.length > 0 },
+            { n: "3", label: t("راجع الملاحظات والحسابات", "Review issues and bank accounts"), href: "#check", done: salaries.length > 0 && !issues.some((issue) => issue.level === "danger") },
+            { n: "4", label: t("كشف الحماية الاجتماعية", "Social protection sheet"), href: `/salaries/spf?${fileQuery}`, done: salaries.length > 0 },
+            { n: "5", label: t("ملف البنك WPS", "Bank file (WPS)"), href: issues.some((issue) => issue.level === "danger") ? "#check" : `/salaries/wps?${fileQuery}`, done: unpaid.length === 0 && salaries.length > 0 },
+            { n: "6", label: t("اعتماد وقفل الشهر", "Approve and lock the month"), href: "#period", done: periodState === "LOCKED" },
+          ].map((item) => (
+            <li key={item.n}>
+              <Link href={item.href} className="flex items-center gap-2 rounded-xl px-3 py-2 ring-1 ring-inset ring-slate-200 hover:bg-slate-50">
+                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.done ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-600"}`}>{item.n}</span>
+                <span className="min-w-0">{item.label}</span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-xs text-slate-500">
+          <Link href={`/salaries/journal?${fileQuery}`} className="font-semibold text-teal-800 underline">
+            {t("تصدير قيد محاسبي CSV", "Export an accounting journal CSV")}
+          </Link>
+        </p>
+      </Card>
+
       <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {stats.map((item) => (
           <Stat key={item.label} label={item.label} value={item.value} icon={item.icon} tone={item.tone} />
         ))}
       </div>
 
+      <div id="period" className="scroll-mt-24">
       <PayrollPeriodBar
         period={payrollPeriod}
         year={year}
@@ -148,9 +176,10 @@ export default async function SalariesPage({
         salaryCount={await prisma.salary.count({ where: { companyId: user.companyId, year, month } })}
         lang={lang}
       />
+      </div>
 
       {unpaid.length ? (
-        <Card className="mb-4 space-y-3">
+        <Card id="check" className="mb-4 scroll-mt-24 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-bold text-slate-900">
               {issues.some((issue) => issue.level !== "info") ? <ShieldAlert size={18} className="text-amber-600" /> : <CheckCircle2 size={18} className="text-emerald-600" />}
@@ -192,7 +221,7 @@ export default async function SalariesPage({
       ) : null}
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <Card className="space-y-4">
+        <Card id="generate" className="scroll-mt-24 space-y-4">
           {step(1, t("إنشاء الرواتب", "Generate payroll"), Sparkles)}
           <p className="text-sm leading-6 text-slate-600">
             {t(

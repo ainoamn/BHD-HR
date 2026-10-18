@@ -25,7 +25,7 @@ import {
 import { muscatDay, muscatTime, workedLabel } from "@/lib/clock";
 import { prisma } from "@/lib/prisma";
 import { calendarDays, daysLabel, formatDate, monthRange, readPeriod, round3 } from "@/lib/utils";
-import { deleteAttendance, markAttendance, updateAttendance } from "@/server/attendance-actions";
+import { deleteAttendance, importAttendanceCsv, markAttendance, updateAttendance } from "@/server/attendance-actions";
 
 export default async function AttendancePage({
   searchParams,
@@ -89,6 +89,20 @@ export default async function AttendancePage({
         <PeriodFilter year={year} month={month} />
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
+      {can(user, "attendance.create") ? (
+        <Card className="mb-5">
+          <form action={importAttendanceCsv} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="min-w-0 flex-1 text-sm">
+              <span className="mb-1 block font-semibold text-slate-800">{t("استيراد غياب من CSV", "Import absence from CSV")}</span>
+              <input name="file" type="file" accept=".csv,text/csv" required className="block w-full text-sm" />
+            </label>
+            <button type="submit" className="rounded-xl bg-teal-800 px-4 py-2 text-sm font-semibold text-white">
+              {t("استيراد", "Import")}
+            </button>
+          </form>
+          <p className="mt-2 text-xs text-slate-500">employeeNumber,YYYY-MM-DD,ABSENT | UNPAID_LEAVE | OFFICIAL | HALF_DAY</p>
+        </Card>
+      ) : null}
       {leaveAlerts.length ? (
         <div className="mb-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-red-800" role="alert">
           <TriangleAlert size={19} className="mt-0.5 shrink-0" />

@@ -162,7 +162,19 @@ export type IntakeResult = { employee: Employee; created: boolean; sponsor: { na
  * attached as the Ministry of Labour data attachment (MOL_FILE).
  */
 export async function saveIntake(ctx: IntakeContext, values: ImportValues, existingId: string | null, file?: { url: string; note: string }): Promise<IntakeResult> {
-  const job = await findOrCreate(ctx.jobs, values.jobTitle, values.jobTitleEn, (nameAr, nameEn) => prisma.jobTitle.create({ data: { companyId: ctx.companyId, nameAr, nameEn } }));
+  const titled = values.jobTitle?.trim() || values.jobTitleEn?.trim() || "";
+  const catalogJob = titled
+    ? ctx.jobs.find(
+        (entry) =>
+          (entry.code && plain(entry.code) === plain(titled)) ||
+          plain(entry.nameAr) === plain(titled) ||
+          plain(entry.nameEn) === plain(titled) ||
+          (values.jobTitleEn && plain(entry.nameEn) === plain(values.jobTitleEn)),
+      )
+    : undefined;
+  const job =
+    catalogJob ??
+    (await findOrCreate(ctx.jobs, values.jobTitle, values.jobTitleEn, (nameAr, nameEn) => prisma.jobTitle.create({ data: { companyId: ctx.companyId, nameAr, nameEn } })));
   const department = await findOrCreate(ctx.departments, values.department, undefined, (nameAr) => prisma.department.create({ data: { companyId: ctx.companyId, nameAr } }));
   const sponsor = await resolveSponsor(ctx, values);
   const data: Prisma.EmployeeUncheckedUpdateInput = {};

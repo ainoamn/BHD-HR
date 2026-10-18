@@ -84,6 +84,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           ))}
         </div>
 
+        <p className="no-print text-sm">
+          <Link href="/compliance" className="font-semibold text-teal-800 underline">
+            {t("لوحة الامتثال والتجديدات", "Compliance and renewals")}
+          </Link>
+          {" · "}
+          <Link href="/reports/omanization" className="font-semibold text-teal-800 underline">
+            {t("CSV التعمين", "Omanization CSV")}
+          </Link>
+        </p>
         <section id="omanization" className="scroll-mt-24">
           <ReportSection
             icon={Flag}

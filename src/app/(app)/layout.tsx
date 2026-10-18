@@ -47,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(user, "employees.view")) allowed.push("/org");
   if (can(user, "attendance.view") || can(user, "documents.view") || can(user, "expenses.view") || decidableTypes(user).length) allowed.push("/approvals");
   if (can(user, "reports.view")) allowed.push("/analytics");
+  if (can(user, "reports.view") || can(user, "documents.view") || can(user, "employees.view")) allowed.push("/compliance");
   if (user.role === "ADMIN") allowed.push("/billing");
   if (hasFeature(user.access, "ai")) allowed.push("/assistant");
   const companyName = (company: { name: string; nameEn: string | null }) => (lang === "en" && company.nameEn ? company.nameEn : company.name);

@@ -223,6 +223,12 @@ export function LabourFileImport({ labels, canUpdate, canAddSponsor }: { labels:
             </p>
           ) : null}
 
+          {item.result?.saved?.some((entry) => entry.gaps.length) ? (
+            <Link href="/employees/complete" className="text-sm font-semibold text-amber-900 underline">
+              {t("أكمل البيانات الناقصة لكل من أُضيف دفعة واحدة", "Complete missing details for everyone added in this batch")}
+            </Link>
+          ) : null}
+
           {item.workers.map((worker, index) => {
             const saved = item.result?.saved?.find((entry) => entry.index === index);
             const failed = item.result?.failed?.[index];

@@ -6,6 +6,7 @@ import { requireActor, requirePermission } from "@/lib/auth";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
+import { attendanceType } from "@/lib/constants";
 import { LEAVE_CHOICE, attendanceLabel, computeLeaveBalances, eachUtcDate, leaveApplies, leaveName, parseAttendanceChoice, rowBalanceKey } from "@/lib/leave";
 import { prisma } from "@/lib/prisma";
 import { clip, daysLabel, formatDate, parseDateInput, req, safeReturn, str } from "@/lib/utils";
@@ -177,4 +178,41 @@ export async function deleteAttendance(formData: FormData) {
       ? t("تم حذف الفترة وإعادة الأيام إلى الرصيد، وظهر طلب الإجازة للموظف «ألغتها الإدارة»", "Period deleted, days returned to the balance, and the employee's leave request now shows “Cancelled by HR”")
       : t("تم حذف الفترة وإعادة الأيام إلى الرصيد", "Period deleted and days returned to the balance"),
   });
+}
+
+/** CSV of absence-style rows: employeeNumber,YYYY-MM-DD,ABSENT|UNPAID_LEAVE|OFFICIAL|HALF_DAY. Existing days are skipped. */
+export async function importAttendanceCsv(formData: FormData) {
+  const { user } = await requireActor("attendance.create", null, "/attendance");
+  const { t } = await getI18n();
+  const file = formData.get("file");
+  if (!(file instanceof File) || !file.size) go("/attendance", { error: t("اختر ملف CSV", "Choose a CSV file") });
+  const text = await (file as File).text();
+  const employees = await prisma.employee.findMany({ where: { companyId: user.companyId }, select: { id: true, employeeNumber: true } });
+  const byNumber = new Map(employees.map((employee) => [employee.employeeNumber.toUpperCase(), employee.id]));
+  let saved = 0;
+  let skipped = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || /^employee/i.test(line)) continue;
+    const [number, date, typeRaw] = line.split(",").map((part) => part.trim().replace(/^"|"$/g, ""));
+    const employeeId = byNumber.get((number || "").toUpperCase());
+    const when = parseDateInput(date || "");
+    const type = (typeRaw || "ABSENT").toUpperCase();
+    const meta = attendanceType(type);
+    if (!employeeId || !when || !meta || type === "CUSTOM_LEAVE" || meta.balance) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      await prisma.attendance.create({
+        data: { employeeId, date: when, type, deductsSalary: meta.deductsSalary, notes: "CSV" },
+      });
+      saved += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+  await writeAudit({ userId: user.id, action: "ATTENDANCE_IMPORT", message: `استيراد حضور CSV: ${saved} جديد، ${skipped} متجاوز` });
+  refreshAll();
+  go("/attendance", { message: t(`أُضيف ${saved} يوماً وتُرك ${skipped}`, `Added ${saved} day(s), skipped ${skipped}`) });
 }
