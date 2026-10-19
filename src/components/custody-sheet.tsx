@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { termText } from "@/lib/constants";
 import { CUSTODY_DIRECTION } from "@/lib/custody";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { OfficialSeal } from "./official-doc-sheet";
 import { Bi, Para, letterFontClass } from "./letter-sheet";
 import type { DocHeader } from "./salary-docs";
 
@@ -23,7 +24,15 @@ export type CustodySheetData = {
  * Receipt (IN) or handover (OUT) form for original documents, on the same official paper as the letters:
  * the list of originals, the declaration, and both parties with the employee's electronic acknowledgement.
  */
-export function CustodySheet({ form, header }: { form: CustodySheetData; header: DocHeader }) {
+export function CustodySheet({
+  form,
+  header,
+  seal,
+}: {
+  form: CustodySheetData;
+  header: DocHeader;
+  seal?: { qr: string; url: string; signedBy: string; signedAt: Date; serial?: string | null } | null;
+}) {
   const direction = form.direction === "IN" ? "IN" : "OUT";
   const meta = CUSTODY_DIRECTION[direction];
   const employee = form.employee;
@@ -233,6 +242,8 @@ export function CustodySheet({ form, header }: { form: CustodySheetData; header:
       </div>
 
       <section className="letter-doc__signatures">{direction === "OUT" ? [companySide, employeeSide] : [employeeSide, companySide]}</section>
+
+      {seal ? <OfficialSeal qr={seal.qr} url={seal.url} signedBy={seal.signedBy} signedAt={seal.signedAt} serial={seal.serial} /> : null}
 
       <footer className="letter-doc__pagefoot">
         <span>

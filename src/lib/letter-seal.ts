@@ -104,11 +104,13 @@ export async function ensureLetterSeal<T extends Letter>(letter: T): Promise<T> 
 export async function sealedLetter<T extends Letter>(input: T, origin: string, inline: boolean): Promise<{ letter: T; seal: LetterSeal }> {
   const letter = await ensureLetterSeal(input);
   const url = verifyUrl(origin, letter.verifyToken!);
-  const [qr, signature, stamp] = await Promise.all([
-    qrSvg(url),
+  const company = await prisma.company.findUnique({ where: { id: letter.companyId }, select: { logoUrl: true } });
+  const [logo, signature, stamp] = await Promise.all([
+    inlineLogo(company?.logoUrl || null, letter.companyId),
     inline ? inlineLogo(letter.signatureUrl, letter.companyId) : letter.signatureUrl,
     inline ? inlineLogo(letter.stampUrl, letter.companyId) : letter.stampUrl,
   ]);
+  const qr = await qrSvg(url, logo || company?.logoUrl);
   return {
     letter,
     seal: { qr, url, serial: letter.signatureNo, signedByName: letter.signedByName, signedAt: letter.signedAt || letter.createdAt, code: fingerprintCode(letter.fingerprint), signature, stamp },
