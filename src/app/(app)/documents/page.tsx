@@ -104,7 +104,7 @@ export default async function DocumentsPage({
         </Link>
       ) : null}
       {allow.create && employees.length ? (
-        <details className="group mb-5 rounded-2xl border border-slate-200/90 bg-surface shadow-card">
+        <details open={Boolean(sp.error)} className="group mb-5 rounded-2xl border border-slate-200/90 bg-surface shadow-card">
           <summary className="flex list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
             <span className="flex items-center gap-2.5 font-bold text-slate-900">
               <span className="flex size-8 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">

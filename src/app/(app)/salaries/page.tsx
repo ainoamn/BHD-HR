@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Banknote, CheckCircle2, Download, FileText, HandCoins, Info, Printer, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, ChevronDown, Download, FileText, HandCoins, Info, Printer, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { PeriodFilter } from "@/components/period-filter";
@@ -174,8 +174,8 @@ export default async function SalariesPage({
         icon={Banknote}
         title={t("الرواتب", "Payroll")}
         description={t(
-          `مسير ${monthName(month, "ar")} ${year} — ${scope}. إنشاء الرواتب ينسخ راتب الموظف الحالي ولا يغيّر الشهور السابقة.`,
-          `${monthName(month, "en")} ${year} payroll — ${scope}. Generating copies each employee's current salary and never changes past months.`,
+          `مسير ${monthName(month, "ar")} ${year} — ${scope}.`,
+          `${monthName(month, "en")} ${year} payroll — ${scope}.`,
         )}
       >
         <PeriodFilter year={year} month={month} employers={employers} employerId={employerId} />
@@ -183,8 +183,12 @@ export default async function SalariesPage({
       <Flash error={sp.error} message={sp.message} />
 
       <Card className="mb-4">
-        <h2 className="mb-3 text-sm font-bold text-slate-900">{t("معالج شهر الرواتب", "Payroll month")}</h2>
-        <ol className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-slate-900">
+          {t("خطوات شهر الرواتب", "Payroll steps")}
+          <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
+        </summary>
+        <ol className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
           {[
             { n: "1", label: t("راجع الغياب والإضافي", "Review absence and overtime"), href: `/attendance?year=${year}&month=${month}`, done: true },
             { n: "2", label: t("أنشئ المسير", "Generate payroll"), href: "#generate", done: salaries.length > 0 },
@@ -206,6 +210,7 @@ export default async function SalariesPage({
             {t("تصدير قيد محاسبي CSV", "Export an accounting journal CSV")}
           </Link>
         </p>
+        </details>
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

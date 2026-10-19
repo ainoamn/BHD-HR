@@ -64,8 +64,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         icon={Receipt}
         title={t("المصروفات", "Expenses")}
         description={t(
-          "مصروفات دفعها الموظفون لأجل العمل ويطلبون تعويضها — من البوابة أو تسجّلها الموارد البشرية. بعد الموافقة تُصرف مع الراتب كبند استحقاق، أو نقداً أو بتحويل.",
-          "Money employees spent on work and claim back — from the portal or recorded by HR. Once approved it is paid with the salary as an entitlement, or by cash or transfer.",
+          "مصروفات العمل التي يطلب الموظفون تعويضها.",
+          "Work expenses employees claim back.",
         )}
       />
       <Flash error={sp.error} message={sp.message} />

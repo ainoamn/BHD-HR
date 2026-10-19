@@ -86,8 +86,8 @@ export default async function AssetsPage({
         icon={LaptopMinimal}
         title={t("العُهد والأصول", "Assets & custody")}
         description={t(
-          "سجل أجهزة الشركة ومركباتها وبطاقاتها: من يحملها الآن، ومتى سُلّمت واستُلمت. تنبيه تلقائي إذا بقيت عهدة لدى موظف انتهت خدمته.",
-          "Company devices, vehicles and cards: who holds each one, and when it was handed over and returned. You are alerted if a former employee still holds one.",
+          "أجهزة ومركبات وبطاقات الشركة، ومن يحملها الآن.",
+          "Company devices, vehicles and cards, and who holds them now.",
         )}
       />
       <Flash error={sp.error} message={sp.message} />

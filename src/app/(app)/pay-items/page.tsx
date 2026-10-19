@@ -69,8 +69,8 @@ export default async function PayItemsPage({
         icon={HandCoins}
         title={t("السلف والمكافآت والخصومات", "Advances, bonuses & deductions")}
         description={t(
-          "سلف ومقدمات رواتب تُسترد بالأقساط، ومكافآت وبدلات واستحقاقات تُضاف، وخصومات مستقبلية. كلها تُطبّق تلقائياً على راتب الشهر عند إنشائه أو إعادة احتسابه.",
-          "Advances repaid in instalments, bonuses, allowances and entitlements to add, and future deductions. All are applied to the month's salary when it is generated or recalculated.",
+          "سلف ومكافآت وخصومات تُطبَّق تلقائياً على راتب الشهر.",
+          "Advances, bonuses and deductions, applied automatically to monthly pay.",
         )}
       />
       <Flash error={sp.error} message={sp.message} />

@@ -165,8 +165,8 @@ export default async function EmployeesPage({
               </p>
               <p className="mt-0.5 text-sm leading-6 text-amber-800">
                 {t(
-                  "كل موظف جديد يحصل على اسم مستخدم وكلمة مرور مؤقتة تلقائياً. هؤلاء أُضيفوا قبل ذلك أو أُضيفوا بلا حساب؛ افتح حساباتهم ليدخلوا ويروا ملفاتهم ورواتبهم وإجازاتهم وخطاباتهم.",
-                  "Every new employee gets a username and temporary password automatically. These were added before that, or without an account; open their accounts so they can sign in to see their file, salaries, leave and letters.",
+                  "افتح حساباتهم ليدخلوا ويروا ملفاتهم ورواتبهم.",
+                  "Open their accounts so they can sign in and see their file and pay.",
                 )}
               </p>
             </div>

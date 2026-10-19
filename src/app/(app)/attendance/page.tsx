@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, CalendarRange, Search, Timer, TriangleAlert } from "lucide-react";
+import { AttendanceCsvImport } from "@/components/attendance-csv-import";
 import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
@@ -28,13 +29,15 @@ import {
 } from "@/lib/leave";
 import { muscatDay, muscatTime, workedLabel } from "@/lib/clock";
 import { prisma } from "@/lib/prisma";
-import { calendarDays, daysLabel, formatDate, monthRange, readPeriod, round3 } from "@/lib/utils";
+import { cn, daysLabel, formatDate, monthRange, readPeriod, round3 } from "@/lib/utils";
 import { deleteAttendance, importAttendanceCsv, markAttendance, updateAttendance } from "@/server/attendance-actions";
+
+type Tab = "log" | "summary" | "clock";
 
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; day?: string; sort?: string; dir?: string; error?: string; message?: string; [key: string]: string | undefined }>;
+  searchParams: Promise<{ year?: string; month?: string; day?: string; tab?: string; q?: string; sort?: string; dir?: string; error?: string; message?: string; [key: string]: string | undefined }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("attendance.view");
@@ -58,6 +61,7 @@ export default async function AttendancePage({
     prisma.clockEntry.findMany({ where: { companyId: user.companyId, day: clockDay } }),
     prisma.attendance.findMany({ where: { date: clockDate, employee: { companyId: user.companyId } }, select: { employeeId: true } }),
   ]);
+
   const q = (sp.q || "").trim();
   const needle = normalizeSearchText(q);
   const matchesEmployee = (employee: { fullName: string; nameEn: string | null; employeeNumber: string; idNumber: string | null }) => {
@@ -71,6 +75,7 @@ export default async function AttendancePage({
   };
   const listed = employees.filter(matchesEmployee);
   const showClock = user.company.clockEnabled || clockEntries.length > 0;
+  const tab: Tab = sp.tab === "summary" || (sp.tab === "clock" && showClock) ? sp.tab : "log";
   const clockById = new Map(clockEntries.map((entry) => [entry.employeeId, entry]));
   const onLeave = new Set(dayAbsences.map((row) => row.employeeId));
   const displayName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
@@ -80,18 +85,25 @@ export default async function AttendancePage({
   const leaveAlerts = listed
     .map((employee) => ({ employee, warnings: leaveWarnings(figuresById.get(employee.id)!, warnDays) }))
     .filter((item) => item.warnings.length > 0);
+
+  const locale = lang === "en" ? "en" : "ar";
+  const clockColumns = ["name", "in", "out", "hours", "status"];
+  const summaryColumns = ["name", "salary", ...leaveTypes.map((type) => `l${type.key}`)];
+  const toolFields = columnHiddenFields(sp, [...new Set([...clockColumns, ...summaryColumns])]);
+
   const summary = listed.map((employee) => {
     const rows = records.filter((row) => row.employeeId === employee.id);
     return {
       employee,
       salaryDays: round3(rows.reduce((sum, row) => sum + salaryDayWeight(row), 0)),
       used: Object.fromEntries(leaveTypes.map((type) => [type.key, round3(rows.reduce((sum, row) => (rowBalanceKey(row) === type.key ? sum + rowDays(row) : sum), 0))])),
+      active: false as boolean,
     };
   });
-  const locale = lang === "en" ? "en" : "ar";
-  const clockColumns = ["name", "in", "out", "hours", "status"];
-  const summaryColumns = ["name", "salary", ...leaveTypes.map((type) => `l${type.key}`)];
-  const toolFields = columnHiddenFields(sp, [...new Set([...clockColumns, ...summaryColumns])]);
+  for (const row of summary) {
+    row.active = row.salaryDays > 0 || leaveTypes.some((type) => row.used[type.key] > 0);
+  }
+
   const clockRows = listed
     .map((employee) => {
       const entry = clockById.get(employee.id);
@@ -114,16 +126,11 @@ export default async function AttendancePage({
         inTime: entry ? entry.inAt.getTime() : Number.POSITIVE_INFINITY,
         outTime: entry?.outAt ? entry.outAt.getTime() : Number.POSITIVE_INFINITY,
         worked: entry?.outAt ? entry.outAt.getTime() - entry.inAt.getTime() : -1,
+        active: Boolean(entry) || onLeave.has(employee.id),
       };
     })
-    .filter(
-      (row) =>
-        includesText(row.name, sp.fname) &&
-        includesText(row.inText, sp.fin) &&
-        includesText(row.outText, sp.fout) &&
-        includesText(row.hoursText, sp.fhours) &&
-        includesText(row.status, sp.fstatus),
-    );
+    .filter((row) => (q || row.active) && includesText(row.name, sp.fname) && includesText(row.inText, sp.fin) && includesText(row.outText, sp.fout) && includesText(row.hoursText, sp.fhours) && includesText(row.status, sp.fstatus));
+
   const clockSort = readSort(sp, clockColumns, "name");
   clockRows.sort((a, b) => {
     if (clockSort.sort === "in") return compareNumber(a.inTime, b.inTime, clockSort.dir);
@@ -132,9 +139,11 @@ export default async function AttendancePage({
     if (clockSort.sort === "status") return compareText(a.status, b.status, clockSort.dir, locale);
     return compareText(a.name, b.name, clockSort.dir, locale);
   });
+
   const summaryRows = summary
     .filter(
       (row) =>
+        (q || row.active) &&
         includesText(displayName(row.employee), sp.fname) &&
         includesText(`${row.salaryDays} ${daysLabel(row.salaryDays)}`, sp.fsalary) &&
         leaveTypes.every((type) => includesText(`${row.used[type.key]} ${daysLabel(row.used[type.key])}`, sp[`fl${type.key}`])),
@@ -148,29 +157,55 @@ export default async function AttendancePage({
     }
     return compareText(displayName(a.employee), displayName(b.employee), summarySort.dir, locale);
   });
+
   const choices = attendanceChoices(leaveTypes, lang);
   const periods = groupAttendance(records).filter((period) => matchesEmployee(period.row.employee));
   const returnParams = new URLSearchParams({ year: String(year), month: String(month) });
   if (q) returnParams.set("q", q);
+  if (tab !== "log") returnParams.set("tab", tab);
   const returnTo = `/attendance?${returnParams}`;
 
+  const href = (next: { tab?: Tab; q?: string; day?: string }) => {
+    const params = new URLSearchParams({ year: String(year), month: String(month) });
+    const nextTab = next.tab ?? tab;
+    const nextQ = next.q ?? q;
+    const nextDay = next.day ?? (sp.day || "");
+    if (nextTab !== "log") params.set("tab", nextTab);
+    if (nextQ) params.set("q", nextQ);
+    if (nextDay) params.set("day", nextDay);
+    return `/attendance?${params}`;
+  };
+
+  const tabs: { id: Tab; label: string; count: number }[] = [
+    { id: "log", label: t("السجل", "Log"), count: periods.length },
+    { id: "summary", label: t("الملخص", "Summary"), count: summaryRows.length },
+    ...(showClock ? [{ id: "clock" as const, label: t("الدوام", "Clock"), count: clockRows.length }] : []),
+  ];
+
   return (
-    <div className="page-wide">
+    <div className="page-wide space-y-5">
       <PageHeader
         icon={CalendarDays}
         title={t("الحضور والغياب", "Attendance & leave")}
-        description={t(
-          "اختر الفترة فيُحسب عدد الأيام مباشرة. الإجازة السنوية والمرضية والتعويضية تخصم من الرصيد ولا تخصم الراتب. الغياب والإجازة بخصم تخصم الراتب ولا تخصم الرصيد. يمكن تغيير خصم الراتب قبل الحفظ.",
-          "Pick a period and the days are counted instantly. Annual, sick and compensatory leave use the balance, not the salary. Absence and unpaid leave deduct salary, not the balance. You can change the salary deduction before saving.",
-        )}
+        description={t("سجّل غياباً أو إجازة، ثم راجع سجل الشهر.", "Record leave, then review the month log.")}
       >
         <PeriodFilter year={year} month={month} />
+        {can(user, "attendance.create") ? <AttendanceCsvImport action={importAttendanceCsv} /> : null}
+        {showClock ? (
+          <Link href={`/attendance/timesheet?year=${year}&month=${month}`} className={secondaryBtn}>
+            <Timer size={16} />
+            {t("الإضافي", "Overtime")}
+          </Link>
+        ) : null}
       </PageHeader>
+
       <Flash error={sp.error} message={sp.message} />
+
       <Toolbar>
         <GetForm className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="year" value={year} />
           <input type="hidden" name="month" value={month} />
+          {tab !== "log" ? <input type="hidden" name="tab" value={tab} /> : null}
           {sp.day ? <input type="hidden" name="day" value={sp.day} /> : null}
           {toolFields.map((field) => (
             <input key={field.name} type="hidden" name={field.name} value={field.value} />
@@ -182,42 +217,25 @@ export default async function AttendancePage({
               name="q"
               type="search"
               defaultValue={q}
-              placeholder={t("ابحث بالاسم أو رقم الموظف أو الرقم المدني", "Search by name, employee no. or civil ID")}
+              placeholder={t("ابحث بالاسم أو الرقم أو المدني", "Search name, number or civil ID")}
               aria-label={t("بحث عن موظف", "Search employee")}
             />
           </div>
           {q ? (
-            <Link href={`/attendance?year=${year}&month=${month}${sp.day ? `&day=${sp.day}` : ""}`} className={secondaryBtn}>
+            <Link href={href({ q: "" })} className={secondaryBtn}>
               {t("مسح", "Clear")}
             </Link>
           ) : null}
         </GetForm>
-        {q ? (
-          <p className="mt-2 text-xs text-slate-500">
-            {t(`${listed.length} من ${employees.length} موظف`, `${listed.length} of ${employees.length} employee(s)`)}
-          </p>
-        ) : null}
       </Toolbar>
-      {can(user, "attendance.create") ? (
-        <Card className="mb-5">
-          <form action={importAttendanceCsv} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="min-w-0 flex-1 text-sm">
-              <span className="mb-1 block font-semibold text-slate-800">{t("استيراد غياب من CSV", "Import absence from CSV")}</span>
-              <input name="file" type="file" accept=".csv,text/csv" required className="block w-full text-sm" />
-            </label>
-            <button type="submit" className="rounded-xl bg-teal-800 px-4 py-2 text-sm font-semibold text-white">
-              {t("استيراد", "Import")}
-            </button>
-          </form>
-          <p className="mt-2 text-xs text-slate-500">employeeNumber,YYYY-MM-DD,ABSENT | UNPAID_LEAVE | OFFICIAL | HALF_DAY</p>
-        </Card>
-      ) : null}
+
       {leaveAlerts.length ? (
-        <div className="mb-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-red-800" role="alert">
-          <TriangleAlert size={19} className="mt-0.5 shrink-0" />
-          <div className="min-w-0">
-          <p className="font-bold">{t("موظفون تجاوزوا أو اقتربوا من نفاد إجازاتهم", "Employees over or close to their leave limit")}</p>
-          <ul className="mt-1.5 space-y-1 text-sm leading-6">
+        <details className="rounded-2xl border border-red-200 bg-red-50 text-red-800 open:pb-3">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-bold">
+            <TriangleAlert size={18} className="shrink-0" />
+            {t(`${leaveAlerts.length} تنبيه رصيد إجازة`, `${leaveAlerts.length} leave-balance alert(s)`)}
+          </summary>
+          <ul className="space-y-1 px-4 pb-1 text-sm leading-6">
             {leaveAlerts.map(({ employee, warnings }) => (
               <li key={employee.id}>
                 <Link href={`/employees/${employee.id}?tab=attendance`} className="font-semibold underline">
@@ -228,14 +246,12 @@ export default async function AttendancePage({
               </li>
             ))}
           </ul>
-          </div>
-        </div>
+        </details>
       ) : null}
+
       {can(user, "attendance.create") ? (
-        <Card className="mb-6">
-          <SectionTitle hint={t("يُحسب عدد الأيام والرصيد المتبقي قبل الحفظ.", "Days and the remaining balance are counted before saving.")}>
-            {t("تسجيل غياب أو إجازة", "Record absence or leave")}
-          </SectionTitle>
+        <Card>
+          <SectionTitle>{t("تسجيل غياب أو إجازة", "Record absence or leave")}</SectionTitle>
           <LeaveRangeForm
             action={markAttendance}
             employees={employees.map((employee) => ({
@@ -253,35 +269,140 @@ export default async function AttendancePage({
         </Card>
       ) : null}
 
-      {showClock ? (
-        <Card id="clock" className="mb-6 scroll-mt-24">
+      <nav className="segmented" aria-label={t("عرض السجلات", "View records")}>
+        {tabs.map((item) => (
+          <Link key={item.id} href={href({ tab: item.id })} aria-current={tab === item.id ? "page" : undefined}>
+            {item.label}
+            <span className="tabular ms-1.5 text-xs opacity-70">{item.count}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "log" ? (
+        <Card>
+          {periods.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">{t("لا توجد سجلات في هذا الشهر.", "No records this month.")}</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {periods.map((period) => (
+                <li key={period.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 gap-3">
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl",
+                        period.row.deductsSalary ? "bg-red-50 text-red-600" : "bg-teal-50 text-teal-700",
+                      )}
+                    >
+                      <CalendarRange size={17} />
+                    </span>
+                    <div className="min-w-0 text-sm">
+                      <p className="font-semibold text-slate-900">
+                        {displayName(period.row.employee)}
+                        <span className="ms-2 inline-block align-middle">
+                          <ToneBadge tone={period.row.deductsSalary ? "red" : "teal"}>{attendanceLabel(period.row, leaveTypes, lang)}</ToneBadge>
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-slate-500">
+                        {formatDate(period.start)}
+                        {String(period.start) !== String(period.end) ? ` ${t("إلى", "to")} ${formatDate(period.end)}` : ""} · {daysLabel(period.days)} {t("يوم", "day(s)")}
+                      </p>
+                      {period.row.notes ? <p className="mt-0.5 text-xs text-slate-500">{period.row.notes}</p> : null}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-start gap-4 ps-12 sm:ps-0">
+                    {can(user, "attendance.edit") ? (
+                      <AttendanceEditForm
+                        action={updateAttendance}
+                        id={period.deleteId}
+                        returnTo={returnTo}
+                        type={attendanceChoiceOf(period.row)}
+                        choices={choices}
+                        start={period.start}
+                        end={period.end}
+                        deductsSalary={period.row.deductsSalary}
+                        notes={period.row.notes}
+                      />
+                    ) : null}
+                    {can(user, "attendance.delete") ? (
+                      <DeleteButton
+                        action={deleteAttendance}
+                        fields={{ id: period.deleteId, returnTo }}
+                        confirm={t("حذف هذه الفترة وإرجاع أيامها إلى الرصيد؟", "Delete this period and return its days to the balance?")}
+                      />
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ) : null}
+
+      {tab === "summary" ? (
+        <div className="table-shell">
+          <table className="table-stack table-tools min-w-full text-sm">
+            <thead>
+              <tr>
+                <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                <ColumnHead column="salary" label={t("خصم راتب", "Pay cut")} />
+                {leaveTypes.map((type) => (
+                  <ColumnHead key={type.key} column={`l${type.key}`} label={leaveName(type, lang)} />
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {summaryRows.length === 0 ? (
+                <tr>
+                  <td colSpan={2 + leaveTypes.length} className="px-4 py-8 text-center text-slate-500">
+                    {t("لا حركة إجازات أو خصم في هذا الشهر.", "No leave or pay cuts this month.")}
+                  </td>
+                </tr>
+              ) : (
+                summaryRows.map((row) => (
+                  <tr key={row.employee.id}>
+                    <td className="cell-title px-4 py-3">
+                      <Link href={`/employees/${row.employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
+                        {displayName(row.employee)}
+                      </Link>
+                      <span className="tabular block text-xs text-slate-500">{row.employee.employeeNumber}</span>
+                    </td>
+                    <td className="tabular px-4 py-3" data-label={t("خصم راتب", "Pay cut")}>
+                      {row.salaryDays > 0 ? <span className="font-semibold text-red-700">{daysLabel(row.salaryDays)}</span> : <span className="text-slate-400">0</span>}
+                    </td>
+                    {leaveTypes.map((type) => (
+                      <td key={type.key} className="tabular px-4 py-3" data-label={leaveName(type, lang)}>
+                        {row.used[type.key] > 0 ? <span className="font-semibold text-slate-900">{daysLabel(row.used[type.key])}</span> : <span className="text-slate-400">0</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {tab === "clock" && showClock ? (
+        <Card id="clock" className="scroll-mt-24">
           <SectionTitle
-            hint={t(
-              `${clockEntries.length} من ${employees.length} سجّلوا حضورهم من البوابة`,
-              `${clockEntries.length} of ${employees.length} clocked in from the portal`,
-            )}
+            hint={formatDate(clockDate)}
             action={
-              <div className="flex flex-wrap items-center gap-2">
-                <form method="get" className="flex items-center gap-2">
-                  <input type="hidden" name="year" value={year} />
-                  <input type="hidden" name="month" value={month} />
-                  {q ? <input type="hidden" name="q" value={q} /> : null}
-                  {toolFields.map((field) => (
-                    <input key={field.name} type="hidden" name={field.name} value={field.value} />
-                  ))}
-                  <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-sm" aria-label={t("اليوم", "Day")} />
-                  <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                    {t("عرض", "Show")}
-                  </button>
-                </form>
-                <Link href={`/attendance/timesheet?year=${year}&month=${month}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800">
-                  <Timer size={15} />
-                  {t("الإضافي والتأخير", "Overtime & lateness")}
-                </Link>
-              </div>
+              <form method="get" className="flex items-center gap-2">
+                <input type="hidden" name="year" value={year} />
+                <input type="hidden" name="month" value={month} />
+                <input type="hidden" name="tab" value="clock" />
+                {q ? <input type="hidden" name="q" value={q} /> : null}
+                {toolFields.map((field) => (
+                  <input key={field.name} type="hidden" name={field.name} value={field.value} />
+                ))}
+                <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-sm" aria-label={t("اليوم", "Day")} />
+                <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  {t("عرض", "Show")}
+                </button>
+              </form>
             }
           >
-            {t("سجل الدوام", "Clock-in log")} — {formatDate(clockDate)}
+            {t("سجل الدوام", "Clock-in log")}
           </SectionTitle>
           <div className="table-shell">
             <table className="table-stack table-tools min-w-full text-sm">
@@ -295,8 +416,14 @@ export default async function AttendancePage({
                 </tr>
               </thead>
               <tbody>
-                {clockRows.map(({ employee, entry }) => {
-                  return (
+                {clockRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                      {t("لا تسجيلات حضور في هذا اليوم.", "No clock-ins for this day.")}
+                    </td>
+                  </tr>
+                ) : (
+                  clockRows.map(({ employee, entry }) => (
                     <tr key={employee.id}>
                       <td className="cell-title px-4 py-2.5">
                         <Link href={`/employees/${employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
@@ -306,7 +433,6 @@ export default async function AttendancePage({
                       </td>
                       <td className="tabular px-4 py-2.5" data-label={t("الحضور", "In")}>
                         {entry ? muscatTime(entry.inAt) : "—"}
-                        {entry?.inDistance != null ? <span className="ms-1 text-xs text-slate-400">({entry.inDistance} {t("م", "m")})</span> : null}
                       </td>
                       <td className="tabular px-4 py-2.5" data-label={t("الانصراف", "Out")}>
                         {entry?.outAt ? muscatTime(entry.outAt) : "—"}
@@ -322,111 +448,19 @@ export default async function AttendancePage({
                             <ToneBadge tone="teal">{t("في الوقت", "On time")}</ToneBadge>
                           )
                         ) : onLeave.has(employee.id) ? (
-                          <ToneBadge tone="slate">{t("غياب/إجازة مسجّلة", "Absence/leave recorded")}</ToneBadge>
+                          <ToneBadge tone="slate">{t("غياب/إجازة", "Absent/leave")}</ToneBadge>
                         ) : (
-                          <span className="text-xs text-slate-400">{t("لم يسجّل", "Not clocked in")}</span>
+                          "—"
                         )}
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </Card>
       ) : null}
-
-      <SectionTitle hint={t(`${calendarDays(year, month)} يوماً في الشهر`, `${calendarDays(year, month)} days in the month`)}>
-        {t("ملخص الشهر", "Month summary")}
-      </SectionTitle>
-      <div className="table-shell">
-        <table className="table-stack table-tools min-w-full text-sm">
-          <thead>
-            <tr>
-              <ColumnHead column="name" label={t("الموظف", "Employee")} />
-              <ColumnHead column="salary" label={t("خصم من الراتب", "Salary deduction")} />
-              {leaveTypes.map((type) => (
-                <ColumnHead key={type.key} column={`l${type.key}`} label={leaveName(type, lang)} />
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {summaryRows.map((row) => (
-              <tr key={row.employee.id}>
-                <td className="cell-title px-4 py-3">
-                  <Link href={`/employees/${row.employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
-                    {displayName(row.employee)}
-                  </Link>
-                  <span className="tabular block text-xs text-slate-500">{row.employee.employeeNumber}</span>
-                </td>
-                <td className="tabular px-4 py-3" data-label={t("خصم من الراتب", "Salary deduction")}>
-                  {row.salaryDays > 0 ? <span className="font-semibold text-red-700">{daysLabel(row.salaryDays)}</span> : <span className="text-slate-400">0</span>}
-                </td>
-                {leaveTypes.map((type) => (
-                  <td key={type.key} className="tabular px-4 py-3" data-label={leaveName(type, lang)}>
-                    {row.used[type.key] > 0 ? <span className="font-semibold text-slate-900">{daysLabel(row.used[type.key])}</span> : <span className="text-slate-400">0</span>}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Card className="mt-6">
-        <SectionTitle hint={t(`${periods.length} فترة مسجّلة`, `${periods.length} recorded period(s)`)}>{t("سجل الشهر", "Month log")}</SectionTitle>
-        {periods.length === 0 ? (
-          <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">{t("لا توجد سجلات في هذا الشهر.", "No records this month.")}</p>
-        ) : null}
-        <ul className="divide-y divide-slate-100">
-          {periods.map((period) => (
-            <li key={period.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 gap-3">
-                <span
-                  className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${period.row.deductsSalary ? "bg-red-50 text-red-600" : "bg-teal-50 text-teal-700"}`}
-                >
-                  <CalendarRange size={17} />
-                </span>
-                <div className="min-w-0 text-sm">
-                  <p className="font-semibold text-slate-900">
-                    {displayName(period.row.employee)}
-                    <span className="ms-2 inline-block align-middle">
-                      <ToneBadge tone={period.row.deductsSalary ? "red" : "teal"}>{attendanceLabel(period.row, leaveTypes, lang)}</ToneBadge>
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-slate-500">
-                    {formatDate(period.start)} {t("إلى", "to")} {formatDate(period.end)} · {daysLabel(period.days)} {t("يوم", "day(s)")} ·{" "}
-                    {period.row.deductsSalary ? t("خصم راتب", "salary deducted") : t("بدون خصم راتب", "no salary deduction")}
-                  </p>
-                  {period.row.notes ? <p className="mt-0.5 text-xs text-slate-500">{period.row.notes}</p> : null}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-start gap-4 ps-12 sm:ps-0">
-                {can(user, "attendance.edit") ? (
-                  <AttendanceEditForm
-                    action={updateAttendance}
-                    id={period.deleteId}
-                    returnTo={returnTo}
-                    type={attendanceChoiceOf(period.row)}
-                    choices={choices}
-                    start={period.start}
-                    end={period.end}
-                    deductsSalary={period.row.deductsSalary}
-                    notes={period.row.notes}
-                  />
-                ) : null}
-                {can(user, "attendance.delete") ? (
-                  <DeleteButton
-                    action={deleteAttendance}
-                    fields={{ id: period.deleteId, returnTo }}
-                    confirm={t("حذف هذه الفترة وإرجاع أيامها إلى الرصيد؟", "Delete this period and return its days to the balance?")}
-                  />
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Card>
     </div>
   );
 }

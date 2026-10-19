@@ -83,8 +83,8 @@ export default async function TasksPage({
         icon={ListTodo}
         title={t("المهام", "Tasks")}
         description={t(
-          "أسند المهام لموظف أو أكثر، وتابعها على لوحة مرئية من «للتنفيذ» حتى «مكتملة»، مع الأولوية وتاريخ الاستحقاق وخطوات التنفيذ والتعليقات.",
-          "Assign tasks to one or more employees and follow them on a visual board from To do to Done, with priority, due date, checklist and comments.",
+          "أسند المهام للموظفين وتابعها من «للتنفيذ» حتى «مكتملة».",
+          "Assign tasks to employees and track them from To do to Done.",
         )}
       >
         {allow.create ? (

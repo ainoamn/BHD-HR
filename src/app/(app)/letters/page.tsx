@@ -123,8 +123,8 @@ export default async function LettersPage({
         icon={ScrollText}
         title={t("الإنذارات والخطابات", "Warnings & letters")}
         description={t(
-          "لفت النظر والإنذارات المتدرجة وخطابات الشكر والخطابات العامة من الإدارة للموظفين، بترويسة رسمية ورقم مرجعي، مع نسخة تصل الموظف بالبريد وواتساب ويؤكد استلامها.",
-          "Notices, escalating warnings, appreciation and general letters from management, on official letterhead with a reference number, plus a copy the employee receives by email and WhatsApp and confirms.",
+          "إنذارات وخطابات رسمية للموظفين مع تأكيد الاستلام.",
+          "Official warnings and letters to employees, with receipt confirmation.",
         )}
       >
         <Link href={draftsView ? "/letters" : "/letters?view=drafts"} className={secondaryBtn}>

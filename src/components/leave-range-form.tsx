@@ -125,51 +125,31 @@ export function LeaveRangeForm({
         {reversed ? <p>{t("تاريخ النهاية قبل تاريخ البداية.", "End date is before start date.")}</p> : null}
         {halfDayRange ? <p>{t("نصف اليوم يُسجل في يوم واحد فقط.", "A half day can only be one date.")}</p> : null}
         {notCovered ? (
-          <p className="font-bold">
-            {t(`${balanceName} غير مشمولة لوظيفة هذا الموظف. غيّر ذلك من الضبط ← الموارد البشرية ← أنواع الإجازات.`, `${balanceName} does not apply to this employee's job. Change it in Settings → HR → Leave types.`)}
-          </p>
+          <p className="font-bold">{t(`${balanceName} غير مشمولة لهذه الوظيفة.`, `${balanceName} does not apply to this job.`)}</p>
         ) : balanceKey && remaining !== null ? (
           <p>
-            {t(
-              `سيُخصم من ${balanceName}. المتبقي الآن ${daysLabel(remaining)} يوم، وبعد التسجيل ${daysLabel(after ?? 0)} يوم.`,
-              `Deducted from ${balanceName}. Remaining now ${daysLabel(remaining)}, after saving ${daysLabel(after ?? 0)}.`,
-            )}
+            {t(`${balanceName}: متبقي ${daysLabel(remaining)} ← بعد التسجيل ${daysLabel(after ?? 0)}`, `${balanceName}: ${daysLabel(remaining)} left → ${daysLabel(after ?? 0)} after`)}
           </p>
         ) : balanceKey ? (
-          <p>{t(`سيُخصم من ${balanceName}.`, `Deducted from ${balanceName}.`)}</p>
+          <p>{t(`من رصيد ${balanceName}`, `From ${balanceName} balance`)}</p>
         ) : (
-          <p>{t("هذه الحالة لا تُخصم من رصيد الإجازات.", "This type does not use a leave balance.")}</p>
+          <p>{deductSalary ? t("خصم من الراتب فقط", "Salary deduction only") : t("بدون خصم راتب أو رصيد", "No pay or balance cut")}</p>
         )}
         {insufficient ? (
           <div className="mt-2 rounded-lg bg-surface/70 p-2.5">
-            <p className="font-bold">
-              {t(
-                `⚠ تجاوز الرصيد بـ ${daysLabel(-(after ?? 0))} يوم.`,
-                `⚠ Exceeds the balance by ${daysLabel(-(after ?? 0))} day(s).`,
-              )}
-            </p>
+            <p className="font-bold">{t(`تجاوز الرصيد بـ ${daysLabel(-(after ?? 0))}`, `Exceeds balance by ${daysLabel(-(after ?? 0))}`)}</p>
             <label className="mt-1.5 flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={allowOverdraft} onChange={(event) => setAllowOverdraft(event.target.checked)} />
-              <span>
-                {t(
-                  "التسجيل رغم التجاوز. سيظهر للموظف تنبيه أحمر حتى يُضاف رصيد يغطي الأيام الزائدة.",
-                  "Record it anyway. The employee will show a red alert until extra days cover the difference.",
-                )}
-              </span>
+              <span>{t("التسجيل رغم التجاوز", "Record anyway")}</span>
             </label>
           </div>
         ) : nearlyOut ? (
           <p className="mt-1 font-bold">
             {after === 0
-              ? t(`⚠ بعد هذا التسجيل ينفد ${balanceName} بالكامل.`, `⚠ After this, ${balanceName} will be fully used.`)
-              : t(`⚠ اقترب الموظف من نفاد ${balanceName}: سيتبقى ${daysLabel(after ?? 0)} يوم فقط.`, `⚠ ${balanceName} is almost used: only ${daysLabel(after ?? 0)} day(s) will remain.`)}
+              ? t(`ينفد ${balanceName} بعد التسجيل`, `${balanceName} will be used up`)
+              : t(`سيتبقى ${daysLabel(after ?? 0)} من ${balanceName}`, `${daysLabel(after ?? 0)} of ${balanceName} will remain`)}
           </p>
         ) : null}
-        <p>
-          {deductSalary
-            ? t("يُخصم مبلغ هذه الأيام من الراتب عند احتساب الشهر.", "These days will be deducted from the monthly salary.")
-            : t("بدون خصم من الراتب.", "No salary deduction.")}
-        </p>
       </div>
       <button type="submit" className={primaryBtn} disabled={blocked}>
         {t("تسجيل", "Save")}
