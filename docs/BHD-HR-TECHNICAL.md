@@ -111,6 +111,9 @@ src/
     search.ts            توحيد النص العربي للبحث (أ/إ/آ، ة/ه، ى/ي، التشكيل)
     leave.ts             أرصدة الإجازات حسب أنواع المنشأة وتنبيهاتها وخيارات الحضور
     alerts.ts            توليد التنبيهات
+    alert-docs.ts        أنواع المستندات المشمولة في تنبيهات الانتهاء (`Company.alertDocTypes`)
+    official-print.ts    ربط زر الطباعة بكشف رسمي PDF (طولي/عرضي)
+    download-pdf.ts      تنزيل عنصر DOM كملف PDF
     calendar.ts          أحداث التقويم والتذكيرات
     contacts.ts          جهات الاتصال للعرض والطباعة
     i18n.ts lang.ts      الترجمة (عربي / إنجليزي)
@@ -438,7 +441,7 @@ src/
 
 | الجدول | الغرض | أهم الحقول |
 |---|---|---|
-| `Company` | المنشأة (مساحة العمل) وإعداداتها — حدّ العزل لكل البيانات | الاسم، `rolePermissions` (JSON: صلاحيات الأدوار المعدّلة لهذه المنشأة؛ الدور غير الموجود يأخذ الافتراضي)، العملة، `salaryDays`، أيام تنبيه المستندات، `payDay`، `leaveWarningDays`، `catalogVersion` (0 = لم يُهيّأ الكتالوج بعد)، الحماية الاجتماعية `spfEnabled` و`spfEmployeeRate` و`spfEmployerRate` و`spfExpatEmployerRate` و`spfWageCap` و`spfBase` (`GROSS`/`BASIC`)، `bankBic` و`bankAccount` لملف WPS، تسجيل الحضور `clockEnabled` و`workLat`/`workLng` و`workRadius` (افتراضياً 200) و`workStart`، التوقيع الإلكتروني `signatoryName` و`signatoryTitle` و`signatureUrl` و`stampUrl`، و`letterAutoKinds` (JSON: أنواع الخطابات المطلوبة التي تصدر تلقائياً)، `payrollApproval`، `portalDeviceCheck` (افتراضياً مفعّل)، وإعدادات الدوام والإضافي (انظر `WorkSchedule`) |
+| `Company` | المنشأة (مساحة العمل) وإعداداتها — حدّ العزل لكل البيانات | الاسم، `rolePermissions` (JSON: صلاحيات الأدوار المعدّلة لهذه المنشأة؛ الدور غير الموجود يأخذ الافتراضي)، العملة، `salaryDays`، أيام تنبيه المستندات (`alertUrgentDays` / `alertWarningDays` / `alertEarlyDays`)، `alertDocTypes` (JSON: أنواع المستندات المشمولة في التنبيهات وتصفية الانتهاء في `/documents`؛ فارغ = الكل؛ `lib/alert-docs.ts`)، `payDay`، `leaveWarningDays`، `catalogVersion` (0 = لم يُهيّأ الكتالوج بعد)، الحماية الاجتماعية `spfEnabled` و`spfEmployeeRate` و`spfEmployerRate` و`spfExpatEmployerRate` و`spfWageCap` و`spfBase` (`GROSS`/`BASIC`)، `bankBic` و`bankAccount` لملف WPS، تسجيل الحضور `clockEnabled` و`workLat`/`workLng` و`workRadius` (افتراضياً 200) و`workStart`، التوقيع الإلكتروني `signatoryName` و`signatoryTitle` و`signatureUrl` و`stampUrl`، و`letterAutoKinds` (JSON: أنواع الخطابات المطلوبة التي تصدر تلقائياً)، `payrollApproval`، `portalDeviceCheck` (افتراضياً مفعّل)، وإعدادات الدوام والإضافي (انظر `WorkSchedule`) |
 | `JobTitle` / `Department` | المسميات الوظيفية والأقسام لكل منشأة | `nameAr` (فريد داخل المنشأة)، `nameEn`؛ وللمسمى `description` (JSON: الوصف الوظيفي بالعربية والإنجليزية) و`descriptionAt` و`descriptionBy` |
 | `LeaveType` | أنواع الإجازات لكل منشأة | `key` (فريد داخل المنشأة؛ `annual`/`sick`/`compensatory`/`other` للأساسية و`t<hex>` للمضافة، وهو ما يُخزَّن في `balanceKey`)، `nameAr`، `nameEn`، `days`، `allJobs`، `jobTitleIds[]`، `sortOrder`، `cycle` (`ONCE`/`YEARLY`/`MONTHLY`)، `carryCap` (حد الترحيل، فارغ = بلا حد) |
 | `AllowanceType` | تعريف العلاوة (القيم الافتراضية) | `nameAr`، `nameEn`، `calc` (`FIXED`/`PERCENT`)، `base` (`BASIC`/`PACKAGE`)، `value`، `frequency` (`MONTHLY`/`QUARTERLY`/`SEMI_ANNUAL`/`ANNUAL`)، `payMonth` |
@@ -800,6 +803,7 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 
 | التاريخ | التغيير |
 |---|---|
+| 2026-10-19 | طباعة رسمية PDF لكل الصفحات (`official-print`، طولي/عرضي، تنزيل PDF أولاً). تصفية المستندات بالكفيل. `Company.alertDocTypes` لاختيار أنواع مستندات التنبيه والانتهاء؛ عرض مجمّع لكل موظف في `/documents` والتنبيهات؛ طباعة موظف / كفيل / الكل (`1bdb0d1`، عمود JSON اختياري) |
 | 2026-10-18 | الدليل الموحد لتصنيف المهن + تسريع القائمة (صفحات 50). ثم منع تكرار الاسم العربي: إلحاق التخصص من عمود الإنجليزية، ودمج المكررات عند الاستيراد (`mergeDuplicateJobTitles`) |
 | 2026-10-18 | قراءة ملف وزارة العمل: فصل تواريخ التأشيرة/التصريح عن البطاقة والإقامة، وفصل تاريخ الوصول عن الالتحاق (`arrivalDate`)، وحفظ `VISA`+`WORK_PERMIT`. بلا تغيير في المخطط |
 | 2026-10-14 | ملف وزارة العمل يُحفظ في مستندات الموظف باسم «مرفق بيانات وزارة العمل» (`MOL_FILE`)، ويُرفق بالموظف المسجل مسبقاً دون تغيير بياناته، والملف المشترك بين عدة عمال لا يُحذف إلا بآخر وثيقة (`removeDocumentFileIfUnused`). إعادة بناء إدارة المنصة `/admin` (إطار بقائمة جانبية ودرج، بحث عام، رسوم الإيراد والتسجيلات، توزيع الباقات، «تحتاج متابعة»، تصفية وترتيب وتصدير CSV للشركات، ملخصات وتصفية المدفوعات والمستخدمين والسجل، صفحات بلا تمرير أفقي). الدخول بحساب BHD من `hr.bhd-om.com` يعود إلى النطاق نفسه (`signInOrigin`). بلا تغيير في المخطط |
