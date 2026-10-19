@@ -6,7 +6,19 @@ import { useEffect, useState } from "react";
 import { useLang } from "@/components/lang-provider";
 
 /** Column title with a small search lens and up/down sort arrows. Keeps the rest of the query string. */
-export function ColumnHead({ column, label, className }: { column: string; label: string; className?: string }) {
+export function ColumnHead({
+  column,
+  label,
+  className,
+  searchable = true,
+  sortable = true,
+}: {
+  column: string;
+  label: string;
+  className?: string;
+  searchable?: boolean;
+  sortable?: boolean;
+}) {
   const { t } = useLang();
   const router = useRouter();
   const pathname = usePathname();
@@ -31,12 +43,12 @@ export function ColumnHead({ column, label, className }: { column: string; label
   }
 
   useEffect(() => {
-    if (value.trim() === current.trim()) return;
+    if (!searchable || value.trim() === current.trim()) return;
     const timer = window.setTimeout(() => go({ [key]: value.trim() || null }), 300);
     return () => window.clearTimeout(timer);
     // go reads the latest params when the timer fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }, [value, searchable]);
 
   const upOn = sort === column && dir === "asc";
   const downOn = sort === column && dir === "desc";
@@ -45,35 +57,41 @@ export function ColumnHead({ column, label, className }: { column: string; label
     <th className={`px-3 py-2 text-start align-bottom ${className || ""}`}>
       <span className="flex flex-wrap items-center gap-1">
         <span className="font-semibold">{label}</span>
-        <button
-          type="button"
-          className={`rounded p-0.5 ${current || open ? "text-teal-700" : "text-slate-400 hover:text-slate-700"}`}
-          aria-label={t(`بحث في ${label}`, `Search ${label}`)}
-          aria-expanded={open}
-          onClick={() => setOpen((item) => !item)}
-        >
-          <Search size={13} />
-        </button>
-        <button
-          type="button"
-          className={`rounded p-0.5 ${upOn ? "text-teal-700" : "text-slate-400 hover:text-slate-700"}`}
-          aria-label={t(`فرز ${label} تصاعدياً`, `Sort ${label} ascending`)}
-          aria-pressed={upOn}
-          onClick={() => go({ sort: column, dir: "asc" })}
-        >
-          <ArrowUp size={13} />
-        </button>
-        <button
-          type="button"
-          className={`rounded p-0.5 ${downOn ? "text-teal-700" : "text-slate-400 hover:text-slate-700"}`}
-          aria-label={t(`فرز ${label} تنازلياً`, `Sort ${label} descending`)}
-          aria-pressed={downOn}
-          onClick={() => go({ sort: column, dir: "desc" })}
-        >
-          <ArrowDown size={13} />
-        </button>
+        {searchable ? (
+          <button
+            type="button"
+            className={`rounded p-0.5 ${current || open ? "text-teal-700" : "text-slate-400 hover:text-slate-700"}`}
+            aria-label={t(`بحث في ${label}`, `Search ${label}`)}
+            aria-expanded={open}
+            onClick={() => setOpen((item) => !item)}
+          >
+            <Search size={13} />
+          </button>
+        ) : null}
+        {sortable ? (
+          <>
+            <button
+              type="button"
+              className={`rounded p-0.5 ${upOn ? "text-teal-700" : "text-slate-400 hover:text-slate-700"}`}
+              aria-label={t(`فرز ${label} تصاعدياً`, `Sort ${label} ascending`)}
+              aria-pressed={upOn}
+              onClick={() => go({ sort: column, dir: "asc" })}
+            >
+              <ArrowUp size={13} />
+            </button>
+            <button
+              type="button"
+              className={`rounded p-0.5 ${downOn ? "text-teal-700" : "text-slate-400 hover:text-slate-700"}`}
+              aria-label={t(`فرز ${label} تنازلياً`, `Sort ${label} descending`)}
+              aria-pressed={downOn}
+              onClick={() => go({ sort: column, dir: "desc" })}
+            >
+              <ArrowDown size={13} />
+            </button>
+          </>
+        ) : null}
       </span>
-      {open ? (
+      {searchable && open ? (
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}

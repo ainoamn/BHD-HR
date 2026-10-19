@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { AlertTriangle, Banknote, CheckCircle2, Download, FileText, HandCoins, Info, Printer, ShieldAlert, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { PeriodFilter } from "@/components/period-filter";
 import { DeleteButton } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, PageHeader, SectionTitle, Stat, ToneBadge, fieldClass, linkAction, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
+import { compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { PAYMENT_LABEL, monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { countAbsenceDays } from "@/lib/payroll";
@@ -17,10 +19,27 @@ import { totalDeductions, totalEarnings } from "@/lib/salary";
 import { daysLabel, money, readPeriod, round3, todayInputValue } from "@/lib/utils";
 import { createSalary, deleteUnpaidSalary, generatePayroll, payAll } from "@/server/salary-actions";
 
+const COLUMNS = ["name", "employer", "basic", "allow", "deduct", "net", "status"];
+
 export default async function SalariesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; employerId?: string; error?: string; message?: string }>;
+  searchParams: Promise<{
+    year?: string;
+    month?: string;
+    employerId?: string;
+    sort?: string;
+    dir?: string;
+    fname?: string;
+    femployer?: string;
+    fbasic?: string;
+    fallow?: string;
+    fdeduct?: string;
+    fnet?: string;
+    fstatus?: string;
+    error?: string;
+    message?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("salaries.view");
@@ -100,6 +119,37 @@ export default async function SalariesPage({
       ? t("بدون صاحب عمل", "No employer")
       : t("كل أصحاب العمل", "All employers");
   const period = `${year}-${String(month).padStart(2, "0")}`;
+  const rows = salaries
+    .map((salary) => ({
+      salary,
+      name: lang === "en" && salary.employeeNameEn ? salary.employeeNameEn : salary.employeeName,
+      employerName: (lang === "en" && salary.employerNameEn ? salary.employerNameEn : salary.employerName) || "",
+      allowances: round3(salary.housingAllowance + salary.transportAllowance + salary.otherAllowance + salary.extraEarnings),
+      deductions: totalDeductions(salary),
+      statusLabel: salary.paid ? t("مصروف", "Paid") : t("غير مصروف", "Unpaid"),
+    }))
+    .filter(
+      (row) =>
+        includesText(`${row.name} ${row.salary.employeeNumber}`, sp.fname) &&
+        includesText(row.employerName, sp.femployer) &&
+        includesText(`${row.salary.basicSalary} ${money(row.salary.basicSalary, currency)}`, sp.fbasic) &&
+        includesText(`${row.allowances} ${money(row.allowances, currency)}`, sp.fallow) &&
+        includesText(`${row.deductions} ${money(row.deductions, currency)}`, sp.fdeduct) &&
+        includesText(`${row.salary.netSalary} ${money(row.salary.netSalary, currency)}`, sp.fnet) &&
+        includesText(row.statusLabel, sp.fstatus),
+    );
+  const { sort, dir } = readSort(sp, COLUMNS, "name");
+  const locale = lang === "en" ? "en" : "ar";
+  rows.sort((a, b) => {
+    if (!sp.sort) return 0; // keep the database order (employer, then employee)
+    if (sort === "employer") return compareText(a.employerName, b.employerName, dir, locale);
+    if (sort === "basic") return compareNumber(a.salary.basicSalary, b.salary.basicSalary, dir);
+    if (sort === "allow") return compareNumber(a.allowances, b.allowances, dir);
+    if (sort === "deduct") return compareNumber(a.deductions, b.deductions, dir);
+    if (sort === "net") return compareNumber(a.salary.netSalary, b.salary.netSalary, dir);
+    if (sort === "status") return compareText(a.statusLabel, b.statusLabel, dir, locale);
+    return compareText(a.name, b.name, dir, locale);
+  });
   const stats = [
     { label: t("المسيرات", "Records"), value: String(salaries.length), icon: FileText, tone: "navy" as const },
     { label: t("الإجمالي", "Gross"), value: money(totalGross, currency), icon: TrendingUp, tone: "teal" as const },
@@ -365,27 +415,23 @@ export default async function SalariesPage({
         {t("مسير الشهر", "Month payroll")}
       </SectionTitle>
       <div className="table-shell">
-        <table className="table-stack min-w-full text-sm">
+        <table className="table-stack table-tools min-w-full text-sm">
           <thead>
             <tr>
-              <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
-              <th className="px-4 py-3 text-start">{t("صاحب العمل", "Employer")}</th>
-              <th className="px-4 py-3 text-start">{t("الأساسي", "Basic")}</th>
-              <th className="px-4 py-3 text-start">{t("البدلات والإضافات", "Allowances & additions")}</th>
-              <th className="px-4 py-3 text-start">{t("الخصومات", "Deductions")}</th>
-              <th className="px-4 py-3 text-start">{t("الصافي", "Net")}</th>
-              <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
+              <ColumnHead column="name" label={t("الموظف", "Employee")} />
+              <ColumnHead column="employer" label={t("صاحب العمل", "Employer")} />
+              <ColumnHead column="basic" label={t("الأساسي", "Basic")} />
+              <ColumnHead column="allow" label={t("البدلات والإضافات", "Allowances & additions")} />
+              <ColumnHead column="deduct" label={t("الخصومات", "Deductions")} />
+              <ColumnHead column="net" label={t("الصافي", "Net")} />
+              <ColumnHead column="status" label={t("الحالة", "Status")} />
               <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th>
             </tr>
           </thead>
           <tbody>
-            {salaries.map((salary) => {
-              const allowances = round3(salary.housingAllowance + salary.transportAllowance + salary.otherAllowance + salary.extraEarnings);
-              const deductions = totalDeductions(salary);
+            {rows.map(({ salary, name, employerName, allowances, deductions }) => {
               const live = liveDays.get(salary.employeeId) ?? 0;
               const stale = !salary.paid && round3(live) !== round3(salary.absenceDays);
-              const name = lang === "en" && salary.employeeNameEn ? salary.employeeNameEn : salary.employeeName;
-              const employerName = lang === "en" && salary.employerNameEn ? salary.employerNameEn : salary.employerName;
               return (
                 <tr key={salary.id}>
                   <td className="cell-title px-4 py-3">
@@ -455,6 +501,8 @@ export default async function SalariesPage({
             </span>
             <p className="mt-3 text-sm text-slate-500">{t("لا توجد رواتب لهذا الشهر. اضغط إنشاء الرواتب.", "No salaries for this month. Click Generate payroll.")}</p>
           </div>
+        ) : rows.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-slate-500">{t("لا توجد رواتب تطابق البحث.", "No salaries match the filters.")}</p>
         ) : null}
       </div>
     </div>

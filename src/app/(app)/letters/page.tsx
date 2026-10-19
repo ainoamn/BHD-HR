@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { Archive, CheckCircle2, Clock3, Plus, ScrollText, Search, TriangleAlert } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { Card, EmptyState, PageHeader, SectionTitle, Stat, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
+import { columnHiddenFields, compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { DRAFT_STATUS, issueDueLetterDrafts, readDraftContent } from "@/lib/letter-drafts";
@@ -13,10 +15,28 @@ import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
 
+const COLUMNS = ["ref", "kind", "subject", "name", "date", "status"];
+
 export default async function LettersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kind?: string; employeeId?: string; q?: string; state?: string; view?: string; error?: string; message?: string }>;
+  searchParams: Promise<{
+    kind?: string;
+    employeeId?: string;
+    q?: string;
+    state?: string;
+    view?: string;
+    sort?: string;
+    dir?: string;
+    fref?: string;
+    fkind?: string;
+    fsubject?: string;
+    fname?: string;
+    fdate?: string;
+    fstatus?: string;
+    error?: string;
+    message?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("letters.view");
@@ -68,6 +88,34 @@ export default async function LettersPage({
     : new Map();
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
   const filtered = Boolean(kind || sp.employeeId || q || state);
+  const locale = lang === "en" ? "en" : "ar";
+  const rows = letters
+    .map((letter) => ({
+      letter,
+      kindLabel: pick((LETTER_KIND[letter.kind as LetterKind] || LETTER_KIND.GENERAL).label, lang),
+      statusLabel: pick(letterState(letter).label, lang),
+      name: nameOf(letter.employee),
+    }))
+    .filter(
+      (row) =>
+        includesText(row.letter.refNo, sp.fref) &&
+        includesText(row.kindLabel, sp.fkind) &&
+        includesText(row.letter.subject, sp.fsubject) &&
+        includesText(`${row.name} ${row.letter.employee.employeeNumber}`, sp.fname) &&
+        includesText(`${formatDate(row.letter.issuedAt)} ${row.letter.issuedAt.toISOString().slice(0, 10)}`, sp.fdate) &&
+        includesText(row.statusLabel, sp.fstatus),
+    );
+  const { sort, dir: sortDir } = readSort(sp, COLUMNS, "date");
+  // No sort chosen: newest letters first.
+  const dir = sp.sort ? sortDir : "desc";
+  rows.sort((a, b) => {
+    if (sort === "ref") return compareText(a.letter.refNo, b.letter.refNo, dir, locale);
+    if (sort === "kind") return compareText(a.kindLabel, b.kindLabel, dir, locale);
+    if (sort === "subject") return compareText(a.letter.subject, b.letter.subject, dir, locale);
+    if (sort === "name") return compareText(a.name, b.name, dir, locale);
+    if (sort === "status") return compareText(a.statusLabel, b.statusLabel, dir, locale);
+    return compareNumber(a.letter.issuedAt.getTime(), b.letter.issuedAt.getTime(), dir);
+  });
 
   return (
     <div className="page-wide">
@@ -200,6 +248,9 @@ export default async function LettersPage({
             </select>
           </label>
           <div className="flex gap-2">
+            {columnHiddenFields(sp, COLUMNS).map((field) => (
+              <input key={field.name} type="hidden" name={field.name} value={field.value} />
+            ))}
             <button className={secondaryBtn}>{t("تطبيق", "Apply")}</button>
             {filtered ? (
               <Link href="/letters" className="self-center text-sm font-semibold text-slate-500 hover:text-teal-800">
@@ -216,34 +267,58 @@ export default async function LettersPage({
             <EmptyState icon={ScrollText} title={t("لا توجد خطابات بعد", "No letters yet")} text={t("أصدر أول خطاب أو إنذار لموظف، وسيظهر هنا مع حالة استلامه.", "Issue the first letter or warning, and it will appear here with its receipt status.")} />
           )
         ) : (
-          <ul className="divide-y divide-slate-100">
-            {letters.map((letter) => {
-              const meta = LETTER_KIND[letter.kind as LetterKind] || LETTER_KIND.GENERAL;
-              const status = letterState(letter);
-              return (
-                <li key={letter.id}>
-                  <Link href={`/letters/${letter.id}`} className="-mx-2 flex flex-col gap-2 rounded-xl px-2 py-3 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ToneBadge tone={meta.tone}>{pick(meta.label, lang)}</ToneBadge>
-                        <span className="tabular text-xs font-semibold text-slate-500" dir="ltr">
-                          {letter.refNo}
-                        </span>
-                      </div>
-                      <p className={`mt-1 truncate font-semibold text-slate-900 ${letter.cancelledAt ? "line-through opacity-60" : ""}`}>{letter.subject}</p>
-                      <p className="truncate text-sm text-slate-500">
-                        {nameOf(letter.employee)} · {letter.employee.employeeNumber}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3 text-sm">
-                      <span className="tabular text-slate-500">{formatDate(letter.issuedAt)}</span>
-                      <ToneBadge tone={status.tone}>{pick(status.label, lang)}</ToneBadge>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <div className="table-shell">
+              <table className="table-stack table-tools min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <ColumnHead column="ref" label={t("الرقم المرجعي", "Reference")} />
+                    <ColumnHead column="kind" label={t("النوع", "Type")} />
+                    <ColumnHead column="subject" label={t("الموضوع", "Subject")} />
+                    <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                    <ColumnHead column="date" label={t("التاريخ", "Date")} />
+                    <ColumnHead column="status" label={t("الحالة", "Status")} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ letter, kindLabel, statusLabel, name }) => {
+                    const meta = LETTER_KIND[letter.kind as LetterKind] || LETTER_KIND.GENERAL;
+                    const status = letterState(letter);
+                    return (
+                      <tr key={letter.id}>
+                        <td className="px-4 py-3 whitespace-nowrap" data-label={t("الرقم المرجعي", "Reference")}>
+                          <Link href={`/letters/${letter.id}`} className="tabular text-xs font-semibold text-slate-500 hover:text-teal-700" dir="ltr">
+                            {letter.refNo}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3" data-label={t("النوع", "Type")}>
+                          <ToneBadge tone={meta.tone}>{kindLabel}</ToneBadge>
+                        </td>
+                        <td className="cell-title px-4 py-3">
+                          <Link href={`/letters/${letter.id}`} className={`font-semibold text-slate-900 hover:text-teal-700 ${letter.cancelledAt ? "line-through opacity-60" : ""}`}>
+                            {letter.subject}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3" data-label={t("الموظف", "Employee")}>
+                          <Link href={`/letters/${letter.id}`} className="text-slate-800 hover:text-teal-700">
+                            {name}
+                          </Link>
+                          <div className="tabular text-xs text-slate-500">{letter.employee.employeeNumber}</div>
+                        </td>
+                        <td className="tabular px-4 py-3 whitespace-nowrap text-slate-500" data-label={t("التاريخ", "Date")}>
+                          {formatDate(letter.issuedAt)}
+                        </td>
+                        <td className="px-4 py-3" data-label={t("الحالة", "Status")}>
+                          <ToneBadge tone={status.tone}>{statusLabel}</ToneBadge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {rows.length === 0 ? <p className="py-10 text-center text-sm text-slate-500">{t("لا توجد خطابات تطابق البحث.", "No letters match the filters.")}</p> : null}
+          </>
         )}
       </Card>
       )}

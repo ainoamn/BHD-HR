@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { CalendarClock, CheckCheck, Settings2, Timer } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { PeriodFilter } from "@/components/period-filter";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, EmptyState, PageHeader, Stat, ToneBadge, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
+import { compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { monthName } from "@/lib/constants";
 import { getI18n } from "@/lib/lang";
 import { monthTimesheet } from "@/lib/timesheet";
@@ -14,7 +16,13 @@ import { approveTimesheets, withdrawTimesheet } from "@/server/work-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function TimesheetPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string; error?: string; message?: string }> }) {
+const COLS = ["name", "days", "late", "early", "otday", "otnight", "otrest", "amount", "status"] as const;
+
+export default async function TimesheetPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; month?: string; sort?: string; dir?: string; fname?: string; fdays?: string; flate?: string; fearly?: string; fotday?: string; fotnight?: string; fotrest?: string; famount?: string; fstatus?: string; error?: string; message?: string }>;
+}) {
   const sp = await searchParams;
   const user = await requirePermission("attendance.view");
   const { lang, t } = await getI18n();
@@ -35,6 +43,37 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
   );
   const name = (row: (typeof rows)[number]) => (lang === "en" && row.nameEn ? row.nameEn : row.fullName);
   const minutes = (value: number) => (value ? hoursLabel(value) : "—");
+  const statusOf = (row: (typeof rows)[number]) =>
+    row.approved ? t("معتمد", "Approved") : !row.schedule ? t("بلا جدول", "No schedule") : t("بانتظار الاعتماد", "Awaiting approval");
+  const amountOf = (row: (typeof rows)[number]) => (row.approved ? row.approved.overtimeAmount : row.amounts.overtime) - (row.approved ? row.approved.latenessAmount : row.amounts.lateness);
+  const { sort, dir } = readSort(sp, [...COLS], "name");
+  const listed = withHours
+    .filter((row) => {
+      const overtime = row.approved ? row.approved.overtimeAmount : row.amounts.overtime;
+      const lateness = row.approved ? row.approved.latenessAmount : row.amounts.lateness;
+      return (
+        includesText(name(row), sp.fname) &&
+        includesText(String(row.figures.days), sp.fdays) &&
+        includesText(minutes(row.figures.lateMinutes), sp.flate) &&
+        includesText(minutes(row.figures.earlyLeaveMinutes), sp.fearly) &&
+        includesText(minutes(row.figures.overtimeDay), sp.fotday) &&
+        includesText(minutes(row.figures.overtimeNight), sp.fotnight) &&
+        includesText(minutes(row.figures.overtimeRest), sp.fotrest) &&
+        includesText(`${overtime} ${lateness} ${money(overtime, currency)} ${money(lateness, currency)}`, sp.famount) &&
+        includesText(statusOf(row), sp.fstatus)
+      );
+    })
+    .sort((a, b) => {
+      if (sort === "days") return compareNumber(a.figures.days, b.figures.days, dir);
+      if (sort === "late") return compareNumber(a.figures.lateMinutes, b.figures.lateMinutes, dir);
+      if (sort === "early") return compareNumber(a.figures.earlyLeaveMinutes, b.figures.earlyLeaveMinutes, dir);
+      if (sort === "otday") return compareNumber(a.figures.overtimeDay, b.figures.overtimeDay, dir);
+      if (sort === "otnight") return compareNumber(a.figures.overtimeNight, b.figures.overtimeNight, dir);
+      if (sort === "otrest") return compareNumber(a.figures.overtimeRest, b.figures.overtimeRest, dir);
+      if (sort === "amount") return compareNumber(amountOf(a), amountOf(b), dir);
+      if (sort === "status") return compareText(statusOf(a), statusOf(b), dir, lang === "en" ? "en" : "ar");
+      return compareText(name(a), name(b), dir, lang === "en" ? "en" : "ar");
+    });
 
   return (
     <div className="page-wide space-y-5">
@@ -87,23 +126,23 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
           ) : null}
         </div>
         {withHours.length ? (
-          <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-slate-200">
-            <table className="w-full min-w-[760px] text-sm">
+          <div className="table-shell overflow-x-auto">
+            <table className="table-stack table-tools w-full min-w-[760px] text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("الموظف", "Employee")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("الأيام", "Days")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("تأخير", "Late")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("خروج مبكر", "Early leave")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("إضافي نهاري", "Day OT")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("إضافي ليلي", "Night OT")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("يوم راحة", "Rest day")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("المبلغ", "Amount")}</th>
-                  <th className="px-3 py-2.5 text-start font-semibold">{t("الحالة", "Status")}</th>
+                  <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                  <ColumnHead column="days" label={t("الأيام", "Days")} />
+                  <ColumnHead column="late" label={t("تأخير", "Late")} />
+                  <ColumnHead column="early" label={t("خروج مبكر", "Early leave")} />
+                  <ColumnHead column="otday" label={t("إضافي نهاري", "Day OT")} />
+                  <ColumnHead column="otnight" label={t("إضافي ليلي", "Night OT")} />
+                  <ColumnHead column="otrest" label={t("يوم راحة", "Rest day")} />
+                  <ColumnHead column="amount" label={t("المبلغ", "Amount")} />
+                  <ColumnHead column="status" label={t("الحالة", "Status")} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {withHours.map((row) => {
+                {listed.map((row) => {
                   const overtime = row.approved ? row.approved.overtimeAmount : row.amounts.overtime;
                   const lateness = row.approved ? row.approved.latenessAmount : row.amounts.lateness;
                   return (
@@ -161,6 +200,9 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
                 })}
               </tbody>
             </table>
+            {!listed.length ? (
+              <p className="px-3 py-6 text-center text-sm text-slate-500">{t("لا نتائج تطابق بحث الأعمدة.", "No rows match the column filters.")}</p>
+            ) : null}
           </div>
         ) : (
           <EmptyState

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, Clock3, FileCheck2, FolderLock, UserRound } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { DeleteButton } from "@/components/row-forms";
@@ -7,6 +8,7 @@ import { SearchSelect } from "@/components/search-select";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, EmptyState, Field, PageHeader, Stat, ToneBadge, fieldClass, linkAction, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
+import { columnHiddenFields, compareNumber, compareText, includesText, readSort, withColumnParams } from "@/lib/column-tools";
 import { CUSTODY_DIRECTION, HELD_DOC_LABEL, HELD_DOC_TYPES, HELD_STATUS_LABEL, HELD_STATUS_TONE, heldDocLabel, overdueWhere } from "@/lib/custody";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -16,8 +18,29 @@ import { deleteHeldDocument, handOverOriginals, receiveOriginals, updateHeldDocu
 
 const VIEWS = ["held", "out", "overdue", "forms"] as const;
 const NEW_ROWS = 4;
+const FORM_COLUMNS = ["form", "name", "handed", "received", "ack"];
+const DOC_COLUMNS = ["doc", "name", "status", "last"];
 
-export default async function CustodyPage({ searchParams }: { searchParams: Promise<{ view?: string; employee?: string; error?: string; message?: string }> }) {
+export default async function CustodyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    view?: string;
+    employee?: string;
+    sort?: string;
+    dir?: string;
+    fform?: string;
+    fname?: string;
+    fhanded?: string;
+    freceived?: string;
+    fack?: string;
+    fdoc?: string;
+    fstatus?: string;
+    flast?: string;
+    error?: string;
+    message?: string;
+  }>;
+}) {
   const sp = await searchParams;
   const user = await requirePermission("documents.view");
   const { lang, t } = await getI18n();
@@ -51,7 +74,8 @@ export default async function CustodyPage({ searchParams }: { searchParams: Prom
     const params = new URLSearchParams({ view, ...(chosen ? { employee: chosen.id } : {}), ...next });
     return `/documents/custody?${params.toString()}`;
   };
-  const returnTo = query({});
+  const columns = view === "forms" ? FORM_COLUMNS : DOC_COLUMNS;
+  const returnTo = `/documents/custody${withColumnParams(`?${query({}).split("?")[1]}`, sp, columns)}`;
 
   const [documents, forms] = await Promise.all([
     view === "forms"
@@ -81,6 +105,64 @@ export default async function CustodyPage({ searchParams }: { searchParams: Prom
     { id: "overdue", label: t("متأخرة الإعادة", "Overdue"), count: overdueCount },
     { id: "forms", label: t("سجل الاستمارات", "Forms log"), count: null },
   ];
+  const locale = lang === "en" ? "en" : "ar";
+  const { sort, dir } = readSort(sp, columns, columns[0]);
+  const formRows = forms
+    .map((form) => ({
+      form,
+      name: nameOf(form.employee),
+      formText: `${form.refNo} ${pick(CUSTODY_DIRECTION[form.direction]?.short, lang, form.direction)}`,
+      ackText: form.acknowledgedAt ? t(`أقرّ ${formatDate(form.acknowledgedAt)}`, `Acknowledged ${formatDate(form.acknowledgedAt)}`) : t("بانتظار إقرار الموظف", "Awaiting the employee"),
+    }))
+    .filter(
+      (row) =>
+        includesText(row.formText, sp.fform) &&
+        includesText(row.name, sp.fname) &&
+        includesText(row.form.handedByName || "", sp.fhanded) &&
+        includesText(row.form.receivedByName || "", sp.freceived) &&
+        includesText(row.ackText, sp.fack),
+    );
+  formRows.sort((a, b) => {
+    if (!sp.sort) return 0; // newest forms first, as fetched
+    if (sort === "name") return compareText(a.name, b.name, dir, locale);
+    if (sort === "handed") return compareText(a.form.handedByName || "", b.form.handedByName || "", dir, locale);
+    if (sort === "received") return compareText(a.form.receivedByName || "", b.form.receivedByName || "", dir, locale);
+    if (sort === "ack") return compareNumber(a.form.acknowledgedAt?.getTime() ?? Number.MAX_SAFE_INTEGER, b.form.acknowledgedAt?.getTime() ?? Number.MAX_SAFE_INTEGER, dir);
+    return compareText(a.form.refNo, b.form.refNo, dir, locale);
+  });
+  const docRows = documents
+    .map((doc) => {
+      const last = doc.items[0]?.form;
+      const late = Boolean(doc.status === "OUT" && doc.dueBack && doc.dueBack < now);
+      const docLabel = pick(heldDocLabel(doc), lang);
+      const statusText = `${pick(HELD_STATUS_LABEL[doc.status], lang, doc.status)}${
+        doc.status === "OUT" ? ` ${doc.dueBack ? t(`موعد الإعادة ${formatDate(doc.dueBack)}`, `Due back ${formatDate(doc.dueBack)}`) : t("سُلّم نهائياً", "Handed over for good")}` : ""
+      }`;
+      return {
+        doc,
+        last,
+        late,
+        docLabel,
+        docText: `${docLabel} ${doc.documentNo || ""}`,
+        name: nameOf(doc.employee),
+        statusText,
+        lastText: last ? `${last.refNo} ${last.handedByName} ${last.receivedByName} ${formatDate(last.createdAt)}` : "",
+      };
+    })
+    .filter(
+      (row) =>
+        includesText(row.docText, sp.fdoc) &&
+        includesText(`${row.name} ${row.doc.employee.employeeNumber}`, sp.fname) &&
+        includesText(row.statusText, sp.fstatus) &&
+        includesText(row.lastText, sp.flast),
+    );
+  docRows.sort((a, b) => {
+    if (!sp.sort) return 0; // keep the database order
+    if (sort === "name") return compareText(a.name, b.name, dir, locale);
+    if (sort === "status") return compareText(a.statusText, b.statusText, dir, locale);
+    if (sort === "last") return compareNumber(a.last?.createdAt.getTime() ?? 0, b.last?.createdAt.getTime() ?? 0, dir);
+    return compareText(a.docText, b.docText, dir, locale);
+  });
   const held = chosen?.heldDocuments.filter((doc) => doc.status === "HELD") || [];
   const out = chosen?.heldDocuments.filter((doc) => doc.status === "OUT") || [];
 
@@ -110,6 +192,9 @@ export default async function CustodyPage({ searchParams }: { searchParams: Prom
       <Card className="mb-5">
         <GetForm className="grid items-end gap-2 sm:flex">
           <input type="hidden" name="view" value={view} />
+          {columnHiddenFields(sp, columns).map((field) => (
+            <input key={field.name} type="hidden" name={field.name} value={field.value} />
+          ))}
           <label className="min-w-0 flex-1 space-y-1.5 text-xs font-medium text-slate-500">
             {t("الموظف", "Employee")}
             <SearchSelect
@@ -248,18 +333,18 @@ export default async function CustodyPage({ searchParams }: { searchParams: Prom
       {view === "forms" ? (
         forms.length ? (
           <div className="table-shell">
-            <table className="table-stack w-full text-sm">
+            <table className="table-stack table-tools w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-xs text-slate-500">
-                  <th className="px-3 py-2 text-start font-medium">{t("الاستمارة", "Form")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("الموظف", "Employee")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("المُسلِّم", "Handed by")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("المُستلِم", "Received by")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("الإقرار", "Acknowledgement")}</th>
+                  <ColumnHead column="form" label={t("الاستمارة", "Form")} />
+                  <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                  <ColumnHead column="handed" label={t("المُسلِّم", "Handed by")} />
+                  <ColumnHead column="received" label={t("المُستلِم", "Received by")} />
+                  <ColumnHead column="ack" label={t("الإقرار", "Acknowledgement")} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {forms.map((form) => (
+                {formRows.map(({ form }) => (
                   <tr key={form.id}>
                     <td className="cell-title px-3 py-2.5" data-label={t("الاستمارة", "Form")}>
                       <Link href={`/documents/custody/${form.id}`} className="font-semibold text-slate-900 hover:text-teal-700">
@@ -291,26 +376,25 @@ export default async function CustodyPage({ searchParams }: { searchParams: Prom
                 ))}
               </tbody>
             </table>
+            {formRows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">{t("لا توجد استمارات تطابق البحث.", "No forms match the filters.")}</p> : null}
           </div>
         ) : (
           <EmptyState icon={FileCheck2} title={t("لا توجد استمارات", "No forms")} text={t("تظهر هنا كل استمارة استلام أو تسليم مستندات أصلية.", "Every receipt or handover form of original documents appears here.")} />
         )
       ) : documents.length ? (
         <div className="table-shell">
-          <table className="table-stack w-full text-sm">
+          <table className="table-stack table-tools w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-xs text-slate-500">
-                <th className="px-3 py-2 text-start font-medium">{t("المستند", "Document")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("الموظف", "Employee")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("الحالة", "Status")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("آخر حركة", "Last movement")}</th>
+                <ColumnHead column="doc" label={t("المستند", "Document")} />
+                <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                <ColumnHead column="status" label={t("الحالة", "Status")} />
+                <ColumnHead column="last" label={t("آخر حركة", "Last movement")} />
                 {allow.edit || allow.remove ? <th className="px-3 py-2 text-end font-medium">{t("إجراءات", "Actions")}</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {documents.map((doc) => {
-                const last = doc.items[0]?.form;
-                const late = doc.status === "OUT" && doc.dueBack && doc.dueBack < now;
+              {docRows.map(({ doc, last, late }) => {
                 return (
                   <tr key={doc.id}>
                     <td className="cell-title px-3 py-2.5" data-label={t("المستند", "Document")}>
@@ -388,6 +472,7 @@ export default async function CustodyPage({ searchParams }: { searchParams: Prom
               })}
             </tbody>
           </table>
+          {docRows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">{t("لا توجد مستندات تطابق البحث.", "No documents match the filters.")}</p> : null}
         </div>
       ) : (
         <EmptyState

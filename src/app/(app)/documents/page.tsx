@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, FilePlus2, Files, FolderLock, Paperclip } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
@@ -7,6 +8,7 @@ import { PageHeader, ToneBadge, fieldClass, linkAction, secondaryBtn } from "@/c
 import { can, requirePermission } from "@/lib/auth";
 import { DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
 import { collectDocuments } from "@/lib/documents";
+import { compareNumber, compareText, includesText, readSort, withColumnParams } from "@/lib/column-tools";
 import { describeExpiry } from "@/lib/expiry";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
@@ -16,8 +18,13 @@ import { addDocument, deleteDocument, updateDocument } from "@/server/document-a
 import { DocumentScan } from "@/components/document-scan";
 
 const VIEW_IDS = ["all", "expired", "warning", "early"];
+const COLUMNS = ["name", "doc", "no", "expiry", "status"];
 
-export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ view?: string; error?: string; message?: string }> }) {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; sort?: string; dir?: string; fname?: string; fdoc?: string; fno?: string; fexpiry?: string; fstatus?: string; error?: string; message?: string }>;
+}) {
   const sp = await searchParams;
   const user = await requirePermission("documents.view");
   const { lang, t } = await getI18n();
@@ -28,7 +35,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     { id: "early", label: t("خلال التنبيه المبكر", "Within early notice") },
   ];
   const view = VIEW_IDS.includes(sp.view || "") ? sp.view || "all" : "all";
-  const returnTo = `/documents?view=${view}`;
+  const toolQuery = (id: string) => withColumnParams(`?view=${id}`, sp, COLUMNS);
+  const returnTo = `/documents${toolQuery(view)}`;
   const allow = { create: can(user, "documents.create"), edit: can(user, "documents.edit"), remove: can(user, "documents.delete") };
   const canEditEmployee = can(user, "employees.edit");
   const showActions = allow.edit || allow.remove || canEditEmployee;
@@ -51,7 +59,25 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       if (view === "early") return row.status.key !== "ok" && row.status.key !== "none";
       return true;
     })
-    .sort((a, b) => a.status.days - b.status.days);
+    .filter(
+      (row) =>
+        includesText(row.employeeName, sp.fname) &&
+        includesText(row.label, sp.fdoc) &&
+        includesText(row.number || "", sp.fno) &&
+        includesText(`${formatDate(row.expiry)} ${row.expiry ? row.expiry.toISOString().slice(0, 10) : ""}`, sp.fexpiry) &&
+        includesText(row.status.label, sp.fstatus),
+    );
+  const { sort, dir } = readSort(sp, COLUMNS, "status");
+  const locale = lang === "en" ? "en" : "ar";
+  rows.sort((a, b) => {
+    // No sort chosen: keep the default order, nearest expiry first.
+    if (!sp.sort) return a.status.days - b.status.days;
+    if (sort === "name") return compareText(a.employeeName, b.employeeName, dir, locale);
+    if (sort === "doc") return compareText(a.label, b.label, dir, locale);
+    if (sort === "no") return compareText(a.number || "", b.number || "", dir, locale);
+    if (sort === "status") return compareText(a.status.label, b.status.label, dir, locale);
+    return compareNumber(a.expiry ? a.expiry.getTime() : Number.MAX_SAFE_INTEGER, b.expiry ? b.expiry.getTime() : Number.MAX_SAFE_INTEGER, dir);
+  });
 
   return (
     <div className="page-wide">
@@ -138,21 +164,21 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       <div className="mb-4 overflow-x-auto pb-1">
         <nav className="segmented" aria-label={t("تصفية المستندات", "Filter documents")}>
           {views.map((item) => (
-            <Link key={item.id} href={`/documents?view=${item.id}`} aria-current={item.id === view ? "page" : undefined}>
+            <Link key={item.id} href={`/documents${toolQuery(item.id)}`} aria-current={item.id === view ? "page" : undefined}>
               {item.label}
             </Link>
           ))}
         </nav>
       </div>
       <div className="table-shell">
-        <table className="table-stack min-w-full text-sm">
+        <table className="table-stack table-tools min-w-full text-sm">
           <thead>
             <tr>
-              <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
-              <th className="px-4 py-3 text-start">{t("المستند", "Document")}</th>
-              <th className="px-4 py-3 text-start">{t("الرقم", "Number")}</th>
-              <th className="px-4 py-3 text-start">{t("الانتهاء", "Expiry")}</th>
-              <th className="px-4 py-3 text-start">{t("الحالة", "Status")}</th>
+              <ColumnHead column="name" label={t("الموظف", "Employee")} />
+              <ColumnHead column="doc" label={t("المستند", "Document")} />
+              <ColumnHead column="no" label={t("الرقم", "Number")} />
+              <ColumnHead column="expiry" label={t("الانتهاء", "Expiry")} />
+              <ColumnHead column="status" label={t("الحالة", "Status")} />
               {showActions ? <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th> : null}
             </tr>
           </thead>

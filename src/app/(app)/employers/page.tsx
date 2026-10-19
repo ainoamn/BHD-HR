@@ -4,7 +4,6 @@ import {
   Building2,
   ChevronDown,
   Contact,
-  FileText,
   LayoutGrid,
   List,
   Mail,
@@ -15,15 +14,18 @@ import {
   Search,
   SearchX,
   User,
+  UserPlus,
   UserRound,
   UserRoundX,
   Users,
 } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { EmployerForm } from "@/components/employer-form";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { Card, EmptyState, PageHeader, Stat, ToneBadge, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
+import { columnHiddenFields, compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
 import { type ContactKind, loadContacts, readContactKind } from "@/lib/contacts";
 import { pick } from "@/lib/i18n";
@@ -34,20 +36,44 @@ import { packageGross } from "@/lib/salary";
 import { cn, currentPeriod, money } from "@/lib/utils";
 import { createEmployer } from "@/server/employer-actions";
 
-const CHIP_LIMIT = 6;
-type View = "cards" | "list" | "contacts";
+const CHIP_LIMIT = 5;
+const LIST_COLS = ["name", "kind", "idno", "phone", "email", "staff", "pay"] as const;
+const CONTACT_COLS = ["name", "kind", "relation", "phone", "email", "extra"] as const;
+type View = "list" | "cards" | "contacts";
 
 export default async function EmployersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; kind?: string; view?: string; employerId?: string; new?: string; error?: string; message?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    kind?: string;
+    view?: string;
+    employerId?: string;
+    new?: string;
+    sort?: string;
+    dir?: string;
+    fname?: string;
+    fkind?: string;
+    fidno?: string;
+    fphone?: string;
+    femail?: string;
+    fstaff?: string;
+    fpay?: string;
+    frelation?: string;
+    fextra?: string;
+    error?: string;
+    message?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("employers.view");
   const showPay = can(user, "salaries.view");
+  const canCreate = can(user, "employers.create");
+  const canHire = can(user, "employees.create");
   const { lang, t } = await getI18n();
+  const locale = lang === "en" ? "en" : "ar";
   const q = sp.q?.trim() || "";
-  const view: View = sp.view === "list" || sp.view === "contacts" ? sp.view : "cards";
+  const view: View = sp.view === "cards" || sp.view === "contacts" ? sp.view : "list";
   const rawKind = readContactKind(sp.kind);
   const kind: ContactKind = view !== "contacts" && rawKind === "EMPLOYEE" ? "" : rawKind;
   const sponsorKind = kind === "COMPANY" || kind === "PERSON" ? kind : "";
@@ -62,7 +88,15 @@ export default async function EmployersPage({
             companyId: user.companyId,
             ...(sponsorKind ? { kind: sponsorKind } : {}),
             ...(q
-              ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { nameEn: { contains: q, mode: "insensitive" } }, { idNumber: { contains: q, mode: "insensitive" } }, { phone: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] }
+              ? {
+                  OR: [
+                    { name: { contains: q, mode: "insensitive" } },
+                    { nameEn: { contains: q, mode: "insensitive" } },
+                    { idNumber: { contains: q, mode: "insensitive" } },
+                    { phone: { contains: q, mode: "insensitive" } },
+                    { email: { contains: q, mode: "insensitive" } },
+                  ],
+                }
               : {}),
           },
           include: {
@@ -88,13 +122,45 @@ export default async function EmployersPage({
     prisma.employer.findMany({ where: { companyId: user.companyId }, select: { id: true, name: true, nameEn: true }, orderBy: { name: "asc" } }),
     view === "contacts" ? loadContacts({ companyId: user.companyId, q, kind, employerId }) : Promise.resolve(null),
   ]);
-  const linkedCount = await prisma.employee.count({ where: { companyId: user.companyId, employerId: { not: null }, status: { not: "TERMINATED" } } });
+  const linkedCount = await prisma.employee.count({
+    where: { companyId: user.companyId, employerId: { not: null }, status: { not: "TERMINATED" } },
+  });
   const { year, month } = currentPeriod();
-  const period = `${year}-${String(month).padStart(2, "0")}`;
-  const filtered = Boolean(q || kind || employerId);
+  const filtered = Boolean(q || kind || employerId || sp.sort || LIST_COLS.some((col) => sp[`f${col}` as keyof typeof sp]) || CONTACT_COLS.some((col) => sp[`f${col}` as keyof typeof sp]));
   const openForm = totalEmployers === 0 || sp.new === "1" || Boolean(sp.error);
   const sponsorName = (sponsor: { name: string; nameEn: string | null }) => (lang === "en" && sponsor.nameEn ? sponsor.nameEn : sponsor.name);
   const personName = (person: { fullName: string; nameEn: string | null }) => (lang === "en" && person.nameEn ? person.nameEn : person.fullName);
+  type Staff = (typeof employers)[number]["employees"][number];
+  const activeOf = (employees: Staff[]) => employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION");
+  const monthlyOf = (employees: Staff[]) => activeOf(employees).reduce((sum, employee) => sum + packageGross(employee), 0);
+
+  const listSort = readSort(sp, [...LIST_COLS], "name");
+  const listed = [...employers]
+    .filter((employer) => {
+      const active = activeOf(employer.employees);
+      const monthly = monthlyOf(employer.employees);
+      return (
+        includesText(sponsorName(employer), sp.fname) &&
+        includesText(pick(EMPLOYER_KIND[employer.kind], lang, employer.kind), sp.fkind) &&
+        includesText(employer.idNumber || "", sp.fidno) &&
+        includesText(formatPhone(employer.phone) || employer.phone || "", sp.fphone) &&
+        includesText(employer.email || "", sp.femail) &&
+        includesText(`${active.length} ${employer.employees.length}`, sp.fstaff) &&
+        includesText(showPay ? `${monthly} ${money(monthly, currency)}` : "", sp.fpay)
+      );
+    })
+    .sort((a, b) => {
+      if (listSort.sort === "staff") return compareNumber(activeOf(a.employees).length, activeOf(b.employees).length, listSort.dir);
+      if (listSort.sort === "pay") return compareNumber(monthlyOf(a.employees), monthlyOf(b.employees), listSort.dir);
+      const label = (employer: (typeof employers)[number]) => {
+        if (listSort.sort === "kind") return pick(EMPLOYER_KIND[employer.kind], lang, employer.kind);
+        if (listSort.sort === "idno") return employer.idNumber || "";
+        if (listSort.sort === "phone") return formatPhone(employer.phone) || employer.phone || "";
+        if (listSort.sort === "email") return employer.email || "";
+        return sponsorName(employer);
+      };
+      return compareText(label(a), label(b), listSort.dir, locale);
+    });
 
   const href = (next: { view?: View; kind?: string; q?: string; employerId?: string }) => {
     const query = new URLSearchParams();
@@ -102,7 +168,7 @@ export default async function EmployersPage({
     const nextKind = next.kind ?? kind;
     const nextQ = next.q ?? q;
     const nextEmployer = next.employerId ?? employerId;
-    if (nextView !== "cards") query.set("view", nextView);
+    if (nextView !== "list") query.set("view", nextView);
     if (nextKind && !(nextView !== "contacts" && nextKind === "EMPLOYEE")) query.set("kind", nextKind);
     if (nextQ) query.set("q", nextQ);
     if (nextEmployer && nextView === "contacts") query.set("employerId", nextEmployer);
@@ -116,34 +182,36 @@ export default async function EmployersPage({
   const printHref = `/address-book/print${printQuery.toString() ? `?${printQuery.toString()}` : ""}`;
 
   const views: { id: View; label: string; icon: typeof LayoutGrid }[] = [
-    { id: "cards", label: t("بطاقات", "Cards"), icon: LayoutGrid },
     { id: "list", label: t("قائمة", "List"), icon: List },
+    { id: "cards", label: t("بطاقات", "Cards"), icon: LayoutGrid },
     { id: "contacts", label: t("جهات الاتصال", "Contacts"), icon: Contact },
   ];
   const kinds = [
     { value: "", label: t("الكل", "All") },
-    { value: "COMPANY", label: t("شركات ومنشآت", "Companies") },
+    { value: "COMPANY", label: t("شركات", "Companies") },
     { value: "PERSON", label: t("أفراد", "Individuals") },
     ...(view === "contacts" ? [{ value: "EMPLOYEE", label: t("موظفون", "Employees") }] : []),
   ];
-  const resultCount = view === "contacts" ? (contacts?.sponsors.length || 0) + (contacts?.employees.length || 0) : employers.length;
+  const resultCount = view === "contacts" ? (contacts?.sponsors.length || 0) + (contacts?.employees.length || 0) : listed.length;
+  const listKeep = columnHiddenFields(sp as Record<string, string | undefined>, [...LIST_COLS]);
+  const contactKeep = columnHiddenFields(sp as Record<string, string | undefined>, [...CONTACT_COLS]);
 
   return (
     <div className="page-wide space-y-5">
       <PageHeader
         icon={BookUser}
-        title={t("دفتر العناوين", "Address book")}
+        title={t("الكفلاء وجهات الاتصال", "Sponsors & contacts")}
         description={t(
-          "سجل الكفلاء وأصحاب العمل وجهات الاتصال. تُصرف رواتب كل موظف باسم كفيله وشعاره، وكل موظف تربطه بكفيل يظهر تحته هنا تلقائياً.",
-          "Your sponsors, employers and contacts. Each employee is paid under their sponsor's name and logo, and every linked employee appears under that sponsor here automatically.",
+          "كل كفيل مع موظفيه ورواتبه وبيانات التواصل في مكان واحد.",
+          "Every sponsor with their staff, payroll and contact details in one place.",
         )}
       >
         <div className="flex flex-wrap gap-2">
           <Link href={printHref} target="_blank" className={secondaryBtn}>
             <Printer size={16} />
-            {t("طباعة جهات الاتصال", "Print contacts")}
+            {t("طباعة", "Print")}
           </Link>
-          {can(user, "employers.create") ? (
+          {canCreate ? (
             <Link href="/employers?new=1#new" className={primaryBtn}>
               <Plus size={16} />
               {t("كفيل جديد", "New sponsor")}
@@ -154,44 +222,45 @@ export default async function EmployersPage({
 
       <Flash error={sp.error} message={sp.message} />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <Stat label={t("الكفلاء", "Sponsors")} value={String(totalEmployers)} icon={Building2} tone="navy" />
-        <Stat label={t("موظفون مرتبطون", "Linked employees")} value={String(linkedCount)} icon={Users} tone="teal" />
-        <div className="col-span-2 sm:col-span-1">
-          <Stat
-            label={t("بدون كفيل", "Without sponsor")}
-            value={String(unlinked)}
-            href="/employees?employerId=none"
-            icon={UserRoundX}
-            tone={unlinked > 0 ? "amber" : "gold"}
-            emphasis={unlinked > 0 ? "amber" : undefined}
-          />
-        </div>
+        <Stat label={t("مرتبطون", "Linked")} value={String(linkedCount)} icon={Users} tone="teal" />
+        <Stat
+          label={t("بلا كفيل", "No sponsor")}
+          value={String(unlinked)}
+          href="/employees?employerId=none"
+          icon={UserRoundX}
+          tone={unlinked > 0 ? "amber" : "gold"}
+          emphasis={unlinked > 0 ? "amber" : undefined}
+        />
       </div>
 
-      {can(user, "employers.create") ? (
-      <details id="new" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
-          <span className="flex items-center gap-3 font-bold text-slate-900">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
-              <Plus size={18} />
+      {canCreate ? (
+        <details id="new" open={openForm} className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/90 bg-surface shadow-card">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50/70 sm:px-5">
+            <span className="flex items-center gap-2.5 font-bold text-slate-900">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100">
+                <Plus size={17} />
+              </span>
+              {t("إضافة كفيل", "Add sponsor")}
             </span>
-            {t("إضافة كفيل / صاحب عمل", "Add sponsor / employer")}
-          </span>
-          <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
-        </summary>
-        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-5 sm:px-5">
-          <EmployerForm action={createEmployer} submitLabel={t("حفظ الكفيل", "Save sponsor")} />
-        </div>
-      </details>
+            <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-5 sm:px-5">
+            <EmployerForm action={createEmployer} submitLabel={t("حفظ الكفيل", "Save sponsor")} />
+          </div>
+        </details>
       ) : null}
 
       <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <GetForm className="flex w-full gap-2 md:max-w-md">
-            {view !== "cards" ? <input type="hidden" name="view" value={view} /> : null}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <GetForm className="flex w-full gap-2 lg:max-w-md">
+            {view !== "list" ? <input type="hidden" name="view" value={view} /> : null}
             {kind ? <input type="hidden" name="kind" value={kind} /> : null}
             {employerId ? <input type="hidden" name="employerId" value={employerId} /> : null}
+            {(view === "contacts" ? contactKeep : listKeep).map((item) => (
+              <input key={item.name} type="hidden" name={item.name} value={item.value} />
+            ))}
             <div className="relative min-w-0 flex-1">
               <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -201,9 +270,6 @@ export default async function EmployersPage({
                 placeholder={t("ابحث بالاسم أو الهاتف أو البريد", "Search name, phone or email")}
               />
             </div>
-            <button className={primaryBtn} type="submit">
-              {t("بحث", "Search")}
-            </button>
           </GetForm>
           <nav className="segmented grid grid-cols-3" aria-label={t("طريقة العرض", "View")}>
             {views.map((item) => {
@@ -218,7 +284,7 @@ export default async function EmployersPage({
           </nav>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex gap-1 overflow-x-auto">
+          <div className="flex gap-1 overflow-x-auto pb-0.5">
             {kinds.map((item) => (
               <Link
                 key={item.value || "all"}
@@ -237,6 +303,9 @@ export default async function EmployersPage({
               <input type="hidden" name="view" value="contacts" />
               {kind ? <input type="hidden" name="kind" value={kind} /> : null}
               {q ? <input type="hidden" name="q" value={q} /> : null}
+              {contactKeep.map((item) => (
+                <input key={item.name} type="hidden" name={item.name} value={item.value} />
+              ))}
               <select className={`${fieldClass} min-w-0 flex-1 sm:w-56`} name="employerId" defaultValue={employerId} aria-label={t("الكفيل", "Sponsor")}>
                 <option value="">{t("كل الكفلاء", "All sponsors")}</option>
                 {sponsorOptions.map((sponsor) => (
@@ -246,9 +315,6 @@ export default async function EmployersPage({
                 ))}
                 <option value="none">{t("بدون كفيل", "No sponsor")}</option>
               </select>
-              <button className={secondaryBtn} type="submit">
-                {t("عرض", "Show")}
-              </button>
             </GetForm>
           ) : null}
         </div>
@@ -259,7 +325,9 @@ export default async function EmployersPage({
               {t("مسح الفلاتر", "Clear filters")}
             </Link>
           </p>
-        ) : null}
+        ) : (
+          <p className="text-xs text-slate-500">{t(`${resultCount} كفيل / جهة اتصال`, `${resultCount} sponsor / contact(s)`)}</p>
+        )}
       </div>
 
       {resultCount === 0 ? (
@@ -268,34 +336,113 @@ export default async function EmployersPage({
           title={filtered ? t("لا توجد نتائج مطابقة", "No matching results") : t("لا يوجد كفلاء بعد", "No sponsors yet")}
           text={
             filtered
-              ? t("جرّب كلمة بحث أخرى أو اعرض الكل.", "Try another search or show all.")
-              : t("أضف أول كفيل من النموذج أعلاه، أو من نموذج إضافة موظف مباشرة.", "Add your first sponsor with the form above, or straight from the add-employee form.")
+              ? t("جرّب كلمة بحث أخرى أو امسح الفلاتر.", "Try another search or clear the filters.")
+              : t("أضف أول كفيل من الزر أعلاه.", "Add your first sponsor with the button above.")
           }
         />
       ) : null}
 
-      {view === "cards" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {employers.map((employer) => {
+      {view === "list" && listed.length ? (
+        <div className="table-shell">
+          <table className="table-stack table-tools min-w-full text-sm">
+            <thead>
+              <tr>
+                <ColumnHead column="name" label={t("الكفيل", "Sponsor")} />
+                <ColumnHead column="kind" label={t("النوع", "Type")} className="hidden md:table-cell" />
+                <ColumnHead column="idno" label={t("السجل / المدني", "CR / ID")} className="hidden lg:table-cell" />
+                <ColumnHead column="phone" label={t("الهاتف", "Phone")} className="hidden sm:table-cell" />
+                <ColumnHead column="email" label={t("البريد", "Email")} className="hidden xl:table-cell" />
+                <ColumnHead column="staff" label={t("الموظفون", "Employees")} />
+                {showPay ? <ColumnHead column="pay" label={t("الرواتب", "Payroll")} /> : null}
+                <th className="px-3 py-2 text-end">{t("إجراءات", "Actions")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {listed.map((employer) => {
+                const title = sponsorName(employer);
+                const active = activeOf(employer.employees);
+                const monthly = monthlyOf(employer.employees);
+                const KindIcon = employer.kind === "PERSON" ? User : Building2;
+                return (
+                  <tr key={employer.id}>
+                    <td className="cell-title px-4 py-3">
+                      <Link href={`/employers/${employer.id}`} className="flex min-w-0 items-center gap-2.5 font-semibold text-slate-900 hover:text-teal-800">
+                        <SponsorAvatar logoUrl={employer.logoUrl} title={title} size="xs" />
+                        <span className="min-w-0 truncate">{title}</span>
+                      </Link>
+                    </td>
+                    <td className="hidden px-4 py-3 md:table-cell" data-label={t("النوع", "Type")}>
+                      <ToneBadge tone="teal">
+                        <KindIcon size={12} className="me-1" />
+                        {pick(EMPLOYER_KIND[employer.kind], lang, employer.kind)}
+                      </ToneBadge>
+                    </td>
+                    <td className="hidden px-4 py-3 lg:table-cell" data-label={t("السجل / المدني", "CR / ID")} dir="ltr">
+                      {employer.idNumber || "—"}
+                    </td>
+                    <td className="hidden px-4 py-3 whitespace-nowrap sm:table-cell" data-label={t("الهاتف", "Phone")}>
+                      {employer.phone ? (
+                        <a href={phoneHref(employer.phone)} className="hover:text-teal-800" dir="ltr">
+                          {formatPhone(employer.phone)}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="hidden max-w-48 truncate px-4 py-3 xl:table-cell" data-label={t("البريد", "Email")}>
+                      {employer.email ? (
+                        <a href={`mailto:${employer.email}`} className="hover:text-teal-800" dir="ltr">
+                          {employer.email}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap" data-label={t("الموظفون", "Employees")}>
+                      <span className="font-semibold">{active.length}</span>
+                      {employer.employees.length > active.length ? <span className="text-xs text-slate-500"> / {employer.employees.length}</span> : null}
+                    </td>
+                    {showPay ? (
+                      <td className="tabular px-4 py-3 whitespace-nowrap" data-label={t("الرواتب", "Payroll")}>
+                        {money(monthly, currency)}
+                      </td>
+                    ) : null}
+                    <td className="cell-actions px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                        <Link href={`/employers/${employer.id}`} className="text-sm font-semibold text-teal-800 hover:underline">
+                          {t("فتح", "Open")}
+                        </Link>
+                        {canHire ? (
+                          <Link href={`/employees/new?employerId=${employer.id}`} className="text-sm font-semibold text-slate-600 hover:text-teal-800">
+                            {t("موظف", "Hire")}
+                          </Link>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {view === "cards" && listed.length ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {listed.map((employer) => {
             const title = sponsorName(employer);
             const otherName = lang === "en" ? (employer.nameEn ? employer.name : null) : employer.nameEn;
             const subtitle = otherName && otherName.trim() !== title.trim() ? otherName : null;
-            const active = employer.employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION");
-            const monthly = active.reduce((sum, employee) => sum + packageGross(employee), 0);
-            const details = [
-              employer.idNumber ? { icon: FileText, label: t("السجل / الرقم المدني", "CR / civil ID"), value: employer.idNumber, href: null } : null,
-              employer.phone ? { icon: Phone, label: t("الهاتف", "Phone"), value: formatPhone(employer.phone), href: phoneHref(employer.phone) } : null,
-              employer.email ? { icon: Mail, label: t("البريد", "Email"), value: employer.email, href: `mailto:${employer.email}` } : null,
-              employer.address ? { icon: MapPin, label: t("العنوان", "Address"), value: employer.address, href: null } : null,
-            ].filter((item): item is NonNullable<typeof item> => Boolean(item));
+            const active = activeOf(employer.employees);
+            const monthly = monthlyOf(employer.employees);
             const KindIcon = employer.kind === "PERSON" ? User : Building2;
             return (
-              <Card key={employer.id} className="flex flex-col p-0 sm:p-0">
-                <div className="flex items-start gap-3 p-4 sm:p-5">
+              <Card key={employer.id} className="flex flex-col gap-4 p-4 sm:p-5">
+                <div className="flex items-start gap-3">
                   <SponsorAvatar logoUrl={employer.logoUrl} title={title} size="lg" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/employers/${employer.id}`} className="break-words text-lg font-bold text-slate-900 hover:text-teal-800">
+                      <Link href={`/employers/${employer.id}`} className="truncate text-base font-bold text-slate-900 hover:text-teal-800">
                         {title}
                       </Link>
                       <ToneBadge tone="teal">
@@ -304,109 +451,83 @@ export default async function EmployersPage({
                       </ToneBadge>
                     </div>
                     {subtitle ? (
-                      <p className="mt-0.5 break-words text-sm text-slate-500" dir={lang === "en" ? "rtl" : "ltr"}>
+                      <p className="mt-0.5 truncate text-sm text-slate-500" dir={lang === "en" ? "rtl" : "ltr"}>
                         {subtitle}
                       </p>
                     ) : null}
-                  </div>
-                </div>
-
-                <div className="px-4 sm:px-5">
-                  {details.length ? (
-                    <dl className="grid gap-2 sm:grid-cols-2">
-                      {details.map((item) => {
-                        const Icon = item.icon;
-                        const value = item.href ? (
-                          <a href={item.href} className="hover:text-teal-800" dir="ltr">
-                            {item.value}
-                          </a>
-                        ) : (
-                          <span dir={item.icon === MapPin ? undefined : "ltr"}>{item.value}</span>
-                        );
-                        return (
-                          <div key={item.label} className={cn("flex min-w-0 items-start gap-2 text-sm", item.icon === MapPin && "sm:col-span-2")}>
-                            <Icon size={15} className="mt-0.5 shrink-0 text-slate-400" />
-                            <dt className="sr-only">{item.label}</dt>
-                            <dd className="min-w-0 break-words text-slate-700">{value}</dd>
-                          </div>
-                        );
-                      })}
-                    </dl>
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      {t("لا توجد بيانات تواصل.", "No contact details.")}{" "}
-                      <Link href={`/employers/${employer.id}#details`} className="font-semibold text-teal-800">
-                        {t("أكملها", "Add them")}
-                      </Link>
-                    </p>
-                  )}
-                </div>
-
-                <div className="mx-4 mt-4 grid grid-cols-2 divide-x divide-slate-200 rounded-xl bg-slate-50 py-2.5 text-center rtl:divide-x-reverse sm:mx-5">
-                  <div>
-                    <p className="text-xs text-slate-500">{t("موظفون نشطون", "Active employees")}</p>
-                    <p className="font-bold text-slate-900">
-                      {active.length}
-                      {employer.employees.length > active.length ? (
-                        <span className="text-xs font-normal text-slate-500"> / {employer.employees.length}</span>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-600">
+                      {employer.phone ? (
+                        <a href={phoneHref(employer.phone)} className="inline-flex items-center gap-1 hover:text-teal-800" dir="ltr">
+                          <Phone size={13} className="text-slate-400" />
+                          {formatPhone(employer.phone)}
+                        </a>
                       ) : null}
-                    </p>
-                  </div>
-                  <div className="min-w-0 px-2">
-                    <p className="text-xs text-slate-500">{t("الرواتب الشهرية", "Monthly payroll")}</p>
-                    <p className="truncate font-bold text-slate-900">{showPay ? money(monthly, currency) : "—"}</p>
-                  </div>
-                </div>
-
-                <div className="flex-1 px-4 pt-4 sm:px-5">
-                  <p className="mb-2 text-xs font-semibold text-slate-500">{t("الموظفون", "Employees")}</p>
-                  {employer.employees.length === 0 ? (
-                    <p className="text-sm text-slate-500">{t("لا يوجد موظفون مرتبطون بعد.", "No linked employees yet.")}</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {employer.employees.slice(0, CHIP_LIMIT).map((employee) => (
-                        <Link
-                          key={employee.id}
-                          href={`/employees/${employee.id}`}
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-surface px-2.5 py-1 text-sm ring-1 ring-slate-200 hover:text-teal-800 hover:ring-teal-200"
-                        >
-                          <StatusDot status={employee.status} />
-                          <span className="truncate">{personName(employee)}</span>
-                          <span className="text-xs text-slate-400">{employee.employeeNumber}</span>
-                        </Link>
-                      ))}
-                      {employer.employees.length > CHIP_LIMIT ? (
-                        <Link href={`/employers/${employer.id}`} className="rounded-lg px-2.5 py-1 text-sm font-semibold text-teal-800">
-                          {t(`+${employer.employees.length - CHIP_LIMIT} آخرين`, `+${employer.employees.length - CHIP_LIMIT} more`)}
-                        </Link>
+                      {employer.email ? (
+                        <a href={`mailto:${employer.email}`} className="inline-flex min-w-0 items-center gap-1 truncate hover:text-teal-800" dir="ltr">
+                          <Mail size={13} className="shrink-0 text-slate-400" />
+                          <span className="truncate">{employer.email}</span>
+                        </a>
+                      ) : null}
+                      {employer.address ? (
+                        <span className="inline-flex min-w-0 items-start gap-1">
+                          <MapPin size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                          <span className="line-clamp-1">{employer.address}</span>
+                        </span>
                       ) : null}
                     </div>
-                  )}
+                  </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:flex sm:flex-wrap sm:px-5">
-                  <Link href={`/employers/${employer.id}`} className={`${primaryBtn} px-3 py-2`}>
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-center">
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500">{t("موظفون نشطون", "Active staff")}</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {active.length}
+                      {employer.employees.length > active.length ? <span className="text-xs font-normal text-slate-500">/{employer.employees.length}</span> : null}
+                    </p>
+                  </div>
+                  <div className="min-w-0 border-s border-slate-200/80">
+                    <p className="text-[11px] font-medium text-slate-500">{t("رواتب الشهر", "Month pay")}</p>
+                    <p className="truncate text-lg font-bold text-slate-900">{showPay ? money(monthly, currency) : "—"}</p>
+                  </div>
+                </div>
+
+                {employer.employees.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {employer.employees.slice(0, CHIP_LIMIT).map((employee) => (
+                      <Link
+                        key={employee.id}
+                        href={`/employees/${employee.id}`}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-xs ring-1 ring-slate-200 hover:text-teal-800 hover:ring-teal-200"
+                      >
+                        <StatusDot status={employee.status} />
+                        <span className="truncate">{personName(employee)}</span>
+                      </Link>
+                    ))}
+                    {employer.employees.length > CHIP_LIMIT ? (
+                      <Link href={`/employers/${employer.id}`} className="rounded-lg px-2 py-1 text-xs font-semibold text-teal-800">
+                        +{employer.employees.length - CHIP_LIMIT}
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">{t("لا يوجد موظفون مرتبطون.", "No linked employees.")}</p>
+                )}
+
+                <div className="mt-auto flex gap-2 border-t border-slate-100 pt-3">
+                  <Link href={`/employers/${employer.id}`} className={`${primaryBtn} flex-1 px-3 py-2`}>
                     {t("فتح الملف", "Open")}
                   </Link>
-                  {can(user, "employees.create") ? (
-                    <Link href={`/employees/new?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`}>
-                      {t("إضافة موظف", "Add employee")}
+                  {canHire ? (
+                    <Link href={`/employees/new?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`} title={t("إضافة موظف", "Add employee")}>
+                      <UserPlus size={16} />
                     </Link>
                   ) : null}
                   {showPay ? (
-                    <>
-                      <Link href={`/salaries?employerId=${employer.id}`} className={`${secondaryBtn} px-3 py-2`}>
-                        {t("الرواتب", "Payroll")}
-                      </Link>
-                      <Link href={`/salaries/sheet?from=${period}&to=${period}&employerId=${employer.id}`} target="_blank" className={`${secondaryBtn} px-3 py-2`}>
-                        {t("كشف الشهر", "Month sheet")}
-                      </Link>
-                    </>
+                    <Link href={`/salaries?employerId=${employer.id}&year=${year}&month=${month}`} className={`${secondaryBtn} px-3 py-2`} title={t("الرواتب", "Payroll")}>
+                      {t("رواتب", "Pay")}
+                    </Link>
                   ) : null}
-                  <Link href={`/address-book/print?employerId=${employer.id}`} target="_blank" className={`${secondaryBtn} col-span-2 px-3 py-2`}>
-                    <Printer size={15} />
-                    {t("طباعة جهات الاتصال", "Print contacts")}
-                  </Link>
                 </div>
               </Card>
             );
@@ -414,118 +535,15 @@ export default async function EmployersPage({
         </div>
       ) : null}
 
-      {view === "list" && employers.length ? (
-        <>
-          <div className="space-y-2 md:hidden">
-            {employers.map((employer) => {
-              const active = employer.employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION").length;
-              return (
-                <div key={employer.id} className="rounded-2xl border border-slate-200/90 bg-surface p-3.5 shadow-card">
-                  <div className="flex items-start gap-3">
-                    <SponsorAvatar logoUrl={employer.logoUrl} title={sponsorName(employer)} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <Link href={`/employers/${employer.id}`} className="block break-words font-bold text-slate-900">
-                        {sponsorName(employer)}
-                      </Link>
-                      <p className="text-xs text-slate-500">
-                        {pick(EMPLOYER_KIND[employer.kind], lang, employer.kind)} · {t(`${active} موظف نشط`, `${active} active`)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-                    {employer.phone ? (
-                      <a href={phoneHref(employer.phone)} className="inline-flex items-center gap-1" dir="ltr">
-                        <Phone size={13} className="text-slate-400" />
-                        {formatPhone(employer.phone)}
-                      </a>
-                    ) : null}
-                    {employer.email ? (
-                      <a href={`mailto:${employer.email}`} className="inline-flex min-w-0 items-center gap-1 break-all" dir="ltr">
-                        <Mail size={13} className="shrink-0 text-slate-400" />
-                        {employer.email}
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="table-shell hidden md:block">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 text-start">{t("الكفيل", "Sponsor")}</th>
-                  <th className="px-4 py-3 text-start">{t("النوع", "Type")}</th>
-                  <th className="px-4 py-3 text-start">{t("السجل / المدني", "CR / ID")}</th>
-                  <th className="px-4 py-3 text-start">{t("الهاتف", "Phone")}</th>
-                  <th className="px-4 py-3 text-start">{t("البريد", "Email")}</th>
-                  <th className="px-4 py-3 text-start">{t("الموظفون", "Employees")}</th>
-                  <th className="px-4 py-3 text-start">{t("الرواتب الشهرية", "Monthly payroll")}</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {employers.map((employer) => {
-                  const activeList = employer.employees.filter((employee) => employee.status === "ACTIVE" || employee.status === "VACATION");
-                  return (
-                    <tr key={employer.id} className="align-middle">
-                      <td className="px-4 py-3">
-                        <Link href={`/employers/${employer.id}`} className="flex items-center gap-2.5 font-semibold text-slate-900 hover:text-teal-800">
-                          <SponsorAvatar logoUrl={employer.logoUrl} title={sponsorName(employer)} size="xs" />
-                          {sponsorName(employer)}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">{pick(EMPLOYER_KIND[employer.kind], lang, employer.kind)}</td>
-                      <td className="px-4 py-3" dir="ltr">{employer.idNumber || "—"}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {employer.phone ? (
-                          <a href={phoneHref(employer.phone)} className="hover:text-teal-800" dir="ltr">
-                            {formatPhone(employer.phone)}
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="max-w-52 truncate px-4 py-3">
-                        {employer.email ? (
-                          <a href={`mailto:${employer.email}`} className="hover:text-teal-800" dir="ltr">
-                            {employer.email}
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-semibold">{activeList.length}</span>
-                        {employer.employees.length > activeList.length ? <span className="text-xs text-slate-500"> / {employer.employees.length}</span> : null}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">{showPay ? money(activeList.reduce((sum, employee) => sum + packageGross(employee), 0), currency) : "—"}</td>
-                      <td className="px-4 py-3 text-end whitespace-nowrap">
-                        <Link href={`/address-book/print?employerId=${employer.id}`} target="_blank" className="me-3 text-xs font-semibold text-slate-600 hover:text-teal-800">
-                          {t("طباعة", "Print")}
-                        </Link>
-                        <Link href={`/employers/${employer.id}`} className="text-xs font-semibold text-teal-800">
-                          {t("فتح", "Open")}
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : null}
-
       {view === "contacts" && contacts && resultCount ? (
-        <ContactsDirectory contacts={contacts} lang={lang} t={t} />
+        <ContactsDirectory contacts={contacts} lang={lang} t={t} sp={sp} locale={locale} />
       ) : null}
     </div>
   );
 }
 
 function SponsorAvatar({ logoUrl, title, size }: { logoUrl: string | null; title: string; size: "xs" | "sm" | "lg" }) {
-  const box = size === "lg" ? "h-14 w-14 rounded-xl text-xl" : size === "sm" ? "h-10 w-10 rounded-lg text-base" : "h-8 w-8 rounded-lg text-sm";
+  const box = size === "lg" ? "h-12 w-12 rounded-xl text-lg" : size === "sm" ? "h-10 w-10 rounded-lg text-base" : "h-8 w-8 rounded-lg text-sm";
   return logoUrl ? (
     <img src={logoUrl} alt="" className={cn(box, "shrink-0 border border-slate-200 bg-white object-contain p-0.5")} />
   ) : (
@@ -538,7 +556,13 @@ function StatusDot({ status }: { status: string }) {
     <span
       className={cn(
         "h-1.5 w-1.5 shrink-0 rounded-full",
-        STATUS_TONE[status] === "green" ? "bg-emerald-500" : STATUS_TONE[status] === "red" ? "bg-red-500" : STATUS_TONE[status] === "amber" ? "bg-amber-500" : "bg-slate-300",
+        STATUS_TONE[status] === "green"
+          ? "bg-emerald-500"
+          : STATUS_TONE[status] === "red"
+            ? "bg-red-500"
+            : STATUS_TONE[status] === "amber"
+              ? "bg-amber-500"
+              : "bg-slate-300",
       )}
     />
   );
@@ -550,7 +574,8 @@ type Row = {
   name: string;
   secondName: string | null;
   type: "COMPANY" | "PERSON" | "EMPLOYEE";
-  relation: React.ReactNode;
+  relation: string;
+  relationNode: React.ReactNode;
   phone: string | null;
   email: string | null;
   extra: string | null;
@@ -561,24 +586,30 @@ function ContactsDirectory({
   contacts,
   lang,
   t,
+  sp,
+  locale,
 }: {
   contacts: Awaited<ReturnType<typeof loadContacts>>;
   lang: "ar" | "en";
   t: (ar: string, en: string) => string;
+  sp: { sort?: string; dir?: string; fname?: string; fkind?: string; frelation?: string; fphone?: string; femail?: string; fextra?: string };
+  locale: string;
 }) {
   const rows: Row[] = [
     ...contacts.sponsors.map((sponsor) => {
       const name = lang === "en" && sponsor.nameEn ? sponsor.nameEn : sponsor.name;
       const other = lang === "en" ? sponsor.name : sponsor.nameEn;
+      const relation = t(`${sponsor.contactCount} جهة اتصال مرتبطة`, `${sponsor.contactCount} linked contact(s)`);
       return {
         key: `s-${sponsor.id}`,
         href: `/employers/${sponsor.id}`,
         name,
         secondName: other && other !== name ? other : null,
         type: sponsor.kind === "PERSON" ? ("PERSON" as const) : ("COMPANY" as const),
-        relation: (
+        relation,
+        relationNode: (
           <Link href={`/employers?view=contacts&employerId=${sponsor.id}`} className="font-semibold text-teal-800">
-            {t(`${sponsor.contactCount} جهة اتصال مرتبطة`, `${sponsor.contactCount} linked contact(s)`)}
+            {relation}
           </Link>
         ),
         phone: formatPhone(sponsor.phone),
@@ -590,16 +621,19 @@ function ContactsDirectory({
       const name = lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName;
       const other = lang === "en" ? employee.fullName : employee.nameEn;
       const sponsor = employee.employer;
+      const sponsorLabel = sponsor ? (lang === "en" && sponsor.nameEn ? sponsor.nameEn : sponsor.name) : "";
+      const relation = sponsor ? `${t("يتبع: ", "Works for: ")}${sponsorLabel}` : t("بدون كفيل", "No sponsor");
       return {
         key: `e-${employee.id}`,
         href: `/employees/${employee.id}`,
         name,
         secondName: other && other !== name ? other : null,
         type: "EMPLOYEE" as const,
-        relation: sponsor ? (
+        relation,
+        relationNode: sponsor ? (
           <Link href={`/employers/${sponsor.id}`} className="hover:text-teal-800">
             {t("يتبع: ", "Works for: ")}
-            <span className="font-semibold">{lang === "en" && sponsor.nameEn ? sponsor.nameEn : sponsor.name}</span>
+            <span className="font-semibold">{sponsorLabel}</span>
           </Link>
         ) : (
           <span className="text-amber-700">{t("بدون كفيل", "No sponsor")}</span>
@@ -611,6 +645,33 @@ function ContactsDirectory({
       };
     }),
   ];
+
+  const kindLabel = (row: Row) =>
+    row.type === "EMPLOYEE" ? t("موظف", "Employee") : pick(EMPLOYER_KIND[row.type], lang, row.type);
+
+  const contactSort = readSort(sp, [...CONTACT_COLS], "name");
+  const listed = rows
+    .filter(
+      (row) =>
+        includesText(row.name, sp.fname) &&
+        includesText(kindLabel(row), sp.fkind) &&
+        includesText(row.relation, sp.frelation) &&
+        includesText(row.phone || "", sp.fphone) &&
+        includesText(row.email || "", sp.femail) &&
+        includesText(row.extra || "", sp.fextra),
+    )
+    .sort((a, b) => {
+      const label = (row: Row) => {
+        if (contactSort.sort === "kind") return kindLabel(row);
+        if (contactSort.sort === "relation") return row.relation;
+        if (contactSort.sort === "phone") return row.phone || "";
+        if (contactSort.sort === "email") return row.email || "";
+        if (contactSort.sort === "extra") return row.extra || "";
+        return row.name;
+      };
+      return compareText(label(a), label(b), contactSort.dir, locale);
+    });
+
   const typeBadge = (row: Row) =>
     row.type === "EMPLOYEE" ? (
       <ToneBadge tone="sky">
@@ -624,102 +685,73 @@ function ContactsDirectory({
       </ToneBadge>
     );
 
+  if (!listed.length) {
+    return <EmptyState icon={SearchX} title={t("لا توجد نتائج مطابقة", "No matching results")} text={t("جرّب بحث عمود آخر.", "Try another column search.")} />;
+  }
+
   return (
-    <>
-      <div className="space-y-2 md:hidden">
-        {rows.map((row) => (
-          <div key={row.key} className="rounded-2xl border border-slate-200/90 bg-surface p-3.5 shadow-card">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <Link href={row.href} className="block break-words font-bold text-slate-900">
+    <div className="table-shell">
+      <table className="table-stack table-tools min-w-full text-sm">
+        <thead>
+          <tr>
+            <ColumnHead column="name" label={t("الاسم", "Name")} />
+            <ColumnHead column="kind" label={t("النوع", "Type")} />
+            <ColumnHead column="relation" label={t("الارتباط", "Relation")} />
+            <ColumnHead column="phone" label={t("الهاتف", "Phone")} className="hidden sm:table-cell" />
+            <ColumnHead column="email" label={t("البريد", "Email")} className="hidden md:table-cell" />
+            <ColumnHead column="extra" label={t("بيانات أخرى", "Other")} className="hidden lg:table-cell" />
+          </tr>
+        </thead>
+        <tbody>
+          {listed.map((row) => (
+            <tr key={row.key}>
+              <td className="cell-title px-4 py-3">
+                <Link href={row.href} className="flex items-center gap-1.5 font-semibold text-slate-900 hover:text-teal-800">
+                  {row.status ? <StatusDot status={row.status} /> : null}
                   {row.name}
                 </Link>
                 {row.secondName ? (
-                  <p className="break-words text-xs text-slate-500" dir={lang === "en" ? "rtl" : "ltr"}>
+                  <span className="block text-xs text-slate-500" dir={lang === "en" ? "rtl" : "ltr"}>
                     {row.secondName}
-                  </p>
+                  </span>
                 ) : null}
-              </div>
-              {typeBadge(row)}
-            </div>
-            <p className="mt-1.5 text-sm text-slate-600">{row.relation}</p>
-            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
-              {row.phone ? (
-                <a href={phoneHref(row.phone)} className="inline-flex items-center gap-1" dir="ltr">
-                  <Phone size={13} className="text-slate-400" />
-                  {row.phone}
-                </a>
-              ) : null}
-              {row.email ? (
-                <a href={`mailto:${row.email}`} className="inline-flex min-w-0 items-center gap-1 break-all" dir="ltr">
-                  <Mail size={13} className="shrink-0 text-slate-400" />
-                  {row.email}
-                </a>
-              ) : null}
-              {!row.phone && !row.email ? <span className="text-slate-400">{t("لا توجد بيانات تواصل", "No contact details")}</span> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="table-shell hidden md:block">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr>
-              <th className="px-4 py-3 text-start">{t("الاسم", "Name")}</th>
-              <th className="px-4 py-3 text-start">{t("النوع", "Type")}</th>
-              <th className="px-4 py-3 text-start">{t("الارتباط", "Relation")}</th>
-              <th className="px-4 py-3 text-start">{t("الهاتف", "Phone")}</th>
-              <th className="px-4 py-3 text-start">{t("البريد", "Email")}</th>
-              <th className="px-4 py-3 text-start">{t("بيانات أخرى", "Other")}</th>
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap" data-label={t("النوع", "Type")}>
+                {typeBadge(row)}
+              </td>
+              <td className="px-4 py-3" data-label={t("الارتباط", "Relation")}>
+                {row.relationNode}
+              </td>
+              <td className="hidden px-4 py-3 whitespace-nowrap sm:table-cell" data-label={t("الهاتف", "Phone")}>
+                {row.phone ? (
+                  <a href={phoneHref(row.phone)} className="hover:text-teal-800" dir="ltr">
+                    {row.phone}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="hidden max-w-52 truncate px-4 py-3 md:table-cell" data-label={t("البريد", "Email")}>
+                {row.email ? (
+                  <a href={`mailto:${row.email}`} className="hover:text-teal-800" dir="ltr">
+                    {row.email}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="hidden px-4 py-3 text-slate-600 lg:table-cell" data-label={t("بيانات أخرى", "Other")}>
+                {row.extra || "—"}
+                {row.status && row.status !== "ACTIVE" ? (
+                  <span className="ms-2">
+                    <ToneBadge tone={STATUS_TONE[row.status] || "slate"}>{pick(STATUS_LABEL[row.status], lang, row.status)}</ToneBadge>
+                  </span>
+                ) : null}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key} className="align-middle">
-                <td className="px-4 py-3">
-                  <Link href={row.href} className="flex items-center gap-1.5 font-semibold text-slate-900 hover:text-teal-800">
-                    {row.status ? <StatusDot status={row.status} /> : null}
-                    {row.name}
-                  </Link>
-                  {row.secondName ? (
-                    <span className="block text-xs text-slate-500" dir={lang === "en" ? "rtl" : "ltr"}>
-                      {row.secondName}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">{typeBadge(row)}</td>
-                <td className="px-4 py-3">{row.relation}</td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  {row.phone ? (
-                    <a href={phoneHref(row.phone)} className="hover:text-teal-800" dir="ltr">
-                      {row.phone}
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="max-w-52 truncate px-4 py-3">
-                  {row.email ? (
-                    <a href={`mailto:${row.email}`} className="hover:text-teal-800" dir="ltr">
-                      {row.email}
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {row.extra || "—"}
-                  {row.status && row.status !== "ACTIVE" ? (
-                    <span className="ms-2">
-                      <ToneBadge tone={STATUS_TONE[row.status] || "slate"}>{pick(STATUS_LABEL[row.status], lang, row.status)}</ToneBadge>
-                    </span>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

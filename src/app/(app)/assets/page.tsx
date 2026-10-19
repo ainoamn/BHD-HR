@@ -1,18 +1,26 @@
 import Link from "next/link";
 import { ChevronDown, LaptopMinimal, PackageCheck, Plus, UserRound, Wrench } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, EmptyState, Field, PageHeader, Stat, ToneBadge, fieldClass, secondaryBtn } from "@/components/ui";
 import { ASSET_CATEGORIES, ASSET_CATEGORY_LABEL, ASSET_STATUSES, ASSET_STATUS_LABEL, ASSET_STATUS_TONE } from "@/lib/assets";
 import { can, requirePermission } from "@/lib/auth";
+import { columnHiddenFields, compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { formatDate, money, round3 } from "@/lib/utils";
 import { saveAsset } from "@/server/asset-actions";
 
-export default async function AssetsPage({ searchParams }: { searchParams: Promise<{ status?: string; category?: string; q?: string; error?: string; message?: string }> }) {
+const COLUMNS = ["name", "status", "held", "value"];
+
+export default async function AssetsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; category?: string; q?: string; sort?: string; dir?: string; fname?: string; fstatus?: string; fheld?: string; fvalue?: string; error?: string; message?: string }>;
+}) {
   const sp = await searchParams;
   const user = await requirePermission("assets.view");
   const { lang, t } = await getI18n();
@@ -48,6 +56,29 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const count = (key: string) => grouped.find((item) => item.status === key)?._count || 0;
   const totalValue = round3(grouped.filter((item) => item.status !== "RETIRED").reduce((sum, item) => sum + (item._sum.value || 0), 0));
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
+  const locale = lang === "en" ? "en" : "ar";
+  const rows = assets
+    .map((asset) => ({
+      asset,
+      statusLabel: pick(ASSET_STATUS_LABEL[asset.status], lang, asset.status),
+      heldName: asset.employee ? nameOf(asset.employee) : "",
+      assetText: `${asset.name} ${pick(ASSET_CATEGORY_LABEL[asset.category], lang, asset.category)} ${asset.tag || ""}`,
+    }))
+    .filter(
+      (row) =>
+        includesText(row.assetText, sp.fname) &&
+        includesText(row.statusLabel, sp.fstatus) &&
+        includesText(row.heldName, sp.fheld) &&
+        includesText(row.asset.value ? `${row.asset.value} ${money(row.asset.value, user.company.currency)}` : "", sp.fvalue),
+    );
+  const { sort, dir } = readSort(sp, COLUMNS, "name");
+  rows.sort((a, b) => {
+    if (!sp.sort) return 0; // keep the database order (status, then name)
+    if (sort === "status") return compareText(a.statusLabel, b.statusLabel, dir, locale);
+    if (sort === "held") return compareText(a.heldName, b.heldName, dir, locale);
+    if (sort === "value") return compareNumber(a.asset.value || 0, b.asset.value || 0, dir);
+    return compareText(a.asset.name, b.asset.name, dir, locale);
+  });
 
   return (
     <div className="page-wide">
@@ -152,6 +183,9 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
               ))}
             </select>
           </label>
+          {columnHiddenFields(sp, COLUMNS).map((field) => (
+            <input key={field.name} type="hidden" name={field.name} value={field.value} />
+          ))}
           <button type="submit" className={`${secondaryBtn} col-span-2`}>
             {t("عرض", "Show")}
           </button>
@@ -161,17 +195,17 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           <EmptyState icon={LaptopMinimal} title={t("لا توجد عهد", "No assets")} text={t("أضف أجهزة الشركة وسلّمها للموظفين ليبقى سجل العهد واضحاً.", "Add company equipment and hand it to employees to keep a clear custody record.")} />
         ) : (
           <div className="table-shell">
-            <table className="table-stack w-full text-sm">
+            <table className="table-stack table-tools w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-xs text-slate-500">
-                  <th className="px-3 py-2 text-start font-medium">{t("العهدة", "Asset")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("الحالة", "Status")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("مع", "Held by")}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t("القيمة", "Value")}</th>
+                  <ColumnHead column="name" label={t("العهدة", "Asset")} />
+                  <ColumnHead column="status" label={t("الحالة", "Status")} />
+                  <ColumnHead column="held" label={t("مع", "Held by")} />
+                  <ColumnHead column="value" label={t("القيمة", "Value")} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {assets.map((asset) => (
+                {rows.map(({ asset }) => (
                   <tr key={asset.id}>
                     <td className="cell-title px-3 py-2.5" data-label={t("العهدة", "Asset")}>
                       <Link href={`/assets/${asset.id}`} className="font-semibold text-slate-900 hover:text-teal-700">
@@ -211,6 +245,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                 ))}
               </tbody>
             </table>
+            {rows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">{t("لا توجد عهد تطابق البحث.", "No assets match the filters.")}</p> : null}
           </div>
         )}
       </Card>

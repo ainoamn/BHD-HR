@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, CalendarRange, Timer, TriangleAlert } from "lucide-react";
+import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { PeriodFilter } from "@/components/period-filter";
@@ -7,6 +8,7 @@ import { AttendanceEditForm, DeleteButton } from "@/components/row-forms";
 import { Card, PageHeader, SectionTitle, ToneBadge } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { getLeaveTypes } from "@/lib/hr-catalog";
+import { columnHiddenFields, compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { getI18n } from "@/lib/lang";
 import {
   attendanceChoiceOf,
@@ -30,7 +32,7 @@ import { deleteAttendance, importAttendanceCsv, markAttendance, updateAttendance
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; day?: string; error?: string; message?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; day?: string; sort?: string; dir?: string; error?: string; message?: string; [key: string]: string | undefined }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("attendance.view");
@@ -71,6 +73,66 @@ export default async function AttendancePage({
       salaryDays: round3(rows.reduce((sum, row) => sum + salaryDayWeight(row), 0)),
       used: Object.fromEntries(leaveTypes.map((type) => [type.key, round3(rows.reduce((sum, row) => (rowBalanceKey(row) === type.key ? sum + rowDays(row) : sum), 0))])),
     };
+  });
+  const locale = lang === "en" ? "en" : "ar";
+  const clockColumns = ["name", "in", "out", "hours", "status"];
+  const summaryColumns = ["name", "salary", ...leaveTypes.map((type) => `l${type.key}`)];
+  const toolFields = columnHiddenFields(sp, [...new Set([...clockColumns, ...summaryColumns])]);
+  const clockRows = employees
+    .map((employee) => {
+      const entry = clockById.get(employee.id);
+      const status = entry
+        ? entry.lateMinutes
+          ? t(`متأخر ${entry.lateMinutes} د`, `${entry.lateMinutes} min late`)
+          : t("في الوقت", "On time")
+        : onLeave.has(employee.id)
+          ? t("غياب/إجازة مسجّلة", "Absence/leave recorded")
+          : t("لم يسجّل", "Not clocked in");
+      const distance = entry?.inDistance != null ? ` (${entry.inDistance} ${t("م", "m")})` : "";
+      return {
+        employee,
+        entry,
+        name: displayName(employee),
+        inText: `${entry ? muscatTime(entry.inAt) : "—"}${distance}`,
+        outText: entry?.outAt ? muscatTime(entry.outAt) : "—",
+        hoursText: entry ? workedLabel(entry.inAt, entry.outAt) : "—",
+        status,
+        inTime: entry ? entry.inAt.getTime() : Number.POSITIVE_INFINITY,
+        outTime: entry?.outAt ? entry.outAt.getTime() : Number.POSITIVE_INFINITY,
+        worked: entry?.outAt ? entry.outAt.getTime() - entry.inAt.getTime() : -1,
+      };
+    })
+    .filter(
+      (row) =>
+        includesText(row.name, sp.fname) &&
+        includesText(row.inText, sp.fin) &&
+        includesText(row.outText, sp.fout) &&
+        includesText(row.hoursText, sp.fhours) &&
+        includesText(row.status, sp.fstatus),
+    );
+  const clockSort = readSort(sp, clockColumns, "name");
+  clockRows.sort((a, b) => {
+    if (clockSort.sort === "in") return compareNumber(a.inTime, b.inTime, clockSort.dir);
+    if (clockSort.sort === "out") return compareNumber(a.outTime, b.outTime, clockSort.dir);
+    if (clockSort.sort === "hours") return compareNumber(a.worked, b.worked, clockSort.dir);
+    if (clockSort.sort === "status") return compareText(a.status, b.status, clockSort.dir, locale);
+    return compareText(a.name, b.name, clockSort.dir, locale);
+  });
+  const summaryRows = summary
+    .filter(
+      (row) =>
+        includesText(displayName(row.employee), sp.fname) &&
+        includesText(`${row.salaryDays} ${daysLabel(row.salaryDays)}`, sp.fsalary) &&
+        leaveTypes.every((type) => includesText(`${row.used[type.key]} ${daysLabel(row.used[type.key])}`, sp[`fl${type.key}`])),
+    );
+  const summarySort = readSort(sp, summaryColumns, "name");
+  summaryRows.sort((a, b) => {
+    if (summarySort.sort === "salary") return compareNumber(a.salaryDays, b.salaryDays, summarySort.dir);
+    if (summarySort.sort.startsWith("l")) {
+      const key = summarySort.sort.slice(1);
+      return compareNumber(a.used[key] || 0, b.used[key] || 0, summarySort.dir);
+    }
+    return compareText(displayName(a.employee), displayName(b.employee), summarySort.dir, locale);
   });
   const choices = attendanceChoices(leaveTypes, lang);
   const periods = groupAttendance(records);
@@ -151,6 +213,9 @@ export default async function AttendancePage({
                 <form method="get" className="flex items-center gap-2">
                   <input type="hidden" name="year" value={year} />
                   <input type="hidden" name="month" value={month} />
+                  {toolFields.map((field) => (
+                    <input key={field.name} type="hidden" name={field.name} value={field.value} />
+                  ))}
                   <input type="date" name="day" defaultValue={clockDay} className="h-9 rounded-lg border border-slate-200 bg-surface px-2 text-sm" aria-label={t("اليوم", "Day")} />
                   <button type="submit" className="h-9 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     {t("عرض", "Show")}
@@ -166,19 +231,18 @@ export default async function AttendancePage({
             {t("سجل الدوام", "Clock-in log")} — {formatDate(clockDate)}
           </SectionTitle>
           <div className="table-shell">
-            <table className="table-stack min-w-full text-sm">
+            <table className="table-stack table-tools min-w-full text-sm">
               <thead>
                 <tr>
-                  <th className="px-4 py-2.5 text-start">{t("الموظف", "Employee")}</th>
-                  <th className="px-4 py-2.5 text-start">{t("الحضور", "In")}</th>
-                  <th className="px-4 py-2.5 text-start">{t("الانصراف", "Out")}</th>
-                  <th className="px-4 py-2.5 text-start">{t("المدة", "Hours")}</th>
-                  <th className="px-4 py-2.5 text-start">{t("الحالة", "Status")}</th>
+                  <ColumnHead column="name" label={t("الموظف", "Employee")} />
+                  <ColumnHead column="in" label={t("الحضور", "In")} />
+                  <ColumnHead column="out" label={t("الانصراف", "Out")} />
+                  <ColumnHead column="hours" label={t("المدة", "Hours")} />
+                  <ColumnHead column="status" label={t("الحالة", "Status")} />
                 </tr>
               </thead>
               <tbody>
-                {employees.map((employee) => {
-                  const entry = clockById.get(employee.id);
+                {clockRows.map(({ employee, entry }) => {
                   return (
                     <tr key={employee.id}>
                       <td className="cell-title px-4 py-2.5">
@@ -222,20 +286,18 @@ export default async function AttendancePage({
         {t("ملخص الشهر", "Month summary")}
       </SectionTitle>
       <div className="table-shell">
-        <table className="table-stack min-w-full text-sm">
+        <table className="table-stack table-tools min-w-full text-sm">
           <thead>
             <tr>
-              <th className="px-4 py-3 text-start">{t("الموظف", "Employee")}</th>
-              <th className="px-4 py-3 text-start">{t("خصم من الراتب", "Salary deduction")}</th>
+              <ColumnHead column="name" label={t("الموظف", "Employee")} />
+              <ColumnHead column="salary" label={t("خصم من الراتب", "Salary deduction")} />
               {leaveTypes.map((type) => (
-                <th key={type.key} className="px-4 py-3 text-start">
-                  {leaveName(type, lang)}
-                </th>
+                <ColumnHead key={type.key} column={`l${type.key}`} label={leaveName(type, lang)} />
               ))}
             </tr>
           </thead>
           <tbody>
-            {summary.map((row) => (
+            {summaryRows.map((row) => (
               <tr key={row.employee.id}>
                 <td className="cell-title px-4 py-3">
                   <Link href={`/employees/${row.employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
