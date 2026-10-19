@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown, Paperclip, Printer } from "lucide-react";
+import { useLang } from "@/components/lang-provider";
 import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { ToneBadge, linkAction, secondaryBtn } from "@/components/ui";
 import type { DocView } from "@/lib/documents";
@@ -24,16 +25,15 @@ export function DocumentEmployeeList({
   returnTo,
   allow,
   canEditEmployee,
-  t,
   printBase,
 }: {
   groups: DocumentEmployeeGroup[];
   returnTo: string;
   allow: { edit: boolean; remove: boolean };
   canEditEmployee: boolean;
-  t: (ar: string, en: string) => string;
   printBase: string;
 }) {
+  const { t } = useLang();
   const showActions = allow.edit || allow.remove || canEditEmployee;
   if (!groups.length) {
     return (

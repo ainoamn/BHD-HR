@@ -296,14 +296,7 @@ export default async function DocumentsPage({
           </Link>
         </p>
       ) : null}
-      <DocumentEmployeeList
-        groups={groups}
-        returnTo={returnTo}
-        allow={allow}
-        canEditEmployee={canEditEmployee}
-        t={t}
-        printBase={printBase}
-      />
+      <DocumentEmployeeList groups={groups} returnTo={returnTo} allow={allow} canEditEmployee={canEditEmployee} printBase={printBase} />
     </div>
   );
 }
