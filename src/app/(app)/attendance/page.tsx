@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { CalendarDays, CalendarRange, Timer, TriangleAlert } from "lucide-react";
+import { CalendarDays, CalendarRange, Search, Timer, TriangleAlert } from "lucide-react";
 import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { PeriodFilter } from "@/components/period-filter";
 import { AttendanceEditForm, DeleteButton } from "@/components/row-forms";
-import { Card, PageHeader, SectionTitle, ToneBadge } from "@/components/ui";
+import { Card, PageHeader, SectionTitle, ToneBadge, Toolbar, fieldClass, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { getLeaveTypes } from "@/lib/hr-catalog";
 import { columnHiddenFields, compareNumber, compareText, includesText, readSort } from "@/lib/column-tools";
 import { getI18n } from "@/lib/lang";
+import { normalizeSearchText } from "@/lib/search";
 import {
   attendanceChoiceOf,
   attendanceChoices,
@@ -56,6 +58,18 @@ export default async function AttendancePage({
     prisma.clockEntry.findMany({ where: { companyId: user.companyId, day: clockDay } }),
     prisma.attendance.findMany({ where: { date: clockDate, employee: { companyId: user.companyId } }, select: { employeeId: true } }),
   ]);
+  const q = (sp.q || "").trim();
+  const needle = normalizeSearchText(q);
+  const matchesEmployee = (employee: { fullName: string; nameEn: string | null; employeeNumber: string; idNumber: string | null }) => {
+    if (!needle) return true;
+    return (
+      normalizeSearchText(employee.fullName).includes(needle) ||
+      Boolean(employee.nameEn && normalizeSearchText(employee.nameEn).includes(needle)) ||
+      normalizeSearchText(employee.employeeNumber).includes(needle) ||
+      Boolean(employee.idNumber && normalizeSearchText(employee.idNumber).includes(needle))
+    );
+  };
+  const listed = employees.filter(matchesEmployee);
   const showClock = user.company.clockEnabled || clockEntries.length > 0;
   const clockById = new Map(clockEntries.map((entry) => [entry.employeeId, entry]));
   const onLeave = new Set(dayAbsences.map((row) => row.employeeId));
@@ -63,10 +77,10 @@ export default async function AttendancePage({
   const warnDays = user.company.leaveWarningDays;
   const figuresById = new Map(employees.map((employee) => [employee.id, computeLeaveBalances(employee, employee.attendance, employee.leaveCredits, leaveTypes)]));
   const balances = Object.fromEntries(employees.map((employee) => [employee.id, remainingByKey(figuresById.get(employee.id)!)]));
-  const leaveAlerts = employees
+  const leaveAlerts = listed
     .map((employee) => ({ employee, warnings: leaveWarnings(figuresById.get(employee.id)!, warnDays) }))
     .filter((item) => item.warnings.length > 0);
-  const summary = employees.map((employee) => {
+  const summary = listed.map((employee) => {
     const rows = records.filter((row) => row.employeeId === employee.id);
     return {
       employee,
@@ -78,7 +92,7 @@ export default async function AttendancePage({
   const clockColumns = ["name", "in", "out", "hours", "status"];
   const summaryColumns = ["name", "salary", ...leaveTypes.map((type) => `l${type.key}`)];
   const toolFields = columnHiddenFields(sp, [...new Set([...clockColumns, ...summaryColumns])]);
-  const clockRows = employees
+  const clockRows = listed
     .map((employee) => {
       const entry = clockById.get(employee.id);
       const status = entry
@@ -135,8 +149,10 @@ export default async function AttendancePage({
     return compareText(displayName(a.employee), displayName(b.employee), summarySort.dir, locale);
   });
   const choices = attendanceChoices(leaveTypes, lang);
-  const periods = groupAttendance(records);
-  const returnTo = `/attendance?year=${year}&month=${month}`;
+  const periods = groupAttendance(records).filter((period) => matchesEmployee(period.row.employee));
+  const returnParams = new URLSearchParams({ year: String(year), month: String(month) });
+  if (q) returnParams.set("q", q);
+  const returnTo = `/attendance?${returnParams}`;
 
   return (
     <div className="page-wide">
@@ -151,6 +167,37 @@ export default async function AttendancePage({
         <PeriodFilter year={year} month={month} />
       </PageHeader>
       <Flash error={sp.error} message={sp.message} />
+      <Toolbar>
+        <GetForm className="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="year" value={year} />
+          <input type="hidden" name="month" value={month} />
+          {sp.day ? <input type="hidden" name="day" value={sp.day} /> : null}
+          {toolFields.map((field) => (
+            <input key={field.name} type="hidden" name={field.name} value={field.value} />
+          ))}
+          <div className="relative min-w-0 flex-1">
+            <Search size={17} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className={`${fieldClass} w-full ps-10`}
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder={t("ابحث بالاسم أو رقم الموظف أو الرقم المدني", "Search by name, employee no. or civil ID")}
+              aria-label={t("بحث عن موظف", "Search employee")}
+            />
+          </div>
+          {q ? (
+            <Link href={`/attendance?year=${year}&month=${month}${sp.day ? `&day=${sp.day}` : ""}`} className={secondaryBtn}>
+              {t("مسح", "Clear")}
+            </Link>
+          ) : null}
+        </GetForm>
+        {q ? (
+          <p className="mt-2 text-xs text-slate-500">
+            {t(`${listed.length} من ${employees.length} موظف`, `${listed.length} of ${employees.length} employee(s)`)}
+          </p>
+        ) : null}
+      </Toolbar>
       {can(user, "attendance.create") ? (
         <Card className="mb-5">
           <form action={importAttendanceCsv} className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -191,7 +238,7 @@ export default async function AttendancePage({
           </SectionTitle>
           <LeaveRangeForm
             action={markAttendance}
-            employees={employees.map((employee) => ({ id: employee.id, fullName: displayName(employee) }))}
+            employees={listed.map((employee) => ({ id: employee.id, fullName: `${displayName(employee)} — ${employee.employeeNumber}` }))}
             balances={balances}
             choices={choices}
             returnTo={returnTo}
@@ -213,6 +260,7 @@ export default async function AttendancePage({
                 <form method="get" className="flex items-center gap-2">
                   <input type="hidden" name="year" value={year} />
                   <input type="hidden" name="month" value={month} />
+                  {q ? <input type="hidden" name="q" value={q} /> : null}
                   {toolFields.map((field) => (
                     <input key={field.name} type="hidden" name={field.name} value={field.value} />
                   ))}
@@ -249,6 +297,7 @@ export default async function AttendancePage({
                         <Link href={`/employees/${employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
                           {displayName(employee)}
                         </Link>
+                        <span className="tabular block text-xs text-slate-500">{employee.employeeNumber}</span>
                       </td>
                       <td className="tabular px-4 py-2.5" data-label={t("الحضور", "In")}>
                         {entry ? muscatTime(entry.inAt) : "—"}
@@ -303,6 +352,7 @@ export default async function AttendancePage({
                   <Link href={`/employees/${row.employee.id}?tab=attendance`} className="font-semibold text-slate-900 hover:text-teal-700">
                     {displayName(row.employee)}
                   </Link>
+                  <span className="tabular block text-xs text-slate-500">{row.employee.employeeNumber}</span>
                 </td>
                 <td className="tabular px-4 py-3" data-label={t("خصم من الراتب", "Salary deduction")}>
                   {row.salaryDays > 0 ? <span className="font-semibold text-red-700">{daysLabel(row.salaryDays)}</span> : <span className="text-slate-400">0</span>}
