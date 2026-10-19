@@ -1,13 +1,11 @@
-import Link from "next/link";
 import { OfficialDocSheet } from "@/components/official-doc-sheet";
-import { PrintButton } from "@/components/print-button";
-import { headerFor } from "@/components/salary-docs";
+import { OfficialPrintBar } from "@/components/official-print-bar";
 import { requirePermission } from "@/lib/auth";
-import { qrSvg } from "@/lib/badge";
 import { collectDocuments } from "@/lib/documents";
 import { describeExpiry } from "@/lib/expiry";
 import { getI18n } from "@/lib/lang";
-import { inlineLogo } from "@/lib/inline-logo";
+import { readOrient } from "@/lib/official-print";
+import { officialPrintSeal } from "@/lib/official-print-seal";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
@@ -17,11 +15,12 @@ const VIEW_IDS = ["all", "expired", "warning", "early"];
 export default async function DocumentsOfficialPrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; orient?: string; download?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("documents.view");
   const { lang, t } = await getI18n();
+  const orient = readOrient(sp.orient);
   const view = VIEW_IDS.includes(sp.view || "") ? sp.view || "all" : "all";
   const viewLabel =
     view === "expired"
@@ -53,22 +52,13 @@ export default async function DocumentsOfficialPrintPage({
     .sort((a, b) => a.status.days - b.status.days);
 
   const origin = await requestOrigin();
-  const pageUrl = `${origin}/documents${view !== "all" ? `?view=${view}` : ""}`;
-  const logo = (await inlineLogo(user.company.logoUrl, user.companyId)) || user.company.logoUrl;
-  const qr = await qrSvg(pageUrl, logo);
-  const printedAt = new Date();
-  const serial = `DOC-${printedAt.getUTCFullYear()}-${String(printedAt.getUTCMonth() + 1).padStart(2, "0")}${String(printedAt.getUTCDate()).padStart(2, "0")}-${String(rows.length).padStart(4, "0")}`;
-  const header = headerFor({}, user.company);
-  if (logo) header.logoUrl = logo;
+  const backHref = `/documents${view !== "all" ? `?view=${view}` : ""}`;
+  const { header, printedAt, seal } = await officialPrintSeal(user.company, `${origin}${backHref}`, user.name);
+  const fileName = `documents-${printedAt.toISOString().slice(0, 10)}.pdf`;
 
   return (
-    <div className="mx-auto max-w-[210mm] px-2 py-4 sm:px-4 sm:py-6 print:px-0 print:py-0">
-      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href={`/documents${view !== "all" ? `?view=${view}` : ""}`} className="text-sm font-semibold text-teal-800">
-          {t("رجوع للمستندات", "Back to documents")}
-        </Link>
-        <PrintButton label={t("طباعة / حفظ PDF", "Print / Save PDF")} />
-      </div>
+    <div className={`mx-auto px-2 py-4 sm:px-4 sm:py-6 print:px-0 print:py-0 ${orient === "landscape" ? "max-w-[297mm]" : "max-w-[210mm]"}`}>
+      <OfficialPrintBar targetId="official-sheet" fileName={fileName} backHref={backHref} backLabel={t("رجوع للمستندات", "Back to documents")} autoDownload={sp.download === "1"} />
       <OfficialDocSheet
         header={header}
         titleAr="كشف مستندات الموظفين"
@@ -98,13 +88,8 @@ export default async function DocumentsOfficialPrintPage({
             status: row.status.label,
           };
         })}
-        seal={{
-          qr,
-          url: pageUrl,
-          signedBy: user.name,
-          signedAt: printedAt,
-          serial,
-        }}
+        seal={seal}
+        orient={orient}
       />
     </div>
   );

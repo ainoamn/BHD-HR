@@ -1,17 +1,10 @@
 import { Fragment } from "react";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import type { PrintOrient } from "@/lib/official-print";
 import { Bi, letterFontClass } from "./letter-sheet";
 import type { DocHeader } from "./salary-docs";
 
-export type OfficialDocRow = {
-  key: string;
-  employeeName: string;
-  employeeNumber: string;
-  label: string;
-  number: string | null;
-  expiry: string;
-  status: string;
-};
+export type OfficialDocRow = { key: string } & Record<string, string | null | undefined>;
 
 /** Shared e-signature strip: QR (optionally with company logo) that opens the live page. */
 export function OfficialSeal({
@@ -68,6 +61,8 @@ export function OfficialDocSheet({
   columns,
   seal,
   emptyText,
+  orient = "portrait",
+  id = "official-sheet",
 }: {
   header: DocHeader;
   titleAr: string;
@@ -75,16 +70,19 @@ export function OfficialDocSheet({
   subtitle?: string | null;
   printedAt: Date;
   rows: OfficialDocRow[];
-  columns: { key: keyof OfficialDocRow | "index"; ar: string; en: string }[];
+  columns: { key: string; ar: string; en: string }[];
   seal: { qr: string; url: string; signedBy: string; signedAt: Date; serial?: string | null };
   emptyText: { ar: string; en: string };
+  orient?: PrintOrient;
+  id?: string;
 }) {
   const nameEn = header.nameEn && header.nameEn !== header.name ? header.nameEn : null;
   const contact = [header.address, header.phone, header.email].filter(Boolean) as string[];
+  const numeric = new Set(["index", "employeeNumber", "number", "no", "ref", "days", "amount", "net", "basic"]);
 
   return (
-    <article className={`letter-doc paper ${letterFontClass}`}>
-      <style>{`@page { size: A4; margin: 8mm; }`}</style>
+    <article id={id} className={`letter-doc paper ${letterFontClass} ${orient === "landscape" ? "letter-doc--landscape" : ""}`}>
+      <style>{`@page { size: A4 ${orient}; margin: 8mm; }`}</style>
       {header.logoUrl ? (
         <div className="letter-doc__deco" aria-hidden="true">
           <img src={header.logoUrl} alt="" className="letter-doc__watermark" />
@@ -164,8 +162,8 @@ export function OfficialDocSheet({
               {rows.map((row, index) => (
                 <tr key={row.key}>
                   {columns.map((column) => (
-                    <td key={column.key} className={column.key === "employeeNumber" || column.key === "number" || column.key === "index" ? "letter-doc__num" : undefined}>
-                      {column.key === "index" ? index + 1 : row[column.key as keyof OfficialDocRow] || "—"}
+                    <td key={column.key} className={numeric.has(column.key) ? "letter-doc__num" : undefined}>
+                      {column.key === "index" ? index + 1 : row[column.key] || "—"}
                     </td>
                   ))}
                 </tr>

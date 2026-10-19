@@ -2,11 +2,12 @@
 
 import { FileDown, FileSpreadsheet, LoaderCircle, Printer } from "lucide-react";
 import { useState } from "react";
+import { downloadElementPdf } from "@/lib/download-pdf";
 import { useLang } from "./lang-provider";
 import { printAfterPaint } from "./print-button";
 import { primaryBtn, secondaryBtn } from "./ui";
 
-/** Print uses the browser; PDF is rendered from the on-screen report so Arabic shaping matches exactly. */
+/** PDF is rendered from the on-screen report so Arabic shaping matches exactly; print is secondary. */
 export function ReportToolbar({ targetId, excelHref, fileName, canExport }: { targetId: string; excelHref: string; fileName: string; canExport: boolean }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
@@ -16,33 +17,7 @@ export function ReportToolbar({ targetId, excelHref, fileName, canExport }: { ta
     if (!element) return;
     setBusy(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        ignoreElements: (node) => node instanceof HTMLElement && node.dataset.pdfIgnore === "true",
-        onclone: (doc) => {
-          doc.documentElement.dataset.theme = "light";
-        },
-        windowWidth: Math.max(element.scrollWidth, 1024),
-      });
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const margin = 8;
-      const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-      const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-      const pxPerMm = canvas.width / pageWidth;
-      const sliceHeight = Math.floor(pageHeight * pxPerMm);
-      for (let offset = 0, page = 0; offset < canvas.height; offset += sliceHeight, page += 1) {
-        const height = Math.min(sliceHeight, canvas.height - offset);
-        const slice = document.createElement("canvas");
-        slice.width = canvas.width;
-        slice.height = height;
-        slice.getContext("2d")!.drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
-        if (page > 0) pdf.addPage();
-        pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", margin, margin, pageWidth, height / pxPerMm);
-      }
-      pdf.save(fileName);
+      await downloadElementPdf(element, fileName, "portrait");
     } catch (error) {
       console.error(error);
       alert(t("تعذر إنشاء ملف PDF. جرّب الطباعة ثم «حفظ كـ PDF».", "Could not create the PDF. Try Print → Save as PDF."));
@@ -53,22 +28,22 @@ export function ReportToolbar({ targetId, excelHref, fileName, canExport }: { ta
 
   return (
     <div className="no-print flex flex-wrap gap-2" data-pdf-ignore="true">
-      <button type="button" onClick={printAfterPaint} className={`${secondaryBtn} flex-1 sm:flex-none`}>
-        <Printer className="size-4" />
-        {t("طباعة", "Print")}
-      </button>
       {canExport ? (
         <>
-          <a href={excelHref} className={`${secondaryBtn} flex-1 sm:flex-none`}>
-            <FileSpreadsheet className="size-4 text-emerald-700" />
-            Excel
-          </a>
           <button type="button" onClick={downloadPdf} disabled={busy} className={`${primaryBtn} flex-1 sm:flex-none`}>
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <FileDown className="size-4" />}
             {busy ? t("جارٍ إنشاء PDF...", "Creating PDF...") : t("تحميل PDF", "Download PDF")}
           </button>
+          <a href={excelHref} className={`${secondaryBtn} flex-1 sm:flex-none`}>
+            <FileSpreadsheet className="size-4 text-emerald-700" />
+            Excel
+          </a>
         </>
       ) : null}
+      <button type="button" onClick={printAfterPaint} className={`${secondaryBtn} flex-1 sm:flex-none`}>
+        <Printer className="size-4" />
+        {t("طباعة", "Print")}
+      </button>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { termText } from "@/lib/constants";
 import { CUSTODY_DIRECTION } from "@/lib/custody";
+import type { PrintOrient } from "@/lib/official-print";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { OfficialSeal } from "./official-doc-sheet";
 import { Bi, Para, letterFontClass } from "./letter-sheet";
@@ -28,10 +29,14 @@ export function CustodySheet({
   form,
   header,
   seal,
+  orient = "portrait",
+  id,
 }: {
   form: CustodySheetData;
   header: DocHeader;
   seal?: { qr: string; url: string; signedBy: string; signedAt: Date; serial?: string | null } | null;
+  orient?: PrintOrient;
+  id?: string;
 }) {
   const direction = form.direction === "IN" ? "IN" : "OUT";
   const meta = CUSTODY_DIRECTION[direction];
@@ -123,8 +128,8 @@ export function CustodySheet({
   );
 
   return (
-    <article className={`letter-doc paper ${letterFontClass}`}>
-      <style>{`@page { size: A4; margin: 8mm; }`}</style>
+    <article id={id} className={`letter-doc paper ${letterFontClass} ${orient === "landscape" ? "letter-doc--landscape" : ""}`}>
+      <style>{`@page { size: A4 ${orient}; margin: 8mm; }`}</style>
       {header.logoUrl ? (
         <div className="letter-doc__deco" aria-hidden="true">
           <img src={header.logoUrl} alt="" className="letter-doc__watermark" />

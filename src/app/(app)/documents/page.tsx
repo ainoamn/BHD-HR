@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, FilePlus2, Files, FolderLock, Paperclip, Printer } from "lucide-react";
+import { ChevronDown, FilePlus2, Files, FolderLock, Paperclip } from "lucide-react";
 import { ColumnHead } from "@/components/column-head";
 import { Flash } from "@/components/flash";
 import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
@@ -85,12 +85,7 @@ export default async function DocumentsPage({
         icon={Files}
         title={t("المستندات", "Documents")}
         description={t("البطاقة والجواز والإقامة وبقية الوثائق، مع حالة الانتهاء.", "ID card, passport, residence and other documents, with expiry status.")}
-        print={false}
       >
-        <Link href={`/documents/print${view !== "all" ? `?view=${view}` : ""}`} target="_blank" className={secondaryBtn}>
-          <Printer size={16} />
-          {t("طباعة رسمية", "Official print")}
-        </Link>
         <Link href="/documents/custody" className={secondaryBtn}>
           <FolderLock size={16} />
           {t("العهدة", "Custody")}

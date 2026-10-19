@@ -594,6 +594,9 @@ textarea:focus-visible {
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
+.letter-doc--landscape {
+  max-width: 297mm;
+}
 :root[data-theme="dark"] .letter-doc.paper { color: var(--doc-ink); }
 @media (min-width: 640px) {
   .letter-doc { aspect-ratio: 210 / 297; }
@@ -1098,6 +1101,9 @@ textarea:focus-visible {
     box-shadow: none;
     font-size: 9.5pt;
     line-height: 1.55;
+  }
+  .letter-doc--landscape {
+    min-height: 190mm;
   }
   .letter-doc__letterhead { padding-bottom: 2.5mm; margin-bottom: 0; }
   .letter-doc__lh-logo img,
