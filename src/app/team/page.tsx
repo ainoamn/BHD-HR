@@ -45,6 +45,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         nameEn: true,
         photoUrl: true,
         employeeNumber: true,
+        idNumber: true,
         jobTitle: true,
         jobTitleEn: true,
         jobTitleId: true,
@@ -201,7 +202,12 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <SectionTitle hint={t("يُخصم من رصيد الإجازة حسب النوع", "Uses the leave balance for the chosen type")}>{t("تسجيل غياب أو إجازة", "Record an absence or leave")}</SectionTitle>
           <LeaveRangeForm
             action={markAttendance}
-            employees={employees.map((employee) => ({ id: employee.id, fullName: nameOf(employee) }))}
+            employees={employees.map((employee) => ({
+              id: employee.id,
+              fullName: nameOf(employee),
+              employeeNumber: employee.employeeNumber,
+              idNumber: employee.idNumber,
+            }))}
             balances={Object.fromEntries(rows.map((row) => [row.employee.id, remainingByKey(row.balances)]))}
             choices={attendanceChoices(leaveTypes, lang)}
             returnTo="/team#record"

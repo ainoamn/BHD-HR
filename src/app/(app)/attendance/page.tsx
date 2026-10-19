@@ -238,7 +238,12 @@ export default async function AttendancePage({
           </SectionTitle>
           <LeaveRangeForm
             action={markAttendance}
-            employees={listed.map((employee) => ({ id: employee.id, fullName: `${displayName(employee)} — ${employee.employeeNumber}` }))}
+            employees={employees.map((employee) => ({
+              id: employee.id,
+              fullName: displayName(employee),
+              employeeNumber: employee.employeeNumber,
+              idNumber: employee.idNumber,
+            }))}
             balances={balances}
             choices={choices}
             returnTo={returnTo}

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { type AttendanceChoice, countInclusiveDays } from "@/lib/leave";
 import { daysLabel, todayInputValue } from "@/lib/utils";
 import { useLang } from "./lang-provider";
+import { SearchSelect } from "./search-select";
 import { fieldClass, primaryBtn } from "./ui";
 
 /** Remaining days per leave-type key, per employee; a missing key means the type does not apply to that employee. */
@@ -19,7 +20,7 @@ export function LeaveRangeForm({
   warnDays = 5,
 }: {
   action: (formData: FormData) => void | Promise<void>;
-  employees: { id: string; fullName: string }[];
+  employees: { id: string; fullName: string; employeeNumber?: string | null; idNumber?: string | null }[];
   balances: Record<string, BalanceSnapshot>;
   choices: AttendanceChoice[];
   returnTo: string;
@@ -48,6 +49,16 @@ export function LeaveRangeForm({
   const [allowOverdraft, setAllowOverdraft] = useState(false);
   const blocked = reversed || halfDayRange || notCovered || (insufficient && !allowOverdraft) || days <= 0 || !employeeId;
   const balanceName = choice?.balanceKey ? choice.label : "";
+  const employeeOptions = useMemo(
+    () =>
+      employees.map((employee) => ({
+        value: employee.id,
+        label: employee.fullName,
+        hint: employee.employeeNumber || null,
+        keywords: [employee.employeeNumber, employee.idNumber].filter(Boolean).join(" "),
+      })),
+    [employees],
+  );
 
   return (
     <form action={action} className="space-y-3">
@@ -58,14 +69,15 @@ export function LeaveRangeForm({
         {employees.length > 1 ? (
           <label className="block space-y-1.5 xl:col-span-2">
             <span className="text-sm font-medium text-slate-700">{t("الموظف", "Employee")}</span>
-            <select className={`${fieldClass} w-full`} name="employeeId" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} required>
-              <option value="">{t("اختر الموظف", "Choose employee")}</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.fullName}
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              name="employeeId"
+              options={employeeOptions}
+              defaultValue={employeeId}
+              emptyLabel={t("اختر الموظف", "Choose employee")}
+              placeholder={t("ابحث بالاسم أو الرقم أو المدني", "Search name, number or civil ID")}
+              ariaLabel={t("الموظف", "Employee")}
+              onChange={setEmployeeId}
+            />
           </label>
         ) : (
           <input type="hidden" name="employeeId" value={employeeId} />
