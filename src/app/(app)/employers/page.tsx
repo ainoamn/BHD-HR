@@ -209,7 +209,7 @@ export default async function EmployersPage({
         <div className="flex flex-wrap gap-2">
           <Link href={printHref} target="_blank" className={secondaryBtn}>
             <Printer size={16} />
-            {t("طباعة", "Print")}
+            {t("طباعة جهات الاتصال", "Print contacts")}
           </Link>
           {canCreate ? (
             <Link href="/employers?new=1#new" className={primaryBtn}>
@@ -252,7 +252,7 @@ export default async function EmployersPage({
         </details>
       ) : null}
 
-      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-4">
+      <div className="no-print space-y-3 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <GetForm className="flex w-full gap-2 lg:max-w-md">
             {view !== "list" ? <input type="hidden" name="view" value={view} /> : null}

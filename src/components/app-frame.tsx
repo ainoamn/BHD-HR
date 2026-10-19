@@ -41,6 +41,7 @@ import { helpHrefFor } from "@/lib/help-search";
 import { SIDEBAR_COOKIE, cn } from "@/lib/utils";
 import { useLang } from "./lang-provider";
 import { NavSpeed } from "./nav-speed";
+import { PrintButton } from "./print-button";
 
 type NavItem = { href: string; ar: string; en: string; icon: LucideIcon; short?: { ar: string; en: string } };
 
@@ -257,6 +258,7 @@ export function AppFrame({
               <p className="hidden truncate text-xs text-slate-500 sm:block">{dateLabel}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <PrintButton compact />
               <Link
                 href={helpHrefFor(pathname)}
                 aria-label={t("شرح هذه الصفحة", "Help for this page")}

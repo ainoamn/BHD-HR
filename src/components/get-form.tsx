@@ -27,7 +27,7 @@ export function GetForm({ action, className, role, children }: { action?: string
       ref={formRef}
       key={key}
       action={action ?? pathname}
-      className={className}
+      className={className ? `no-print ${className}` : "no-print"}
       role={role}
       onInput={(event) => {
         const target = event.target;

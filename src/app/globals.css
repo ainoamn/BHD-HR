@@ -1473,4 +1473,42 @@ textarea:focus-visible {
     box-shadow: none !important;
     margin: 0 !important;
   }
+
+  /* Clean list/table pages: hide filters and chrome, keep the data. */
+  .segmented,
+  .table-shell {
+    box-shadow: none !important;
+  }
+
+  .shadow-card {
+    box-shadow: none !important;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  .table-stack thead {
+    display: table-header-group !important;
+  }
+
+  .table-stack.table-tools thead {
+    display: table-header-group !important;
+  }
+
+  .table-stack.table-tools thead tr {
+    display: table-row !important;
+    flex-wrap: nowrap !important;
+    padding: 0 !important;
+  }
+
+  .table-stack.table-tools thead th {
+    display: table-cell !important;
+  }
+
+  .table-stack th,
+  .table-stack td {
+    break-inside: avoid;
+  }
 }

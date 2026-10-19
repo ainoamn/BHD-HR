@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Inbox } from "lucide-react";
+import { PrintButton } from "@/components/print-button";
 import { cn } from "@/lib/utils";
 
 export const fieldClass =
@@ -60,26 +61,34 @@ export function PageHeader({
   description,
   icon: Icon,
   children,
+  print = true,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
   children?: React.ReactNode;
+  /** Show a print button that prints the current page (default on). */
+  print?: boolean;
 }) {
   return (
     <div className="mb-6 flex animate-fade-up flex-col gap-4 sm:mb-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex min-w-0 items-start gap-3.5">
         {Icon ? (
-          <span className="mt-0.5 hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-teal-700 shadow-card ring-1 ring-slate-200 sm:flex">
+          <span className="mt-0.5 hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-teal-700 shadow-card ring-1 ring-slate-200 print:hidden sm:flex">
             <Icon size={22} strokeWidth={1.8} />
           </span>
         ) : null}
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.75rem] sm:leading-tight">{title}</h1>
-          {description ? <p className="mt-1.5 max-w-3xl text-sm leading-7 text-slate-500">{description}</p> : null}
+          {description ? <p className="mt-1.5 max-w-3xl text-sm leading-7 text-slate-500 print:hidden">{description}</p> : null}
         </div>
       </div>
-      {children ? <div className="flex min-w-0 flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">{children}</div> : null}
+      {print || children ? (
+        <div className="no-print flex min-w-0 flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
+          {print ? <PrintButton variant="secondary" /> : null}
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -185,7 +194,7 @@ export function EmptyState({ title, text, icon: Icon = Inbox, children }: { titl
 
 /** Filter / search bar above lists. */
 export function Toolbar({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("mb-4 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-3.5", className)}>{children}</div>;
+  return <div className={cn("no-print mb-4 rounded-2xl border border-slate-200/90 bg-surface p-3 shadow-card sm:p-3.5", className)}>{children}</div>;
 }
 
 /** Label / value pair in detail grids. */

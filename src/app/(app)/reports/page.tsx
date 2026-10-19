@@ -56,6 +56,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         icon={PieChart}
         title={t("التقارير", "Reports")}
         description={t(`ملخص ${report.title}. اطبع التقرير أو حمّله Excel أو PDF.`, `${report.title} summary. Print it or download it as Excel or PDF.`)}
+        print={false}
       />
 
       <div className="no-print mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
