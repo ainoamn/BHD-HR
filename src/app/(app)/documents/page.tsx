@@ -1,21 +1,22 @@
 import Link from "next/link";
 import { ChevronDown, FilePlus2, Files, FolderLock, Paperclip } from "lucide-react";
 import { ColumnHead } from "@/components/column-head";
+import { DocumentScan } from "@/components/document-scan";
 import { Flash } from "@/components/flash";
+import { GetForm } from "@/components/get-form";
 import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
-import { PageHeader, ToneBadge, fieldClass, linkAction, secondaryBtn } from "@/components/ui";
+import { PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
 import { collectDocuments } from "@/lib/documents";
-import { compareNumber, compareText, includesText, readSort, withColumnParams } from "@/lib/column-tools";
+import { columnHiddenFields, compareNumber, compareText, includesText, readSort, withColumnParams } from "@/lib/column-tools";
 import { describeExpiry } from "@/lib/expiry";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
 import { formatDate, text } from "@/lib/utils";
 import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
-import { DocumentScan } from "@/components/document-scan";
 
 const VIEW_IDS = ["all", "expired", "warning", "early"];
 const COLUMNS = ["name", "doc", "no", "expiry", "status"];
@@ -23,7 +24,19 @@ const COLUMNS = ["name", "doc", "no", "expiry", "status"];
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; sort?: string; dir?: string; fname?: string; fdoc?: string; fno?: string; fexpiry?: string; fstatus?: string; error?: string; message?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    employerId?: string;
+    sort?: string;
+    dir?: string;
+    fname?: string;
+    fdoc?: string;
+    fno?: string;
+    fexpiry?: string;
+    fstatus?: string;
+    error?: string;
+    message?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("documents.view");
@@ -35,8 +48,20 @@ export default async function DocumentsPage({
     { id: "early", label: t("خلال التنبيه المبكر", "Within early notice") },
   ];
   const view = VIEW_IDS.includes(sp.view || "") ? sp.view || "all" : "all";
-  const toolQuery = (id: string) => withColumnParams(`?view=${id}`, sp, COLUMNS);
-  const returnTo = `/documents${toolQuery(view)}`;
+  const employers = await prisma.employer.findMany({
+    where: { companyId: user.companyId },
+    select: { id: true, name: true, nameEn: true },
+    orderBy: { name: "asc" },
+  });
+  const employerId = sp.employerId === "none" || employers.some((item) => item.id === sp.employerId) ? sp.employerId || "" : "";
+  const employerFilter = employerId === "none" ? { employerId: null } : employerId ? { employerId } : {};
+  const baseQuery = (id: string) => {
+    const params = new URLSearchParams();
+    params.set("view", id);
+    if (employerId) params.set("employerId", employerId);
+    return withColumnParams(`?${params}`, sp, COLUMNS);
+  };
+  const returnTo = `/documents${baseQuery(view)}`;
   const allow = { create: can(user, "documents.create"), edit: can(user, "documents.edit"), remove: can(user, "documents.delete") };
   const canEditEmployee = can(user, "employees.edit");
   const showActions = allow.edit || allow.remove || canEditEmployee;
@@ -45,12 +70,28 @@ export default async function DocumentsPage({
     warning: user.company.alertWarningDays,
     early: user.company.alertEarlyDays,
   };
-  const employees = await prisma.employee.findMany({
-    where: { companyId: user.companyId, status: { not: "TERMINATED" } },
-    include: { documents: true },
-    orderBy: { fullName: "asc" },
-  });
-  const pendingReview = employees.reduce((sum, employee) => sum + employee.documents.filter((document) => document.submittedAt && !document.reviewedAt).length, 0);
+  const [employees, pendingReview] = await Promise.all([
+    prisma.employee.findMany({
+      where: { companyId: user.companyId, status: { not: "TERMINATED" }, ...employerFilter },
+      include: { documents: true },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.employeeDocument.count({
+      where: {
+        submittedAt: { not: null },
+        reviewedAt: null,
+        employee: { companyId: user.companyId, status: { not: "TERMINATED" } },
+      },
+    }),
+  ]);
+  const selectedEmployer = employers.find((item) => item.id === employerId);
+  const employerLabel = selectedEmployer
+    ? lang === "en" && selectedEmployer.nameEn
+      ? selectedEmployer.nameEn
+      : selectedEmployer.name
+    : employerId === "none"
+      ? t("بدون كفيل", "No sponsor")
+      : "";
   const rows = collectDocuments(employees, lang)
     .map((row) => ({ ...row, status: describeExpiry(row.expiry, limits, lang) }))
     .filter((row) => {
@@ -103,6 +144,31 @@ export default async function DocumentsPage({
           <span className="shrink-0 underline underline-offset-2">{t("مراجعة", "Review")}</span>
         </Link>
       ) : null}
+      <Toolbar>
+        <GetForm className="flex w-full flex-wrap items-center gap-2">
+          {view !== "all" ? <input type="hidden" name="view" value={view} /> : null}
+          {columnHiddenFields(sp, COLUMNS).map((field) => (
+            <input key={field.name} type="hidden" name={field.name} value={field.value} />
+          ))}
+          <select className={`${fieldClass} min-w-0 flex-1 sm:w-56 sm:flex-none`} name="employerId" defaultValue={employerId} aria-label={t("الكفيل", "Sponsor")}>
+            <option value="">{t("كل الكفلاء", "All sponsors")}</option>
+            {employers.map((employer) => (
+              <option key={employer.id} value={employer.id}>
+                {lang === "en" && employer.nameEn ? employer.nameEn : employer.name}
+              </option>
+            ))}
+            <option value="none">{t("بدون كفيل", "No sponsor")}</option>
+          </select>
+          <button className={primaryBtn} type="submit">
+            {t("عرض", "Show")}
+          </button>
+          {employerId ? (
+            <Link href={`/documents${withColumnParams(view !== "all" ? `?view=${view}` : "", sp, COLUMNS)}`} className={`${secondaryBtn} px-3`}>
+              {t("مسح", "Clear")}
+            </Link>
+          ) : null}
+        </GetForm>
+      </Toolbar>
       {allow.create && employees.length ? (
         <details open={Boolean(sp.error)} className="group mb-5 rounded-2xl border border-slate-200/90 bg-surface shadow-card">
           <summary className="flex list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
@@ -111,6 +177,7 @@ export default async function DocumentsPage({
                 <FilePlus2 size={17} />
               </span>
               {t("إضافة مستند", "Add a document")}
+              {employerLabel ? <span className="text-sm font-semibold text-slate-500">· {employerLabel}</span> : null}
             </span>
             <ChevronDown size={18} className="shrink-0 text-slate-400 transition duration-200 group-open:rotate-180" />
           </summary>
@@ -160,11 +227,15 @@ export default async function DocumentsPage({
             </div>
           </form>
         </details>
+      ) : allow.create && employerId ? (
+        <p className="mb-5 rounded-2xl border border-slate-200/90 bg-surface px-4 py-3.5 text-sm text-slate-600 shadow-card">
+          {t("لا يوجد موظفون لهذا الكفيل. اختر كفيلاً آخر أو أضف موظفاً.", "No employees for this sponsor. Pick another sponsor or add an employee.")}
+        </p>
       ) : null}
       <div className="mb-4 overflow-x-auto pb-1">
         <nav className="segmented" aria-label={t("تصفية المستندات", "Filter documents")}>
           {views.map((item) => (
-            <Link key={item.id} href={`/documents${toolQuery(item.id)}`} aria-current={item.id === view ? "page" : undefined}>
+            <Link key={item.id} href={`/documents${baseQuery(item.id)}`} aria-current={item.id === view ? "page" : undefined}>
               {item.label}
             </Link>
           ))}

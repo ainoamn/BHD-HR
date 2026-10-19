@@ -15,13 +15,28 @@ const VIEW_IDS = ["all", "expired", "warning", "early"];
 export default async function DocumentsOfficialPrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; orient?: string; download?: string }>;
+  searchParams: Promise<{ view?: string; employerId?: string; orient?: string; download?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("documents.view");
   const { lang, t } = await getI18n();
   const orient = readOrient(sp.orient);
   const view = VIEW_IDS.includes(sp.view || "") ? sp.view || "all" : "all";
+  const employers = await prisma.employer.findMany({
+    where: { companyId: user.companyId },
+    select: { id: true, name: true, nameEn: true },
+    orderBy: { name: "asc" },
+  });
+  const employerId = sp.employerId === "none" || employers.some((item) => item.id === sp.employerId) ? sp.employerId || "" : "";
+  const employerFilter = employerId === "none" ? { employerId: null } : employerId ? { employerId } : {};
+  const selected = employers.find((item) => item.id === employerId);
+  const employerLabel = selected
+    ? lang === "en" && selected.nameEn
+      ? selected.nameEn
+      : selected.name
+    : employerId === "none"
+      ? t("بدون كفيل", "No sponsor")
+      : "";
   const viewLabel =
     view === "expired"
       ? t("منتهية", "Expired")
@@ -30,6 +45,7 @@ export default async function DocumentsOfficialPrintPage({
         : view === "early"
           ? t("خلال التنبيه المبكر", "Within early notice")
           : t("الكل", "All");
+  const subtitle = [viewLabel, employerLabel].filter(Boolean).join(" · ");
 
   const limits = {
     urgent: user.company.alertUrgentDays,
@@ -37,7 +53,7 @@ export default async function DocumentsOfficialPrintPage({
     early: user.company.alertEarlyDays,
   };
   const employees = await prisma.employee.findMany({
-    where: { companyId: user.companyId, status: { not: "TERMINATED" } },
+    where: { companyId: user.companyId, status: { not: "TERMINATED" }, ...employerFilter },
     include: { documents: true, employer: true },
     orderBy: { fullName: "asc" },
   });
@@ -52,7 +68,11 @@ export default async function DocumentsOfficialPrintPage({
     .sort((a, b) => a.status.days - b.status.days);
 
   const origin = await requestOrigin();
-  const backHref = `/documents${view !== "all" ? `?view=${view}` : ""}`;
+  const back = new URLSearchParams();
+  if (view !== "all") back.set("view", view);
+  if (employerId) back.set("employerId", employerId);
+  const backQuery = back.toString();
+  const backHref = backQuery ? `/documents?${backQuery}` : "/documents";
   const { header, printedAt, seal } = await officialPrintSeal(user.company, `${origin}${backHref}`, user.name);
   const fileName = `documents-${printedAt.toISOString().slice(0, 10)}.pdf`;
 
@@ -63,7 +83,7 @@ export default async function DocumentsOfficialPrintPage({
         header={header}
         titleAr="كشف مستندات الموظفين"
         titleEn="Employee documents register"
-        subtitle={viewLabel}
+        subtitle={subtitle}
         printedAt={printedAt}
         emptyText={{ ar: "لا توجد مستندات في هذه التصفية.", en: "No documents in this filter." }}
         columns={[
