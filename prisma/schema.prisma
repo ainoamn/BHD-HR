@@ -22,6 +22,8 @@ model Company {
   alertUrgentDays      Int                 @default(7)
   alertWarningDays     Int                 @default(30)
   alertEarlyDays       Int                 @default(60)
+  /// Document types shown in expiry alerts and the documents expiry views (src/lib/alert-docs.ts). Null = all types.
+  alertDocTypes        Json?
   payDay               Int                 @default(0)
   leaveWarningDays     Int                 @default(5)
   /// 0 until the built-in job titles, departments and leave types are seeded (src/lib/hr-catalog.ts).

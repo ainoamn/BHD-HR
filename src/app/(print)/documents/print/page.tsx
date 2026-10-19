@@ -1,5 +1,6 @@
 import { OfficialDocSheet } from "@/components/official-doc-sheet";
 import { OfficialPrintBar } from "@/components/official-print-bar";
+import { readAlertDocTypes, tracksAlertDoc } from "@/lib/alert-docs";
 import { requirePermission } from "@/lib/auth";
 import { collectDocuments } from "@/lib/documents";
 import { describeExpiry } from "@/lib/expiry";
@@ -15,13 +16,14 @@ const VIEW_IDS = ["all", "expired", "warning", "early"];
 export default async function DocumentsOfficialPrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; employerId?: string; orient?: string; download?: string }>;
+  searchParams: Promise<{ view?: string; employerId?: string; employeeId?: string; orient?: string; download?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("documents.view");
   const { lang, t } = await getI18n();
   const orient = readOrient(sp.orient);
   const view = VIEW_IDS.includes(sp.view || "") ? sp.view || "all" : "all";
+  const alertDocs = readAlertDocTypes(user.company.alertDocTypes);
   const employers = await prisma.employer.findMany({
     where: { companyId: user.companyId },
     select: { id: true, name: true, nameEn: true },
@@ -45,7 +47,6 @@ export default async function DocumentsOfficialPrintPage({
         : view === "early"
           ? t("خلال التنبيه المبكر", "Within early notice")
           : t("الكل", "All");
-  const subtitle = [viewLabel, employerLabel].filter(Boolean).join(" · ");
 
   const limits = {
     urgent: user.company.alertUrgentDays,
@@ -53,28 +54,41 @@ export default async function DocumentsOfficialPrintPage({
     early: user.company.alertEarlyDays,
   };
   const employees = await prisma.employee.findMany({
-    where: { companyId: user.companyId, status: { not: "TERMINATED" }, ...employerFilter },
+    where: {
+      companyId: user.companyId,
+      status: { not: "TERMINATED" },
+      ...employerFilter,
+      ...(sp.employeeId ? { id: sp.employeeId } : {}),
+    },
     include: { documents: true, employer: true },
     orderBy: { fullName: "asc" },
   });
+  const focus = employees.length === 1 ? employees[0] : null;
+  const focusName = focus ? (lang === "en" && focus.nameEn ? focus.nameEn : focus.fullName) : "";
+  const subtitle = [viewLabel, focusName || employerLabel || t("كل الكفلاء", "All sponsors")].filter(Boolean).join(" · ");
+
   const rows = collectDocuments(employees, lang)
     .map((row) => ({ ...row, status: describeExpiry(row.expiry, limits, lang) }))
     .filter((row) => {
+      if (view !== "all" && !tracksAlertDoc(alertDocs, row.type)) return false;
       if (view === "expired") return row.status.key === "expired" || row.status.key === "today";
       if (view === "warning") return ["expired", "today", "urgent", "warning"].includes(row.status.key);
       if (view === "early") return row.status.key !== "ok" && row.status.key !== "none";
       return true;
     })
-    .sort((a, b) => a.status.days - b.status.days);
+    .sort((a, b) => a.status.days - b.status.days || a.employeeName.localeCompare(b.employeeName, lang === "en" ? "en" : "ar"));
 
   const origin = await requestOrigin();
   const back = new URLSearchParams();
   if (view !== "all") back.set("view", view);
   if (employerId) back.set("employerId", employerId);
+  if (sp.employeeId && focus) back.set("employeeId", focus.id);
   const backQuery = back.toString();
   const backHref = backQuery ? `/documents?${backQuery}` : "/documents";
   const { header, printedAt, seal } = await officialPrintSeal(user.company, `${origin}${backHref}`, user.name);
-  const fileName = `documents-${printedAt.toISOString().slice(0, 10)}.pdf`;
+  const fileName = focus
+    ? `documents-${focus.employeeNumber}-${printedAt.toISOString().slice(0, 10)}.pdf`
+    : `documents-${printedAt.toISOString().slice(0, 10)}.pdf`;
 
   return (
     <div className={`mx-auto px-2 py-4 sm:px-4 sm:py-6 print:px-0 print:py-0 ${orient === "landscape" ? "max-w-[297mm]" : "max-w-[210mm]"}`}>

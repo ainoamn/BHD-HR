@@ -4,6 +4,7 @@ import { can, getSessionUser } from "./auth";
 import type { Permission } from "./permissions";
 import { reminderDayIn, payDayFor } from "./calendar";
 import { muscatDateTime } from "./clock";
+import { readAlertDocTypes, tracksAlertDoc } from "./alert-docs";
 import { DOC_LABEL, monthName } from "./constants";
 import { heldDocLabel } from "./custody";
 import { backupStatus, visibleErrorScope } from "./errors";
@@ -119,6 +120,7 @@ export async function computeAlerts(company: Company, permissions: readonly stri
     warning: company.alertWarningDays,
     early: company.alertEarlyDays,
   };
+  const alertDocs = readAlertDocTypes(company.alertDocTypes);
   const now = new Date();
   const thisYear = now.getFullYear();
   const thisMonth = now.getMonth() + 1;
@@ -217,28 +219,39 @@ export async function computeAlerts(company: Company, permissions: readonly stri
   for (const employee of employees) {
     const name = nameOf(employee);
     const docs = [
-      { id: `doc-${employee.id}-id`, label: pick(DOC_LABEL.ID_CARD, lang), expiry: employee.idExpiry, tab: "docs" },
-      { id: `doc-${employee.id}-passport`, label: pick(DOC_LABEL.PASSPORT, lang), expiry: employee.passportExpiry, tab: "docs" },
-      { id: `doc-${employee.id}-residence`, label: pick(DOC_LABEL.RESIDENCE, lang), expiry: employee.residenceExpiry, tab: "docs" },
-      { id: `doc-${employee.id}-contract`, label: pick(DOC_LABEL.CONTRACT, lang), expiry: employee.contractEnd, tab: "info" },
+      { type: "ID_CARD", label: pick(DOC_LABEL.ID_CARD, lang), expiry: employee.idExpiry },
+      { type: "PASSPORT", label: pick(DOC_LABEL.PASSPORT, lang), expiry: employee.passportExpiry },
+      { type: "RESIDENCE", label: pick(DOC_LABEL.RESIDENCE, lang), expiry: employee.residenceExpiry },
+      { type: "CONTRACT", label: pick(DOC_LABEL.CONTRACT, lang), expiry: employee.contractEnd },
       ...employee.documents.map((document) => ({
-        id: `extra-${document.id}`,
+        type: document.type,
         label: pick(DOC_LABEL[document.type], lang, t("مستند", "Document")),
         expiry: document.expiryDate,
-        tab: "docs",
       })),
     ];
-    for (const doc of docs) {
-      if (!doc.expiry) continue;
-      const status = describeExpiry(doc.expiry, limits, lang);
-      if (status.key === "ok" || status.key === "none") continue;
+    const dueDocs = docs
+      .filter((doc) => doc.expiry && tracksAlertDoc(alertDocs, doc.type))
+      .map((doc) => {
+        const status = describeExpiry(doc.expiry!, limits, lang);
+        return { ...doc, status };
+      })
+      .filter((doc) => doc.status.key !== "ok" && doc.status.key !== "none");
+    if (dueDocs.length) {
+      const worst = dueDocs.reduce((a, b) => (a.status.days <= b.status.days ? a : b));
+      const labels = dueDocs.map((doc) => doc.label);
+      const names = labels.length > 3 ? `${labels.slice(0, 3).join(lang === "en" ? ", " : "، ")} +${labels.length - 3}` : labels.join(lang === "en" ? ", " : "، ");
       alerts.push({
-        id: doc.id,
-        severity: severityFor(status.key),
-        title: status.key === "expired" ? t(`${doc.label} منتهية`, `${doc.label} expired`) : t(`${doc.label} قاربت على الانتهاء`, `${doc.label} expiring soon`),
-        message: `${name} — ${status.label}`,
-        href: `/employees/${employee.id}?tab=${doc.tab}`,
-        days: status.days,
+        id: `docs-${employee.id}`,
+        severity: severityFor(worst.status.key),
+        title:
+          dueDocs.length === 1
+            ? worst.status.key === "expired"
+              ? t(`${labels[0]} منتهية`, `${labels[0]} expired`)
+              : t(`${labels[0]} قاربت على الانتهاء`, `${labels[0]} expiring soon`)
+            : t(`${dueDocs.length} مستندات تحتاج متابعة`, `${dueDocs.length} documents need attention`),
+        message: `${name} — ${names}`,
+        href: `/documents?view=early&employeeId=${employee.id}`,
+        days: worst.status.days,
       });
     }
 
@@ -527,8 +540,8 @@ export async function computeAlerts(company: Company, permissions: readonly stri
 
 function alertPermission(id: string): Permission {
   if (id.startsWith("emp-requests-")) return REQUEST_TYPE[id.split("-")[2] as RequestType]?.perm || "employees.edit";
-  if (id.endsWith("-contract") || id.startsWith("birthday-")) return "employees.view";
-  if (id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
+  if (id.startsWith("birthday-")) return "employees.view";
+  if (id.startsWith("docs-") || id.startsWith("doc-") || id.startsWith("extra-")) return "documents.view";
   if (id.startsWith("leave-") || id.startsWith("att-") || id.startsWith("request-")) return "attendance.view";
   if (id === "review-documents" || id.startsWith("custody-")) return "documents.view";
   if (id.startsWith("reminder-")) return "calendar.view";

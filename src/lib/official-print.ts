@@ -2,7 +2,7 @@
 
 const ROUTES: { match: RegExp; print: string; keep?: string[] }[] = [
   { match: /^\/attendance(\/|$)/, print: "/attendance/print", keep: ["year", "month", "day", "tab", "q"] },
-  { match: /^\/documents(\/|$)/, print: "/documents/print", keep: ["view", "employerId"] },
+  { match: /^\/documents(\/|$)/, print: "/documents/print", keep: ["view", "employerId", "employeeId"] },
   { match: /^\/employees(\/|$)/, print: "/employees/print", keep: ["q", "status", "employerId"] },
   { match: /^\/employers(\/|$)/, print: "/employers/print", keep: ["q", "kind", "view", "employerId"] },
   { match: /^\/salaries(\/|$)/, print: "/salaries/print", keep: ["year", "month", "employerId", "q"] },

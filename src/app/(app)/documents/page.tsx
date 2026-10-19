@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { ChevronDown, FilePlus2, Files, FolderLock, Paperclip } from "lucide-react";
-import { ColumnHead } from "@/components/column-head";
+import { ChevronDown, FilePlus2, Files, FolderLock, Printer } from "lucide-react";
+import { DocumentEmployeeList, type DocumentEmployeeGroup } from "@/components/document-employee-list";
 import { DocumentScan } from "@/components/document-scan";
 import { Flash } from "@/components/flash";
 import { GetForm } from "@/components/get-form";
-import { DeleteButton, DocumentEditForm } from "@/components/row-forms";
 import { SubmitButton } from "@/components/submit-button";
-import { PageHeader, ToneBadge, Toolbar, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
+import { PageHeader, Toolbar, fieldClass, primaryBtn, secondaryBtn } from "@/components/ui";
+import { readAlertDocTypes, tracksAlertDoc } from "@/lib/alert-docs";
 import { can, requirePermission } from "@/lib/auth";
 import { DOC_LABEL, EXTRA_DOC_TYPES } from "@/lib/constants";
 import { collectDocuments } from "@/lib/documents";
@@ -15,8 +15,8 @@ import { describeExpiry } from "@/lib/expiry";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
-import { formatDate, text } from "@/lib/utils";
-import { addDocument, deleteDocument, updateDocument } from "@/server/document-actions";
+import { formatDate } from "@/lib/utils";
+import { addDocument } from "@/server/document-actions";
 
 const VIEW_IDS = ["all", "expired", "warning", "early"];
 const COLUMNS = ["name", "doc", "no", "expiry", "status"];
@@ -27,6 +27,7 @@ export default async function DocumentsPage({
   searchParams: Promise<{
     view?: string;
     employerId?: string;
+    employeeId?: string;
     sort?: string;
     dir?: string;
     fname?: string;
@@ -48,6 +49,7 @@ export default async function DocumentsPage({
     { id: "early", label: t("خلال التنبيه المبكر", "Within early notice") },
   ];
   const view = VIEW_IDS.includes(sp.view || "") ? sp.view || "all" : "all";
+  const alertDocs = readAlertDocTypes(user.company.alertDocTypes);
   const employers = await prisma.employer.findMany({
     where: { companyId: user.companyId },
     select: { id: true, name: true, nameEn: true },
@@ -59,12 +61,12 @@ export default async function DocumentsPage({
     const params = new URLSearchParams();
     params.set("view", id);
     if (employerId) params.set("employerId", employerId);
+    if (sp.employeeId) params.set("employeeId", sp.employeeId);
     return withColumnParams(`?${params}`, sp, COLUMNS);
   };
   const returnTo = `/documents${baseQuery(view)}`;
   const allow = { create: can(user, "documents.create"), edit: can(user, "documents.edit"), remove: can(user, "documents.delete") };
   const canEditEmployee = can(user, "employees.edit");
-  const showActions = allow.edit || allow.remove || canEditEmployee;
   const limits = {
     urgent: user.company.alertUrgentDays,
     warning: user.company.alertWarningDays,
@@ -84,6 +86,7 @@ export default async function DocumentsPage({
       },
     }),
   ]);
+  const employeeId = employees.some((item) => item.id === sp.employeeId) ? sp.employeeId || "" : "";
   const selectedEmployer = employers.find((item) => item.id === employerId);
   const employerLabel = selectedEmployer
     ? lang === "en" && selectedEmployer.nameEn
@@ -95,6 +98,8 @@ export default async function DocumentsPage({
   const rows = collectDocuments(employees, lang)
     .map((row) => ({ ...row, status: describeExpiry(row.expiry, limits, lang) }))
     .filter((row) => {
+      if (employeeId && row.employeeId !== employeeId) return false;
+      if (view !== "all" && !tracksAlertDoc(alertDocs, row.type)) return false;
       if (view === "expired") return row.status.key === "expired" || row.status.key === "today";
       if (view === "warning") return ["expired", "today", "urgent", "warning"].includes(row.status.key);
       if (view === "early") return row.status.key !== "ok" && row.status.key !== "none";
@@ -111,7 +116,6 @@ export default async function DocumentsPage({
   const { sort, dir } = readSort(sp, COLUMNS, "status");
   const locale = lang === "en" ? "en" : "ar";
   rows.sort((a, b) => {
-    // No sort chosen: keep the default order, nearest expiry first.
     if (!sp.sort) return a.status.days - b.status.days;
     if (sort === "name") return compareText(a.employeeName, b.employeeName, dir, locale);
     if (sort === "doc") return compareText(a.label, b.label, dir, locale);
@@ -120,6 +124,45 @@ export default async function DocumentsPage({
     return compareNumber(a.expiry ? a.expiry.getTime() : Number.MAX_SAFE_INTEGER, b.expiry ? b.expiry.getTime() : Number.MAX_SAFE_INTEGER, dir);
   });
 
+  const grouped = new Map<string, DocumentEmployeeGroup>();
+  for (const row of rows) {
+    const existing = grouped.get(row.employeeId);
+    if (existing) {
+      existing.rows.push(row);
+      existing.labels.push(row.label);
+      if (row.status.days < existing.worst.days) existing.worst = row.status;
+    } else {
+      grouped.set(row.employeeId, {
+        employeeId: row.employeeId,
+        employeeName: row.employeeName,
+        employeeNumber: row.employeeNumber,
+        labels: [row.label],
+        worst: row.status,
+        rows: [row],
+      });
+    }
+  }
+  const groups = [...grouped.values()];
+  if (!sp.sort || sort === "name") {
+    groups.sort((a, b) => compareText(a.employeeName, b.employeeName, dir, locale));
+  } else {
+    groups.sort((a, b) => a.worst.days - b.worst.days);
+  }
+
+  const printParams = new URLSearchParams();
+  if (view !== "all") printParams.set("view", view);
+  if (employerId) printParams.set("employerId", employerId);
+  const printQuery = printParams.toString();
+  const printBase = printQuery ? `/documents/print?${printQuery}` : "/documents/print";
+  const printAllHref = `${printBase}${printBase.includes("?") ? "&" : "?"}download=1`;
+  const clearEmployeeHref = (() => {
+    const params = new URLSearchParams();
+    if (view !== "all") params.set("view", view);
+    if (employerId) params.set("employerId", employerId);
+    const withCols = withColumnParams(params.toString() ? `?${params}` : "", sp, COLUMNS);
+    return `/documents${withCols}`;
+  })();
+
   return (
     <div className="page-wide">
       <PageHeader
@@ -127,6 +170,10 @@ export default async function DocumentsPage({
         title={t("المستندات", "Documents")}
         description={t("البطاقة والجواز والإقامة وبقية الوثائق، مع حالة الانتهاء.", "ID card, passport, residence and other documents, with expiry status.")}
       >
+        <Link href={printAllHref} className={secondaryBtn}>
+          <Printer size={16} />
+          {employerId ? t("طباعة الكفيل", "Print sponsor") : t("طباعة الكل", "Print all")}
+        </Link>
         <Link href="/documents/custody" className={secondaryBtn}>
           <FolderLock size={16} />
           {t("العهدة", "Custody")}
@@ -151,7 +198,7 @@ export default async function DocumentsPage({
             <input key={field.name} type="hidden" name={field.name} value={field.value} />
           ))}
           <select className={`${fieldClass} min-w-0 flex-1 sm:w-56 sm:flex-none`} name="employerId" defaultValue={employerId} aria-label={t("الكفيل", "Sponsor")}>
-            <option value="">{t("كل الكفلاء", "All sponsors")}</option>
+            <option value="">{t("كل الكفلاء / كل الشركات", "All sponsors / companies")}</option>
             {employers.map((employer) => (
               <option key={employer.id} value={employer.id}>
                 {lang === "en" && employer.nameEn ? employer.nameEn : employer.name}
@@ -162,7 +209,7 @@ export default async function DocumentsPage({
           <button className={primaryBtn} type="submit">
             {t("عرض", "Show")}
           </button>
-          {employerId ? (
+          {employerId || employeeId ? (
             <Link href={`/documents${withColumnParams(view !== "all" ? `?view=${view}` : "", sp, COLUMNS)}`} className={`${secondaryBtn} px-3`}>
               {t("مسح", "Clear")}
             </Link>
@@ -188,7 +235,7 @@ export default async function DocumentsPage({
             </div>
             <label className="space-y-1 text-sm">
               <span className="text-slate-600">{t("الموظف", "Employee")}</span>
-              <select className={`${fieldClass} w-full`} name="employeeId" required>
+              <select className={`${fieldClass} w-full`} name="employeeId" required defaultValue={employeeId || undefined}>
                 {employees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName} — {employee.employeeNumber}
@@ -241,82 +288,22 @@ export default async function DocumentsPage({
           ))}
         </nav>
       </div>
-      <div className="table-shell">
-        <table className="table-stack table-tools min-w-full text-sm">
-          <thead>
-            <tr>
-              <ColumnHead column="name" label={t("الموظف", "Employee")} />
-              <ColumnHead column="doc" label={t("المستند", "Document")} />
-              <ColumnHead column="no" label={t("الرقم", "Number")} />
-              <ColumnHead column="expiry" label={t("الانتهاء", "Expiry")} />
-              <ColumnHead column="status" label={t("الحالة", "Status")} />
-              {showActions ? <th className="px-4 py-3 text-end">{t("إجراءات", "Actions")}</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key}>
-                <td className="cell-title px-4 py-3">
-                  <Link href={`/employees/${row.employeeId}?tab=docs`} className="font-semibold text-slate-900 hover:text-teal-700">
-                    {row.employeeName}
-                  </Link>
-                  <div className="tabular text-xs text-slate-500">{row.employeeNumber}</div>
-                </td>
-                <td className="px-4 py-3" data-label={t("المستند", "Document")}>
-                  <span className="inline-flex flex-wrap items-center gap-2">
-                    {row.label}
-                    {row.fileUrl ? (
-                      <a href={row.fileUrl} target="_blank" className="inline-flex items-center gap-1 rounded-lg bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 hover:bg-teal-100">
-                        <Paperclip size={12} />
-                        {t("ملف", "File")}
-                      </a>
-                    ) : null}
-                  </span>
-                </td>
-                <td className="tabular px-4 py-3" data-label={t("الرقم", "Number")}>
-                  <span dir="ltr">{text(row.number)}</span>
-                </td>
-                <td className="tabular px-4 py-3 whitespace-nowrap" data-label={t("الانتهاء", "Expiry")}>
-                  {formatDate(row.expiry)}
-                </td>
-                <td className="px-4 py-3" data-label={t("الحالة", "Status")}>
-                  <ToneBadge tone={row.status.tone}>{row.status.label}</ToneBadge>
-                </td>
-                {showActions ? (
-                  <td className="cell-actions px-4 py-3">
-                    {row.document ? (
-                      <div className="flex flex-wrap items-start gap-4 sm:justify-end">
-                        {allow.edit ? <DocumentEditForm action={updateDocument} returnTo={returnTo} document={row.document} /> : null}
-                        {allow.remove ? (
-                          <DeleteButton
-                            action={deleteDocument}
-                            fields={{ id: row.document.id, returnTo }}
-                            confirm={t("حذف هذا المستند وملفه المرفق؟", "Delete this document and its file?")}
-                          />
-                        ) : null}
-                      </div>
-                    ) : canEditEmployee ? (
-                      <div className="sm:text-end">
-                        <Link href={`/employees/${row.employeeId}/edit`} className={linkAction}>
-                          {t("تعديل من بيانات الموظف", "Edit in employee record")}
-                        </Link>
-                      </div>
-                    ) : null}
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 ? (
-          <div className="flex flex-col items-center px-4 py-12 text-center">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-inset ring-slate-200">
-              <Files size={22} />
-            </span>
-            <p className="mt-3 text-sm text-slate-500">{t("لا توجد مستندات في هذا العرض.", "No documents in this view.")}</p>
-          </div>
-        ) : null}
-      </div>
+      {employeeId ? (
+        <p className="mb-3 text-sm text-slate-600">
+          {t("عرض موظف واحد —", "One employee —")}{" "}
+          <Link href={clearEmployeeHref} className="font-semibold text-teal-800">
+            {t("إظهار الجميع", "Show all")}
+          </Link>
+        </p>
+      ) : null}
+      <DocumentEmployeeList
+        groups={groups}
+        returnTo={returnTo}
+        allow={allow}
+        canEditEmployee={canEditEmployee}
+        t={t}
+        printBase={printBase}
+      />
     </div>
   );
 }

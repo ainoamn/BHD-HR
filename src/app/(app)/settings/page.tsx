@@ -28,6 +28,8 @@ import { ACCESS_LABEL, ACCESS_TONE } from "@/lib/subscription";
 import { formatDate } from "@/lib/utils";
 import { sendPendingLetterCopies } from "@/server/letter-actions";
 import { inviteMember, removeMember, renewInviteLink, updateCompanySettings, updateLetterIssuing, updateMemberAccess, updateProfile, updateSignatureSettings } from "@/server/settings-actions";
+import { ALERT_DOC_TYPES, readAlertDocTypes } from "@/lib/alert-docs";
+import { DOC_LABEL } from "@/lib/constants";
 import { AUTO_ISSUE_KINDS, LETTER_KIND, readAutoKinds } from "@/lib/letters";
 
 function SectionHead({ icon: Icon, title, text, children }: { icon: LucideIcon; title: string; text?: string; children?: React.ReactNode }) {
@@ -155,6 +157,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     ? await Promise.all([prisma.errorEvent.count({ where: { ...errorScope.where, resolvedAt: null } }), platformAdmin ? backupStatus().then((status) => status.overdue) : false])
     : [0, false];
   const autoKinds = readAutoKinds(user.company.letterAutoKinds);
+  const alertDocTypes = readAlertDocTypes(user.company.alertDocTypes);
 
   return (
     <div className="page-wide">
@@ -373,6 +376,27 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   </Field>
                   <Field label={t("تنبيه مبكر خلال (يوم)", "Early notice within (days)")}>
                     <input className={`${fieldClass} w-full`} type="number" min="1" name="alertEarlyDays" defaultValue={company.alertEarlyDays} />
+                  </Field>
+                </div>
+                <div className="md:col-span-2">
+                  <Field
+                    label={t("مستندات التنبيه والانتهاء", "Expiry alert documents")}
+                    hint={t(
+                      "المحدّدة تظهر في التنبيهات وصفحة المستندات عند التصفية بمنتهية أو قريبة الانتهاء.",
+                      "Checked types appear in alerts and on the documents page under expired / soon-to-expire filters.",
+                    )}
+                  >
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {ALERT_DOC_TYPES.map((type) => (
+                        <label
+                          key={type}
+                          className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface p-3 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 has-[:checked]:bg-emerald-50/60 has-[:checked]:ring-emerald-300"
+                        >
+                          <input type="checkbox" name="alertDocTypes" value={type} defaultChecked={alertDocTypes.includes(type)} className="mt-0.5 size-4 shrink-0 accent-teal-700" />
+                          <span className="text-sm font-semibold text-slate-900">{pick(DOC_LABEL[type], lang, type)}</span>
+                        </label>
+                      ))}
+                    </div>
                   </Field>
                 </div>
                 <Field

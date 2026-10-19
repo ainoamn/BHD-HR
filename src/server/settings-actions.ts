@@ -16,6 +16,7 @@ import { normalizePhone } from "@/lib/phone";
 import { channelReady, sendEmailMessage } from "@/lib/delivery";
 import { requestOrigin } from "@/lib/request-origin";
 import { fitsLimit, limitMessage } from "@/lib/subscription";
+import { ALERT_DOC_TYPES } from "@/lib/alert-docs";
 import { clip, intValue, req, str } from "@/lib/utils";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,6 +40,12 @@ export async function updateCompanySettings(formData: FormData) {
   }
   if (!(alertUrgentDays <= alertWarningDays && alertWarningDays <= alertEarlyDays)) {
     go("/settings", { error: t("اجعل التنبيه العاجل أقل من التحذير، والتحذير أقل من التنبيه المبكر", "Urgent ≤ warning ≤ early") });
+  }
+  const alertDocTypes = formData
+    .getAll("alertDocTypes")
+    .filter((item): item is string => typeof item === "string" && ALERT_DOC_TYPES.includes(item));
+  if (!alertDocTypes.length) {
+    go("/settings", { error: t("اختر مستنداً واحداً على الأقل للتنبيهات", "Pick at least one document type for alerts") });
   }
 
   const previousLogo = user.company.logoUrl;
@@ -67,6 +74,7 @@ export async function updateCompanySettings(formData: FormData) {
       alertUrgentDays,
       alertWarningDays,
       alertEarlyDays,
+      alertDocTypes,
       payDay,
       leaveWarningDays,
       payrollApproval: req(formData, "payrollApproval") === "1",
