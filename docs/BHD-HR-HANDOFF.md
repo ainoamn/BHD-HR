@@ -2,7 +2,7 @@
 
 ملف الاستكمال من جهاز آخر: ما أُنجز بالتوقيت، والوضع الحالي، وتجهيز الجهاز الجديد، وما بقي، وقواعد العمل. لا يحتوي على أي سر؛ الأسرار في Vercel وNeon وملفات `.env` المحلية فقط.
 
-التفاصيل الكاملة لكل نشر في [`BHD-HR-DEPLOYMENT-LOG.md`](./BHD-HR-DEPLOYMENT-LOG.md) (آخرها §69)، والمرجع التقني في [`BHD-HR-TECHNICAL.md`](./BHD-HR-TECHNICAL.md)، وشرح الاستخدام في [`BHD-HR-USER-GUIDE.md`](./BHD-HR-USER-GUIDE.md).
+التفاصيل الكاملة لكل نشر في [`BHD-HR-DEPLOYMENT-LOG.md`](./BHD-HR-DEPLOYMENT-LOG.md) (آخرها §70)، والمرجع التقني في [`BHD-HR-TECHNICAL.md`](./BHD-HR-TECHNICAL.md)، وشرح الاستخدام في [`BHD-HR-USER-GUIDE.md`](./BHD-HR-USER-GUIDE.md).
 
 ---
 

@@ -9,9 +9,11 @@ type MeResponse = {
   accounts?: BhdSwitcherUser[];
 };
 
+/** Staff workspace after SSO (docs/BHD-ACCOUNT-SWITCHER.md §5). */
+const WORKSPACE = "/";
+
 /**
- * Product header account menu (docs/BHD-SESSION-POLICY.md + BHD-APP-SWITCHER §2.2).
- * Roster + switch live on the identity host; after switch/add/logout-this we re-enter via silent SSO start.
+ * Product header account menu (BHD-ACCOUNT-SWITCHER §5 — soft switch, no reload flash).
  */
 export function BhdSessionMenu({
   user,
@@ -22,7 +24,6 @@ export function BhdSessionMenu({
   user: BhdSwitcherUser;
   platformAdmin?: boolean;
   locale?: UiLocale;
-  /** False for local username accounts that are not linked to BHD identity. */
   identityLinked?: boolean;
 }) {
   const [accounts, setAccounts] = useState<BhdSwitcherUser[]>(user.id ? [user] : []);
@@ -36,32 +37,41 @@ export function BhdSessionMenu({
   useEffect(() => {
     if (!identityLinked) return;
     let cancelled = false;
-    const issuer = DEFAULT_IDENTITY_ISSUER;
-    fetch(`${issuer}/api/auth/me`, { credentials: "include", cache: "no-store" })
+    fetch(`${DEFAULT_IDENTITY_ISSUER}/api/auth/me`, { credentials: "include", cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: MeResponse | null) => {
         if (cancelled || !data) return;
-        const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
-        if (list.length) setAccounts(list);
-        const current =
-          (user.id && list.find((item) => item.id === user.id)) ||
-          data.user ||
-          list.find((item) => item.email && item.email === user.email);
-        if (current) setActive({ ...user, ...current, id: current.id || user.id });
+        applyRoster(data, user);
       })
       .catch(() => {
-        /* Identity may block cross-origin reads (CORP); add/logout still work via top-level navigation. */
+        /* CORP may block; add/logout still work via navigation. */
       });
     return () => {
       cancelled = true;
     };
   }, [identityLinked, user]);
 
-  const productStart = useCallback(() => `${window.location.origin}/api/auth/bhd/start?returnTo=${encodeURIComponent("/")}`, []);
+  function applyRoster(data: MeResponse, fallback: BhdSwitcherUser) {
+    const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
+    if (list.length) setAccounts(list);
+    const current =
+      (fallback.id && list.find((item) => item.id === fallback.id)) ||
+      data.user ||
+      list.find((item) => item.email && item.email === fallback.email);
+    if (current) setActive({ ...fallback, ...current, id: current.id || fallback.id });
+  }
 
   const clearProductThen = useCallback((url: string) => {
     window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(url)}`);
   }, []);
+
+  /**
+   * Clear product cookie then silent SSO into workspace.
+   * `/` without a session is the marketing rewrite, so rebind goes through start once (§5).
+   */
+  const rebindWorkspace = useCallback(() => {
+    clearProductThen(`/api/auth/bhd/start?returnTo=${encodeURIComponent(WORKSPACE)}`);
+  }, [clearProductThen]);
 
   const signOutThis = useCallback(async () => {
     if (!identityLinked) {
@@ -69,7 +79,6 @@ export function BhdSessionMenu({
       return;
     }
     const issuer = DEFAULT_IDENTITY_ISSUER;
-    const clientId = "bhd-hr";
     try {
       const response = await fetch(`${issuer}/api/auth/logout`, {
         method: "POST",
@@ -78,18 +87,24 @@ export function BhdSessionMenu({
         body: JSON.stringify({ all: false }),
       });
       if (response.ok) {
-        const data = (await response.json()) as { user?: BhdSwitcherUser | null };
-        clearProductThen(data.user ? productStart() : `${issuer}/login`);
+        const data = (await response.json()) as MeResponse;
+        if (data.user) {
+          applyRoster(data, data.user);
+          window.dispatchEvent(new Event("bhd-account-changed"));
+          rebindWorkspace();
+          return;
+        }
+        clearProductThen(`${issuer}/login`);
         return;
       }
     } catch {
-      /* fall through to end-session hop */
+      /* fall through */
     }
     const end = new URL(`${issuer}/oauth/end-session`);
-    end.searchParams.set("client_id", clientId);
-    end.searchParams.set("post_logout_redirect_uri", productStart());
+    end.searchParams.set("client_id", "bhd-hr");
+    end.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/api/auth/bhd/start?returnTo=${encodeURIComponent(WORKSPACE)}`);
     clearProductThen(end.toString());
-  }, [clearProductThen, identityLinked, productStart]);
+  }, [clearProductThen, identityLinked, rebindWorkspace]);
 
   const signOutAll = useCallback(async () => {
     if (!identityLinked) {
@@ -106,7 +121,7 @@ export function BhdSessionMenu({
 
   const switchAccount = useCallback(
     async (sub: string) => {
-      if (!sub || sub === user.id) return;
+      if (!sub || sub === active.id) return;
       const issuer = DEFAULT_IDENTITY_ISSUER;
       try {
         const response = await fetch(`${issuer}/api/auth/switch`, {
@@ -116,16 +131,23 @@ export function BhdSessionMenu({
           body: JSON.stringify({ sub }),
         });
         if (response.ok) {
-          clearProductThen(productStart());
+          const data = (await response.json()) as MeResponse;
+          if (data.user) {
+            applyRoster(data, data.user);
+            window.dispatchEvent(new Event("bhd-account-changed"));
+          }
+          // Soft UI first; rebind product session once if identity sub changed (no reload of same tree).
+          if (data.user?.id && data.user.id !== user.id) {
+            rebindWorkspace();
+          }
           return;
         }
       } catch {
         /* cross-origin blocked */
       }
-      // Fallback: identity account page has the roster switcher (same browser, host-only cookies).
       window.location.assign(`${issuer}/account`);
     },
-    [clearProductThen, productStart, user.id],
+    [active.id, rebindWorkspace, user.id],
   );
 
   const addAccount = useCallback(() => {
