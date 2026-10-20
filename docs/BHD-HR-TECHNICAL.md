@@ -793,6 +793,7 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 | `BHD-IDENTITY-SSO.md` | OIDC + PKCE S256، `state` و`nonce`، كوكيز Host-only، `email_verified`، لا مفاتيح في المتصفح |
 | `BHD-SESSION-POLICY.md` | 400 يوم، بلا خمول ولا KeepAlive ولا جوجل محلي، لا `Set-Cookie` عند القراءة؛ قائمة حسابات وتبديل من الرأس |
 | `BHD-APP-SWITCHER.md` | `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher`/`BhdSessionMenu`، إضافة حساب وتبديل وخروج هذا/الكل |
+| `BHD-ACCOUNT-SWITCHER.md` | شكل بطاقة الحساب: صورة دائرية + بريد، شارة مصدر على زاوية الصورة |
 | `BHD-UNIFIED-LOGIN-AND-APPS.md` §0.1 و§0.2 و§0.5 | الألوان؛ حسابات متعددة من الرأس؛ فوتر «برامجنا» |
 | `BHD-BRAND-IDENTITY.md` | الشعار الرسمي بنسخة الحبر في الواجهة والنسخة الفاتحة في الفوتر |
 

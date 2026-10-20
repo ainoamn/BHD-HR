@@ -31,8 +31,9 @@ const COPY = {
     admin: "الإدارة",
     signOut: "خروج من هذا الحساب",
     signOutAll: "خروج من كل الحسابات",
-    addAccount: "إضافة حساب",
+    addAccount: "إضافة حساب آخر",
     switchTo: "تبديل إلى",
+    manage: "إدارة الحساب",
     providerPassword: "تسجيل عادي",
     providerGoogle: "جوجل",
     providerFacebook: "فيسبوك",
@@ -46,8 +47,9 @@ const COPY = {
     admin: "Admin",
     signOut: "Sign out of this account",
     signOutAll: "Sign out of all accounts",
-    addAccount: "Add account",
+    addAccount: "Add another account",
     switchTo: "Switch to",
+    manage: "Manage account",
     providerPassword: "Password",
     providerGoogle: "Google",
     providerFacebook: "Facebook",
@@ -123,14 +125,32 @@ function ProviderMarks({ providers, t }: { providers: AuthProviderMark[]; t: Swi
   );
 }
 
-function AccountIdentity({ user, t }: { user: BhdSwitcherUser; t: SwitcherCopy }) {
+function Face({ user, t, large = false }: { user: BhdSwitcherUser; t: SwitcherCopy; large?: boolean }) {
+  const [broken, setBroken] = useState(false);
+  const show = Boolean(user.picture) && !broken;
+  const initial = (user.name || user.email || "B").trim().slice(0, 1).toUpperCase();
+  return (
+    <span className={large ? "bhd-switcher-face is-large" : "bhd-switcher-face"}>
+      {show ? (
+        <img src={user.picture || undefined} alt="" width={large ? 56 : 40} height={large ? 56 : 40} referrerPolicy="no-referrer" onError={() => setBroken(true)} />
+      ) : (
+        <span aria-hidden="true">{initial}</span>
+      )}
+      <ProviderMarks providers={accountProviders(user).slice(0, 1)} t={t} />
+    </span>
+  );
+}
+
+function AccountRow({ user, t, large = false }: { user: BhdSwitcherUser; t: SwitcherCopy; large?: boolean }) {
   const meta = accountMeta(user);
   return (
-    <div className="bhd-switcher-identity">
-      <strong>{accountHandle(user)}</strong>
-      {meta.length ? <small>{meta.join(" · ")}</small> : null}
-      <ProviderMarks providers={accountProviders(user)} t={t} />
-    </div>
+    <span className="bhd-switcher-person">
+      <Face user={user} t={t} large={large} />
+      <span className="bhd-switcher-who">
+        <strong dir="ltr">{accountHandle(user)}</strong>
+        {meta.length ? <small dir="ltr">{meta.join(" · ")}</small> : null}
+      </span>
+    </span>
   );
 }
 
@@ -213,7 +233,7 @@ export function BhdAppSwitcher({
     openApp(app, origin);
   }
 
-  const initial = (accountHandle(user) || user.name).trim().slice(0, 1).toUpperCase() || "B";
+  const initial = user.name.trim().slice(0, 1) || "B";
   const showPicture = Boolean(user.picture) && !pictureBroken;
 
   return (
@@ -280,48 +300,54 @@ export function BhdAppSwitcher({
 
       {panel === "account" ? (
         <div className="bhd-switcher-card bhd-switcher-account" id={accountId} role="dialog" aria-label={t.accountAria}>
-          <div className="bhd-switcher-account-row">
-            {showPicture ? (
-              <img src={user.picture || undefined} alt="" width={44} height={44} referrerPolicy="no-referrer" onError={() => setPictureBroken(true)} />
-            ) : (
-              <span className="bhd-switcher-account-initial">{initial}</span>
-            )}
-            <AccountIdentity user={user} t={t} />
-          </div>
-          <a className="bhd-switcher-account-link" href={accountPageUrl(origin)}>
-            {t.account}
-          </a>
-          {platformAdmin ? (
-            <a className="bhd-switcher-account-link" href="/admin">
-              {t.admin}
+          <div className="bhd-switcher-account-now">
+            <AccountRow user={user} t={t} large />
+            <a className="bhd-switcher-manage" href={accountPageUrl(origin)}>
+              {t.manage}
             </a>
-          ) : null}
-          {accounts
-            .filter((item) => (item.id || item.email) !== (user.id || user.email))
-            .map((item) => (
-              <button
-                key={item.id || item.email}
-                type="button"
-                className="bhd-switcher-account-link bhd-switcher-account-switch"
-                aria-label={`${t.switchTo} ${accountHandle(item)}`}
-                onClick={() => item.id && void onSwitchAccount?.(item.id)}
-              >
-                <AccountIdentity user={item} t={t} />
+            {platformAdmin ? (
+              <a className="bhd-switcher-manage" href="/admin">
+                {t.admin}
+              </a>
+            ) : null}
+          </div>
+          <div className="bhd-switcher-account-list">
+            {accounts
+              .filter((item) => (item.id || item.email) !== (user.id || user.email))
+              .map((item) => (
+                <button
+                  key={item.id || item.email}
+                  type="button"
+                  className="bhd-switcher-account-choice"
+                  aria-label={`${t.switchTo} ${accountHandle(item)}`}
+                  onClick={() => item.id && void onSwitchAccount?.(item.id)}
+                >
+                  <AccountRow user={item} t={t} />
+                </button>
+              ))}
+            {onAddAccount ? (
+              <button type="button" className="bhd-switcher-account-choice" onClick={onAddAccount}>
+                <span className="bhd-switcher-person">
+                  <span className="bhd-switcher-face is-action" aria-hidden="true">
+                    <span>+</span>
+                  </span>
+                  <span className="bhd-switcher-who">
+                    <strong>{t.addAccount}</strong>
+                  </span>
+                </span>
               </button>
-            ))}
-          {onAddAccount ? (
-            <button type="button" className="bhd-switcher-account-link" onClick={onAddAccount}>
-              {t.addAccount}
+            ) : null}
+          </div>
+          <div className="bhd-switcher-account-foot">
+            <button type="button" className="bhd-switcher-account-choice" onClick={() => void onSignOut()}>
+              {t.signOut}
             </button>
-          ) : null}
-          <button type="button" className="bhd-switcher-signout" onClick={() => void onSignOut()}>
-            {t.signOut}
-          </button>
-          {onSignOutAll ? (
-            <button type="button" className="bhd-switcher-signout bhd-switcher-signout-all" onClick={() => void onSignOutAll()}>
-              {t.signOutAll}
-            </button>
-          ) : null}
+            {onSignOutAll ? (
+              <button type="button" className="bhd-switcher-account-choice" onClick={() => void onSignOutAll()}>
+                {t.signOutAll}
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>
