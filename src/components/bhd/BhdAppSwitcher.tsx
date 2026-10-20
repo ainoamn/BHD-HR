@@ -84,12 +84,21 @@ function stripSlash(value: string) {
 function isCurrentApp(app: BhdApp, pageOrigin: string) {
   const here = stripSlash(pageOrigin);
   if (app.id === "account") return here === "https://id.bhd-om.com";
+  // HR hosts (docs/BHD-APP-SWITCHER.md §4.1) — include preview + typo alias.
+  if (app.id === "hr") {
+    return (
+      here === "https://hr.bhd-om.com" ||
+      here === "https://hr.hd-om.com" ||
+      /^https:\/\/bhd-hr([.-].*)?\.vercel\.app$/.test(here) ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(here)
+    );
+  }
   if (app.id === "portal") {
     return (
       here === "https://www.bhd-om.com" ||
       here === "https://bhd-om.com" ||
-      here.endsWith(".vercel.app") ||
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(here)
+      /^https:\/\/(www\.)?bhd-om\.vercel\.app$/.test(here) ||
+      /^https:\/\/one-bhd([.-].*)?\.vercel\.app$/.test(here)
     );
   }
   return Boolean(app.origin) && here === stripSlash(app.origin);
