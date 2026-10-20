@@ -26,12 +26,15 @@ export function BhdSessionMenu({
   identityLinked?: boolean;
 }) {
   const [accounts, setAccounts] = useState<BhdSwitcherUser[]>(user.id ? [user] : []);
+  const [active, setActive] = useState<BhdSwitcherUser>(user);
 
   useEffect(() => {
-    if (!identityLinked) {
-      setAccounts(user.id ? [user] : []);
-      return;
-    }
+    setActive(user);
+    if (!identityLinked) setAccounts(user.id ? [user] : []);
+  }, [identityLinked, user]);
+
+  useEffect(() => {
+    if (!identityLinked) return;
     let cancelled = false;
     const issuer = DEFAULT_IDENTITY_ISSUER;
     fetch(`${issuer}/api/auth/me`, { credentials: "include", cache: "no-store" })
@@ -40,6 +43,11 @@ export function BhdSessionMenu({
         if (cancelled || !data) return;
         const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
         if (list.length) setAccounts(list);
+        const current =
+          (user.id && list.find((item) => item.id === user.id)) ||
+          data.user ||
+          list.find((item) => item.email && item.email === user.email);
+        if (current) setActive({ ...user, ...current, id: current.id || user.id });
       })
       .catch(() => {
         /* Identity may block cross-origin reads (CORP); add/logout still work via top-level navigation. */
@@ -47,7 +55,7 @@ export function BhdSessionMenu({
     return () => {
       cancelled = true;
     };
-  }, [identityLinked, user.id]);
+  }, [identityLinked, user]);
 
   const productStart = useCallback(() => `${window.location.origin}/api/auth/bhd/start?returnTo=${encodeURIComponent("/")}`, []);
 
@@ -126,7 +134,7 @@ export function BhdSessionMenu({
 
   return (
     <BhdAppSwitcher
-      user={user}
+      user={active}
       accounts={accounts}
       platformAdmin={platformAdmin}
       locale={locale}

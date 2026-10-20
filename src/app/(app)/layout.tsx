@@ -123,7 +123,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <ThemeToggle initial={theme} />
           <LangToggle />
           <BhdSessionMenu
-            user={{ id: user.bhdSub ?? undefined, name: user.name, email: user.email, picture: user.picture }}
+            user={{
+              id: user.bhdSub ?? undefined,
+              name: user.name,
+              email: user.email,
+              username: user.username,
+              picture: user.picture,
+              hasPassword: Boolean(user.password),
+            }}
             platformAdmin={user.platformAdmin}
             locale={lang}
             identityLinked={Boolean(user.bhdSub)}

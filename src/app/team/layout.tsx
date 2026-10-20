@@ -47,7 +47,14 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
             ) : null}
             {user.bhdSub ? (
               <BhdSessionMenu
-                user={{ id: user.bhdSub, name: user.name, email: user.email, picture: user.picture }}
+                user={{
+                  id: user.bhdSub,
+                  name: user.name,
+                  email: user.email,
+                  username: user.username,
+                  picture: user.picture,
+                  hasPassword: Boolean(user.password),
+                }}
                 locale={lang}
                 identityLinked
               />
