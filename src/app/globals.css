@@ -1354,17 +1354,18 @@ textarea:focus-visible {
   font-weight: 500;
 }
 
-.bhd-switcher-face .bhd-switcher-providers {
-  position: absolute;
-  inset-inline-end: -2px;
-  bottom: -2px;
-}
-
 .bhd-switcher-who {
   min-width: 0;
   flex: 1;
   display: grid;
   gap: 2px;
+}
+
+.bhd-switcher-who-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .bhd-switcher-who strong,
@@ -1389,6 +1390,7 @@ textarea:focus-visible {
 
 .bhd-switcher-providers {
   display: flex;
+  flex-shrink: 0;
   gap: 2px;
 }
 
@@ -1404,7 +1406,6 @@ textarea:focus-visible {
   font-weight: 800;
   line-height: 1;
   cursor: default;
-  box-shadow: 0 0 0 2px #fff;
 }
 
 .bhd-switcher-provider.is-password {

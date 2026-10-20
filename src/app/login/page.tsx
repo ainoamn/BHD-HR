@@ -6,6 +6,7 @@ import { LangToggle } from "@/components/lang-provider";
 import { SubmitButton } from "@/components/submit-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Field, fieldClass } from "@/components/ui";
+import { getSessionUser } from "@/lib/auth";
 import { isSsoConfigured, safeReturnPath } from "@/lib/bhd/identity";
 import { getI18n } from "@/lib/lang";
 import { prisma } from "@/lib/prisma";
@@ -20,6 +21,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sso = isSsoConfigured();
   const startHref = `/api/auth/bhd/start?returnTo=${encodeURIComponent(next)}`;
 
+  // Already signed in and not forcing local form → home/next (docs/BHD-ACCOUNT-SWITCHER.md §2.6).
+  if (sp.local !== "1" && (await getSessionUser())) redirect(next);
   if (sso && sp.local !== "1") redirect(startHref);
   if (sso && sp.local === "1" && /^\/(admin|settings)(\/|\?|$)/.test(next)) {
     redirect(`/api/auth/admin-entry?next=${encodeURIComponent(next)}`);

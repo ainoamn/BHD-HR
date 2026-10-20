@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { DEFAULT_IDENTITY_ISSUER, type UiLocale } from "@/lib/bhd/identity-public";
+import { type UiLocale } from "@/lib/bhd/identity-public";
+import { addAccountUrl, applyAccountIsolation, identityFetch } from "@/lib/identity/client";
 import { BhdAppSwitcher, type BhdSwitcherUser } from "./BhdAppSwitcher";
 
 type MeResponse = {
@@ -9,11 +10,9 @@ type MeResponse = {
   accounts?: BhdSwitcherUser[];
 };
 
-/** Staff workspace after SSO (docs/BHD-ACCOUNT-SWITCHER.md §5). */
-const WORKSPACE = "/";
-
 /**
- * Product header account menu (BHD-ACCOUNT-SWITCHER §5 — soft switch, no reload flash).
+ * Product header — Google-style isolation (docs/BHD-ACCOUNT-SWITCHER.md).
+ * Switch never opens /login?add=1; after switch the product rebinds via start so data matches the active sub.
  */
 export function BhdSessionMenu({
   user,
@@ -37,122 +36,84 @@ export function BhdSessionMenu({
   useEffect(() => {
     if (!identityLinked) return;
     let cancelled = false;
-    fetch(`${DEFAULT_IDENTITY_ISSUER}/api/auth/me`, { credentials: "include", cache: "no-store" })
+    identityFetch("/api/auth/me")
       .then((response) => (response.ok ? response.json() : null))
       .then((data: MeResponse | null) => {
         if (cancelled || !data) return;
-        applyRoster(data, user);
+        const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
+        if (list.length) setAccounts(list);
+        const current =
+          (user.id && list.find((item) => item.id === user.id)) ||
+          data.user ||
+          list.find((item) => item.email && item.email === user.email);
+        if (current) setActive({ ...user, ...current, id: current.id || user.id });
       })
-      .catch(() => {
-        /* CORP may block; add/logout still work via navigation. */
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [identityLinked, user]);
-
-  function applyRoster(data: MeResponse, fallback: BhdSwitcherUser) {
-    const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
-    if (list.length) setAccounts(list);
-    const current =
-      (fallback.id && list.find((item) => item.id === fallback.id)) ||
-      data.user ||
-      list.find((item) => item.email && item.email === fallback.email);
-    if (current) setActive({ ...fallback, ...current, id: current.id || fallback.id });
-  }
-
-  const clearProductThen = useCallback((url: string) => {
-    window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(url)}`);
-  }, []);
-
-  /**
-   * Clear product cookie then silent SSO into workspace.
-   * `/` without a session is the marketing rewrite, so rebind goes through start once (§5).
-   */
-  const rebindWorkspace = useCallback(() => {
-    clearProductThen(`/api/auth/bhd/start?returnTo=${encodeURIComponent(WORKSPACE)}`);
-  }, [clearProductThen]);
 
   const signOutThis = useCallback(async () => {
     if (!identityLinked) {
       window.location.assign("/api/auth/bhd/logout?local=1");
       return;
     }
-    const issuer = DEFAULT_IDENTITY_ISSUER;
     try {
-      const response = await fetch(`${issuer}/api/auth/logout`, {
+      const response = await identityFetch("/api/auth/logout", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: false }),
       });
       if (response.ok) {
         const data = (await response.json()) as MeResponse;
         if (data.user) {
-          applyRoster(data, data.user);
-          window.dispatchEvent(new Event("bhd-account-changed"));
-          rebindWorkspace();
+          applyAccountIsolation();
           return;
         }
-        clearProductThen(`${issuer}/login`);
+        window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
         return;
       }
     } catch {
       /* fall through */
     }
-    const end = new URL(`${issuer}/oauth/end-session`);
-    end.searchParams.set("client_id", "bhd-hr");
-    end.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/api/auth/bhd/start?returnTo=${encodeURIComponent(WORKSPACE)}`);
-    clearProductThen(end.toString());
-  }, [clearProductThen, identityLinked, rebindWorkspace]);
+    window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
+  }, [identityLinked]);
 
   const signOutAll = useCallback(async () => {
     if (!identityLinked) {
       window.location.assign("/api/auth/bhd/logout?local=1");
       return;
     }
-    const issuer = DEFAULT_IDENTITY_ISSUER;
-    const end = new URL(`${issuer}/oauth/end-session`);
+    const end = new URL("https://id.bhd-om.com/oauth/end-session");
     end.searchParams.set("client_id", "bhd-hr");
     end.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/`);
     end.searchParams.set("all", "1");
-    clearProductThen(end.toString());
-  }, [clearProductThen, identityLinked]);
+    window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(end.toString())}`);
+  }, [identityLinked]);
 
   const switchAccount = useCallback(
     async (sub: string) => {
       if (!sub || sub === active.id) return;
-      const issuer = DEFAULT_IDENTITY_ISSUER;
       try {
-        const response = await fetch(`${issuer}/api/auth/switch`, {
+        const response = await identityFetch("/api/auth/switch", {
           method: "POST",
-          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sub }),
         });
         if (response.ok) {
-          const data = (await response.json()) as MeResponse;
-          if (data.user) {
-            applyRoster(data, data.user);
-            window.dispatchEvent(new Event("bhd-account-changed"));
-          }
-          // Soft UI first; rebind product session once if identity sub changed (no reload of same tree).
-          if (data.user?.id && data.user.id !== user.id) {
-            rebindWorkspace();
-          }
+          // Full rebind: product session + page data must become the new account only.
+          applyAccountIsolation();
           return;
         }
       } catch {
         /* cross-origin blocked */
       }
-      window.location.assign(`${issuer}/account`);
+      // Never /login?add=1 on switch failure — identity account page has the roster.
+      window.location.assign("https://id.bhd-om.com/account");
     },
-    [active.id, rebindWorkspace, user.id],
+    [active.id],
   );
-
-  const addAccount = useCallback(() => {
-    window.location.assign(`${DEFAULT_IDENTITY_ISSUER}/login?add=1`);
-  }, []);
 
   return (
     <BhdAppSwitcher
@@ -163,7 +124,7 @@ export function BhdSessionMenu({
       onSignOut={() => void signOutThis()}
       onSignOutAll={identityLinked ? () => void signOutAll() : undefined}
       onSwitchAccount={identityLinked ? (sub) => void switchAccount(sub) : undefined}
-      onAddAccount={identityLinked ? addAccount : undefined}
+      onAddAccount={identityLinked ? () => window.location.assign(addAccountUrl()) : undefined}
     />
   );
 }

@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/login",
   "/pricing",
   "/paused",
+  "/auth/",
   "/api/",
   "/_next/",
   "/portal/",
