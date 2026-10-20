@@ -4,7 +4,7 @@ import { CreditCard, KeyRound, Megaphone } from "lucide-react";
 import { TranslateToggle } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
 import { AppFrame } from "@/components/app-frame";
-import { BhdAppSwitcher } from "@/components/bhd/BhdAppSwitcher";
+import { BhdSessionMenu } from "@/components/bhd/BhdSessionMenu";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { SiteFooter } from "@/components/bhd/site-footer";
 import { LangToggle } from "@/components/lang-provider";
@@ -19,7 +19,7 @@ import { platformConfig } from "@/lib/platform";
 import { decidableTypes } from "@/lib/requests";
 import { hasFeature } from "@/lib/subscription";
 import { SIDEBAR_COOKIE, THEME_COOKIE, formatLongDate, normalizeTheme } from "@/lib/utils";
-import { logout, switchCompany } from "@/server/auth-actions";
+import { switchCompany } from "@/server/auth-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +122,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <TranslateToggle compact />
           <ThemeToggle initial={theme} />
           <LangToggle />
-          <BhdAppSwitcher user={{ name: user.name, email: user.email, picture: user.picture }} onSignOut={logout} platformAdmin={user.platformAdmin} locale={lang} />
+          <BhdSessionMenu
+            user={{ id: user.bhdSub ?? undefined, name: user.name, email: user.email, picture: user.picture }}
+            platformAdmin={user.platformAdmin}
+            locale={lang}
+            identityLinked={Boolean(user.bhdSub)}
+          />
         </>
       }
       footer={<SiteFooter locale={lang} />}

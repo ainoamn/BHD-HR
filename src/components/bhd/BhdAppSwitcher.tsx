@@ -6,6 +6,7 @@ import { BhdAppIcon } from "./BhdAppIcon";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 export type BhdSwitcherUser = {
+  id?: string;
   name: string;
   email: string;
   picture: string | null;
@@ -20,7 +21,10 @@ const COPY = {
     appsTitle: "تطبيقات BHD",
     account: "الحساب",
     admin: "الإدارة",
-    signOut: "خروج",
+    signOut: "خروج من هذا الحساب",
+    signOutAll: "خروج من كل الحسابات",
+    addAccount: "إضافة حساب",
+    switchTo: "تبديل إلى",
   },
   en: {
     appsAria: "BHD apps",
@@ -28,7 +32,10 @@ const COPY = {
     appsTitle: "BHD apps",
     account: "Account",
     admin: "Admin",
-    signOut: "Sign out",
+    signOut: "Sign out of this account",
+    signOutAll: "Sign out of all accounts",
+    addAccount: "Add account",
+    switchTo: "Switch to",
   },
 } as const;
 
@@ -54,10 +61,7 @@ function accountPageUrl(pageOrigin: string) {
   if (!pageOrigin) return "/account";
   const accountApp = BHD_APPS.find((app) => app.id === "account");
   const portalApp = BHD_APPS.find((app) => app.id === "portal");
-  if (
-    (accountApp && isCurrentApp(accountApp, pageOrigin)) ||
-    (portalApp && isCurrentApp(portalApp, pageOrigin))
-  ) {
+  if ((accountApp && isCurrentApp(accountApp, pageOrigin)) || (portalApp && isCurrentApp(portalApp, pageOrigin))) {
     return "/account";
   }
   return `${DEFAULT_IDENTITY_ISSUER}/account`;
@@ -73,12 +77,20 @@ function openApp(app: BhdApp, pageOrigin: string) {
 
 export function BhdAppSwitcher({
   user,
+  accounts = [],
   onSignOut,
+  onSignOutAll,
+  onSwitchAccount,
+  onAddAccount,
   platformAdmin = false,
   locale = "ar",
 }: {
   user: BhdSwitcherUser;
+  accounts?: BhdSwitcherUser[];
   onSignOut: () => void | Promise<void>;
+  onSignOutAll?: () => void | Promise<void>;
+  onSwitchAccount?: (sub: string) => void | Promise<void>;
+  onAddAccount?: () => void;
   platformAdmin?: boolean;
   locale?: UiLocale;
 }) {
@@ -136,6 +148,7 @@ export function BhdAppSwitcher({
 
   const initial = user.name.trim().slice(0, 1) || "B";
   const showPicture = Boolean(user.picture) && !pictureBroken;
+  const others = accounts.filter((item) => (item.id || item.email) !== (user.id || user.email));
 
   return (
     <div className="bhd-switcher-slot" ref={rootRef}>
@@ -165,14 +178,7 @@ export function BhdAppSwitcher({
         onClick={() => setPanel((current) => (current === "account" ? null : "account"))}
       >
         {showPicture ? (
-          <img
-            src={user.picture || undefined}
-            alt=""
-            width={32}
-            height={32}
-            referrerPolicy="no-referrer"
-            onError={() => setPictureBroken(true)}
-          />
+          <img src={user.picture || undefined} alt="" width={32} height={32} referrerPolicy="no-referrer" onError={() => setPictureBroken(true)} />
         ) : (
           <span>{initial}</span>
         )}
@@ -197,11 +203,7 @@ export function BhdAppSwitcher({
                   aria-current={current ? "page" : undefined}
                   onClick={() => onAppClick(app)}
                 >
-                  <BhdAppIcon
-                    id={app.id}
-                    title={label}
-                    className={current ? "bhd-switcher-mark is-current" : "bhd-switcher-mark"}
-                  />
+                  <BhdAppIcon id={app.id} title={label} className={current ? "bhd-switcher-mark is-current" : "bhd-switcher-mark"} />
                   <span>{label}</span>
                 </button>
               );
@@ -214,14 +216,7 @@ export function BhdAppSwitcher({
         <div className="bhd-switcher-card bhd-switcher-account" id={accountId} role="dialog" aria-label={t.accountAria}>
           <div className="bhd-switcher-account-row">
             {showPicture ? (
-              <img
-                src={user.picture || undefined}
-                alt=""
-                width={44}
-                height={44}
-                referrerPolicy="no-referrer"
-                onError={() => setPictureBroken(true)}
-              />
+              <img src={user.picture || undefined} alt="" width={44} height={44} referrerPolicy="no-referrer" onError={() => setPictureBroken(true)} />
             ) : (
               <span className="bhd-switcher-account-initial">{initial}</span>
             )}
@@ -238,9 +233,24 @@ export function BhdAppSwitcher({
               {t.admin}
             </a>
           ) : null}
+          {others.map((item) => (
+            <button key={item.id || item.email} type="button" className="bhd-switcher-account-link" onClick={() => item.id && void onSwitchAccount?.(item.id)}>
+              {t.switchTo}: {item.name}
+            </button>
+          ))}
+          {onAddAccount ? (
+            <button type="button" className="bhd-switcher-account-link" onClick={onAddAccount}>
+              {t.addAccount}
+            </button>
+          ) : null}
           <button type="button" className="bhd-switcher-signout" onClick={() => void onSignOut()}>
             {t.signOut}
           </button>
+          {onSignOutAll ? (
+            <button type="button" className="bhd-switcher-signout bhd-switcher-signout-all" onClick={() => void onSignOutAll()}>
+              {t.signOutAll}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -102,11 +102,16 @@ export function authorizeUrl(config: IdentityConfig, oauth: OAuthState) {
   return url.toString();
 }
 
-export function endSessionUrl(requestOrigin: string) {
+export function endSessionUrl(requestOrigin: string, options?: { all?: boolean; postLogoutRedirectUri?: string }) {
   const issuer = identityIssuer();
   const clientId = process.env.BHD_OAUTH_CLIENT_ID?.trim() ?? "";
   const url = new URL(`${issuer}/oauth/end-session`);
-  url.search = new URLSearchParams({ client_id: clientId, post_logout_redirect_uri: `${requestOrigin}/` }).toString();
+  const params = new URLSearchParams({
+    client_id: clientId,
+    post_logout_redirect_uri: options?.postLogoutRedirectUri || `${requestOrigin}/`,
+  });
+  if (options?.all) params.set("all", "1");
+  url.search = params.toString();
   return url.toString();
 }
 

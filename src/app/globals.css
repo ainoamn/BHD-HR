@@ -1327,6 +1327,13 @@ textarea:focus-visible {
   color: #fff;
 }
 
+.bhd-switcher-signout-all {
+  margin-top: 4px;
+  background: transparent;
+  color: var(--color-ink-900);
+  box-shadow: inset 0 0 0 1px var(--color-slate-300);
+}
+
 @media (max-width: 600px) {
   .bhd-switcher-card {
     position: fixed;

@@ -60,7 +60,7 @@ src/
     (app)/analytics/     لوحة المالك (تحليلات 12 شهراً + قراءة بالذكاء الاصطناعي)
     login/               غلاف الدخول + دخول الطوارئ المحلي
   components/
-    bhd/                 BhdAppSwitcher و BhdAppIcon (منسوخان من ONE-BHD) و site-footer
+    bhd/                 BhdAppSwitcher و BhdSessionMenu و BhdAppIcon (من ONE-BHD) و site-footer
     app-frame.tsx        هيكل الواجهة: الشريط الجانبي، الدرج والشريط السفلي للهاتف، الشريط العلوي
     nav-speed.tsx        الجلب المسبق وشريط التقدّم (انظر «سرعة التنقل» أدناه)
     get-form.tsx         نموذج بحث/فلترة بتنقل داخلي بلا إعادة تحميل
@@ -570,7 +570,8 @@ sequenceDiagram
 |---|---|
 | `api/auth/bhd/start` | يولّد `state` و`nonce` و`verifier`، يحفظها في `bhd_oauth_state`، ويحوّل إلى `authorize` |
 | `api/auth/bhd/callback` | يطابق `state`، يبدّل الرمز من الخادم، يتحقق من `id_token`، يربط المستخدم، ويضع الجلسة |
-| `api/auth/bhd/logout` | يمسح الجلسة ثم يحوّل إلى `end-session` على الهوية |
+| `api/auth/bhd/logout` | يمسح جلسة المنتج ثم يحوّل إلى `continue` آمن أو `end-session` (`?all=1` لكل الحسابات، `?local=1` للحساب المحلي فقط) |
+| `components/bhd/BhdSessionMenu` | قائمة الحسابات من `/api/auth/me` على الهوية، إضافة/تبديل/خروج هذا أو الكل (§0.2 و`BHD-SESSION-POLICY`) |
 | `api/auth/admin-entry` | دخول الإدارة: يفتح `/settings` عبر الهوية (لا يرسل إلى كلمة المرور المحلية) |
 | `lib/request-origin.ts` → `signInOrigin` | `start` و`callback` و`admin-entry` تعمل على النطاق الذي بدأ منه الدخول إن كان من `https://hr.bhd-om.com` أو `https://bhd-hr.vercel.app` (أو `SIGN_IN_ORIGINS` مفصولة بفواصل)، وإلا `APP_ORIGIN`؛ لأن كوكي `bhd_oauth_state` والجلسة تخصّان ذلك النطاق. `identityConfig(origin)` يستخدم `BHD_OAUTH_REDIRECT_URI` إن كان على النطاق نفسه، وإلا `{origin}/api/auth/bhd/callback` (والهوية تقبل الاثنين). الروابط المشاركة (البوابة، QR، الخطابات) والخروج تبقى على `APP_ORIGIN` |
 | `login/page.tsx` | غلاف: يحوّل إلى `start` إلا مع `?local=1`؛ و`local=1` مع `next=/settings` أو `/admin` يذهب إلى `admin-entry` |
@@ -790,9 +791,9 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 |---|---|
 | `BHD-PRODUCT-SSO-ADMIN.md` | start / callback / logout / admin-entry، غلاف `/login`، `bhdSub`، رابط الإدارة في الفوتر |
 | `BHD-IDENTITY-SSO.md` | OIDC + PKCE S256، `state` و`nonce`، كوكيز Host-only، `email_verified`، لا مفاتيح في المتصفح |
-| `BHD-SESSION-POLICY.md` | 400 يوم، بلا خمول ولا KeepAlive ولا جوجل محلي، لا `Set-Cookie` عند القراءة |
-| `BHD-APP-SWITCHER.md` | `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher` منسوخة حرفياً (تغيير مسار الاستيراد فقط)، في الرأس بجانب زر الحساب |
-| `BHD-UNIFIED-LOGIN-AND-APPS.md` §0.1 و§0.5 | الألوان والخط والحدود؛ فوتر «برامجنا» والروابط ورابط الإدارة |
+| `BHD-SESSION-POLICY.md` | 400 يوم، بلا خمول ولا KeepAlive ولا جوجل محلي، لا `Set-Cookie` عند القراءة؛ قائمة حسابات وتبديل من الرأس |
+| `BHD-APP-SWITCHER.md` | `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher`/`BhdSessionMenu`، إضافة حساب وتبديل وخروج هذا/الكل |
+| `BHD-UNIFIED-LOGIN-AND-APPS.md` §0.1 و§0.2 و§0.5 | الألوان؛ حسابات متعددة من الرأس؛ فوتر «برامجنا» |
 | `BHD-BRAND-IDENTITY.md` | الشعار الرسمي بنسخة الحبر في الواجهة والنسخة الفاتحة في الفوتر |
 
 **ما يبقى قراراً في ONE-BHD:** إضافة BHD-HR إلى الكتالوج المجمّد `apps.ts` (فيظهر في مشغّل كل المنتجات) وقلب `mode` إلى `sso`. هذا لا يُعدّل من هذا المستودع.
@@ -803,6 +804,7 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 
 | التاريخ | التغيير |
 |---|---|
+| 2026-10-20 | حسابات متعددة من الرأس: `BhdSessionMenu`، إضافة/تبديل دون كلمة مرور، خروج هذا/الكل (`end-session?all=1`)، تحديث §0.2 |
 | 2026-10-19 | طباعة رسمية PDF لكل الصفحات (`official-print`، طولي/عرضي، تنزيل PDF أولاً). تصفية المستندات بالكفيل. `Company.alertDocTypes` لاختيار أنواع مستندات التنبيه والانتهاء؛ عرض مجمّع لكل موظف في `/documents` والتنبيهات؛ طباعة موظف / كفيل / الكل (`1bdb0d1`، عمود JSON اختياري) |
 | 2026-10-18 | الدليل الموحد لتصنيف المهن + تسريع القائمة (صفحات 50). ثم منع تكرار الاسم العربي: إلحاق التخصص من عمود الإنجليزية، ودمج المكررات عند الاستيراد (`mergeDuplicateJobTitles`) |
 | 2026-10-18 | قراءة ملف وزارة العمل: فصل تواريخ التأشيرة/التصريح عن البطاقة والإقامة، وفصل تاريخ الوصول عن الالتحاق (`arrivalDate`)، وحفظ `VISA`+`WORK_PERMIT`. بلا تغيير في المخطط |

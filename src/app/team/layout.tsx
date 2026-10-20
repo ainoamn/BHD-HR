@@ -3,6 +3,7 @@ import Link from "next/link";
 import { KeyRound, LifeBuoy, LogOut, UserRound, Users } from "lucide-react";
 import { TranslateToggle } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
+import { BhdSessionMenu } from "@/components/bhd/BhdSessionMenu";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { LangToggle } from "@/components/lang-provider";
 import { LiveUpdates } from "@/components/live-updates";
@@ -38,16 +39,26 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
             <TranslateToggle tone="dark" compact />
             <ThemeToggle initial={theme} className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20" />
             <LangToggle className="inline-flex h-9 shrink-0 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20" />
-            <Link href="/password" className={pill} title={t("تغيير كلمة المرور", "Change password")}>
-              <KeyRound size={15} />
-              <span className="hidden sm:inline">{t("كلمة المرور", "Password")}</span>
-            </Link>
-            <form action={logout}>
-              <button type="submit" className={pill}>
-                <LogOut size={15} />
-                {t("خروج", "Sign out")}
-              </button>
-            </form>
+            {user.username && !user.bhdSub ? (
+              <Link href="/password" className={pill} title={t("تغيير كلمة المرور", "Change password")}>
+                <KeyRound size={15} />
+                <span className="hidden sm:inline">{t("كلمة المرور", "Password")}</span>
+              </Link>
+            ) : null}
+            {user.bhdSub ? (
+              <BhdSessionMenu
+                user={{ id: user.bhdSub, name: user.name, email: user.email, picture: user.picture }}
+                locale={lang}
+                identityLinked
+              />
+            ) : (
+              <form action={logout}>
+                <button type="submit" className={pill}>
+                  <LogOut size={15} />
+                  {t("خروج", "Sign out")}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </header>

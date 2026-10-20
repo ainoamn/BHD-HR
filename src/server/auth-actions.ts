@@ -88,13 +88,15 @@ export async function switchCompany(formData: FormData) {
   redirect("/");
 }
 
-export async function logout() {
+/** Explicit sign-out only (docs/BHD-SESSION-POLICY.md). Pass all=true to clear the whole identity roster. */
+export async function logout(formData?: FormData) {
   const jar = await cookies();
   const userId = readSession(jar.get(SESSION_COOKIE)?.value);
   const local = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { username: true, bhdSub: true } }) : null;
+  const all = formData?.get("all") === "1" || formData?.get("all") === "true";
   jar.delete(SESSION_COOKIE);
   jar.delete(COMPANY_COOKIE);
   if (local?.username && !local.bhdSub) redirect("/login?local=1");
-  if (isSsoConfigured()) redirect(endSessionUrl(await requestOrigin()));
+  if (isSsoConfigured()) redirect(endSessionUrl(await requestOrigin(), { all }));
   redirect("/login?local=1");
 }

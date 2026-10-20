@@ -97,7 +97,10 @@ sequenceDiagram
 | الاسم | جلسة المنتج |
 | البريد | جلسة المنتج |
 | رابط «الحساب» | على البوابة/الهوية: `/account`. على بقية المنتجات: `https://id.bhd-om.com/account` |
-| خروج | `POST` مسار الخروج الحالي للمنتج ثم تحويل إلى `{ISSUER}/oauth/end-session` كما في قسم 6.5 من SSO |
+| قائمة الحسابات | من `/api/auth/me` → `accounts` على الهوية. النقر يبدّل فوراً (`POST /api/auth/switch`) |
+| إضافة حساب | `/login?add=1` على الهوية |
+| خروج من هذا الحساب | `POST /api/auth/logout` (إن بقي حساب يُفعَّل فوراً) |
+| خروج من كل الحسابات | `POST` خروج المنتج ثم `{ISSUER}/oauth/end-session?all=1` |
 
 ---
 
