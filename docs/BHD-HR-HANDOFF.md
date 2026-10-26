@@ -10,7 +10,7 @@
 
 | البند | الحالة |
 |---|---|
-| آخر commit منشور | يُحدَّث بعد دفع §76 — `main` في GitHub؛ كل دفع ينشر على Vercel تلقائياً |
+| آخر commit منشور | `6da83c3` — `main` في GitHub؛ كل دفع ينشر على Vercel تلقائياً |
 | الإنتاج | https://bhd-hr.vercel.app و https://hr.bhd-om.com |
 | قاعدة البيانات | Neon **BHD HR** (`billowing-hat-97652194`)، الفرع `production`، القاعدة `neondb`. آخر: `Letter.clauseCode`/`clauseTitle` + `CompanyPolicy` + `CompanyPenaltyCause` (§73)؛ قبله `Company.alertDocTypes` (§66) |
 | النسخ الاحتياطي | يومي مشفّر 02:00 مسقط إلى حاوية Neon `backups` (30 يوماً)، دالة `backup` ومشغّل `daily-backup` |
