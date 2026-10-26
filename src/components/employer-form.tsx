@@ -42,6 +42,14 @@ export async function EmployerForm({
           <Field label={t("السجل التجاري أو الرقم المدني", "CR or civil ID number")}>
             <input className={`${fieldClass} w-full`} name="idNumber" dir="ltr" defaultValue={employer?.idNumber || ""} />
           </Field>
+          {employer ? null : (
+            <Field
+              label={t("رمز الأرقام الوظيفية", "Employee number code")}
+              hint={t("اختياري — حرفان إلى 8 (A–Z / 0–9). يظهر مثل SFH-0001. يمكن تغييره لاحقاً من صفحة الكفيل.", "Optional — 2–8 chars (A–Z / 0–9). Shows as SFH-0001. Change later on the sponsor page.")}
+            >
+              <input className={`${fieldClass} w-full tracking-wide`} name="employeeCode" dir="ltr" maxLength={8} placeholder="SFH" autoComplete="off" />
+            </Field>
+          )}
         </div>
       </fieldset>
 

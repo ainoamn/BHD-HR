@@ -327,6 +327,10 @@ model Employer {
   address   String?
   logoUrl   String?
   notes     String?
+  /// Short Latin code shown in employee numbers, e.g. SFH → SFH-0001 (src/lib/employee-number.ts).
+  employeeCode   String?
+  /// How many times employee numbers were rebuilt for this sponsor; first rebuild is free, later ones need the actor's password.
+  numberRebuilds Int     @default(0)
   employees Employee[]
   salaries  Salary[]
   account   Membership?

@@ -4,11 +4,13 @@ import { ArrowLeft, ArrowRight, Banknote, FileText, Mail, MapPin, PencilLine, Ph
 import { AccountCard } from "@/components/account-card";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 import { EmployerForm } from "@/components/employer-form";
+import { EmployerNumbersPanel } from "@/components/employer-numbers-panel";
 import { Flash } from "@/components/flash";
 import { DeleteButton } from "@/components/row-forms";
 import { Card, EmptyState, SectionTitle, Stat, ToneBadge, primaryBtn, secondaryBtn } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { EMPLOYER_KIND, STATUS_LABEL, STATUS_TONE, termText } from "@/lib/constants";
+import { formatEmployeeNumber, parseEmployeeNumberSeq } from "@/lib/employee-number";
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { formatPhone, phoneHref } from "@/lib/phone";
@@ -49,6 +51,8 @@ export default async function EmployerPage({
     employer.address ? { icon: MapPin, value: employer.address, href: null, ltr: false } : null,
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));
   const employeeName = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
+  const maxSeq = employer.employees.reduce((highest, employee) => Math.max(highest, parseEmployeeNumberSeq(employee.employeeNumber)), 0);
+  const nextPreview = formatEmployeeNumber(employer.employeeCode, maxSeq + 1);
 
   return (
     <div className="page-wide space-y-5">
@@ -192,6 +196,18 @@ export default async function EmployerPage({
             </table>
           </div>
         )}
+      </Card>
+
+      <Card id="numbers" className="scroll-mt-24">
+        <EmployerNumbersPanel
+          employerId={employer.id}
+          employeeCode={employer.employeeCode}
+          numberRebuilds={employer.numberRebuilds}
+          employeeCount={employer.employees.length}
+          nextPreview={nextPreview}
+          canEdit={can(user, "employers.edit")}
+          t={t}
+        />
       </Card>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
