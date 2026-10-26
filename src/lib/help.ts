@@ -275,7 +275,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       { file: "employees-list", caption: b("قائمة الموظفين بالشارات والإجراءات", "The employee list with badges and actions") },
     ],
     steps: [
-      b("الموظفون ← «إضافة موظف». رقم الموظف يُنشأ تلقائياً (EMP-0001…).", "Employees → “Add employee”. The employee number is generated (EMP-0001…)."),
+      b("الموظفون ← «إضافة موظف». رقم الموظف يُنشأ تلقائياً لكل كفيل (EMP-0001…).", "Employees → “Add employee”. The number is generated per employer (EMP-0001…)."),
       b("اكتب الاسم بالعربية ثم انتقل للحقل التالي فيُكتب بالإنجليزية تلقائياً (زر ✨ يعيد الترجمة).", "Type the Arabic name and move on — the English name is filled in automatically (✨ translates again)."),
       b("في الوثائق اضغط «اختر صورة أو PDF» لبطاقة أو جواز أو إقامة، فيقرأ الذكاء الاصطناعي الرقم والانتهاء ويرفق الملف.", "In Documents press “Choose an image or PDF” for an ID, passport or residence card; AI reads the number and expiry and attaches the file."),
       b("في العمل اختر المسمى والقسم من القائمة، والمدير المباشر، وتاريخ الالتحاق، وصاحب العمل (الكفيل).", "Under Job pick the title and department from the list, the direct manager, joining date and sponsor."),

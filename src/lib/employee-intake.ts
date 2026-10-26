@@ -4,7 +4,7 @@ import { can, type SessionUser } from "./auth";
 import { newBadgeToken } from "./badge";
 import { EMPLOYER_KIND } from "./constants";
 import type { ExistingEmployee, ImportValues } from "./employee-import";
-import { nextEmployeeNumber } from "./employee-number";
+import { employeeNumberScope, nextEmployeeNumber } from "./employee-number";
 import { getHrCatalog } from "./hr-catalog";
 import { syncEmployeeSalaries } from "./pay-items";
 import { prisma } from "./prisma";
@@ -206,12 +206,15 @@ export async function saveIntake(ctx: IntakeContext, values: ImportValues, exist
     const payChanged = MONEY_FIELDS.some((key) => key in data && data[key] !== before[key]) || ("nationality" in data && data.nationality !== before.nationality);
     if (payChanged) await prisma.$transaction((tx) => syncEmployeeSalaries(tx, employee.id, ctx.salaryDays), { maxWait: 10000, timeout: 30000 });
   } else {
+    const employerId = typeof data.employerId === "string" ? data.employerId : null;
+    const numberScope = employeeNumberScope(employerId);
     employee = await prisma.employee.create({
       data: {
         ...(data as Prisma.EmployeeUncheckedCreateInput),
         fullName: values.fullName,
         companyId: ctx.companyId,
-        employeeNumber: await nextEmployeeNumber(ctx.companyId),
+        numberScope,
+        employeeNumber: await nextEmployeeNumber(ctx.companyId, employerId),
         badgeToken: newBadgeToken(),
       },
     });

@@ -8,7 +8,7 @@ import { EMPLOYER_KIND, NEW_EMPLOYER, STATUS_LABEL } from "@/lib/constants";
 import { readIds } from "@/lib/employee-filter";
 import { openMissingEmployeeAccounts } from "@/server/account-actions";
 import { readAllowanceRows, readEmployeeInput, readLeaveDays } from "@/lib/employee-input";
-import { nextEmployeeNumber } from "@/lib/employee-number";
+import { employeeNumberScope, nextEmployeeNumber } from "@/lib/employee-number";
 import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -167,7 +167,8 @@ export async function createEmployee(formData: FormData) {
   const managerId = await resolveManager(formData, user.companyId, null, "/employees/new");
   const scheduleId = await resolveSchedule(formData, user.companyId);
   const files = await readDocFiles(formData, {}, user.companyId, "/employees/new");
-  const employeeNumber = await nextEmployeeNumber(user.companyId);
+  const numberScope = employeeNumberScope(employerId);
+  const employeeNumber = await nextEmployeeNumber(user.companyId, employerId);
   const employee = await prisma.$transaction(async (tx) => {
     const created = await tx.employee.create({
       data: {
@@ -176,6 +177,7 @@ export async function createEmployee(formData: FormData) {
         ...files.data,
         leaveDays: readLeaveDays(formData, catalog.leaveTypes),
         employerId,
+        numberScope,
         managerId,
         scheduleId,
         terminatedAt: input.status === "TERMINATED" ? new Date() : null,

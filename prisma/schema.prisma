@@ -337,6 +337,8 @@ model Employer {
 model Employee {
   id                 String              @id @default(cuid())
   employeeNumber     String
+  /// Scope for EMP-#### sequencing: the employer (كفيل) id, or "" when none. Set at create and kept if the employer later changes.
+  numberScope        String              @default("")
   fullName           String
   nameEn             String?
   /// ISO country code (src/lib/nationalities.ts); older rows may still hold a nationality name.
@@ -435,7 +437,8 @@ model Employee {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
-  @@unique([companyId, employeeNumber])
+  @@unique([companyId, numberScope, employeeNumber])
+  @@index([companyId, employerId])
 }
 
 model JobTitle {

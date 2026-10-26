@@ -6,7 +6,7 @@ import { aiScreenCandidate, isRateLimited } from "@/lib/ai";
 import { writeAudit } from "@/lib/audit";
 import { can, requirePermission } from "@/lib/auth";
 import { newBadgeToken } from "@/lib/badge";
-import { nextEmployeeNumber } from "@/lib/employee-number";
+import { employeeNumberScope, nextEmployeeNumber } from "@/lib/employee-number";
 import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -352,11 +352,13 @@ export async function hireCandidate(formData: FormData) {
   const jobTitle = catalog.jobTitles.find((item) => item.id === job.jobTitleId) || null;
   const joiningDate = parseDateInput(str(formData, "joiningDate")) || parseDateInput(todayInputValue())!;
   const basicSalary = can(user, "salaries.edit") ? optionalAmount(formData, "basicSalary") || 0 : 0;
-  const employeeNumber = await nextEmployeeNumber(user.companyId);
+  const numberScope = employeeNumberScope(null);
+  const employeeNumber = await nextEmployeeNumber(user.companyId, null);
   const employee = await prisma.$transaction(async (tx) => {
     const created = await tx.employee.create({
       data: {
         companyId: user.companyId,
+        numberScope,
         employeeNumber,
         badgeToken: newBadgeToken(),
         fullName: candidate!.fullName,
