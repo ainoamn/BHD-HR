@@ -1,22 +1,36 @@
 "use client";
 
 import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { blanksIn } from "@/lib/letter-library";
 import { isLetterKind, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
 import type { DraftContent } from "@/lib/letter-drafts";
 import { formatCauseReason, type WarningCause } from "@/lib/oman-labour";
-import { cn } from "@/lib/utils";
-import { draftLetter, type SavedLetterTemplate } from "@/server/letter-actions";
+import { cn, parseDateInput } from "@/lib/utils";
+import { draftLetter, previewComposedLetter, type SavedLetterTemplate } from "@/server/letter-actions";
+import type { DocHeader } from "./salary-docs";
 import { EmployeeMultiSelect } from "./employee-multi-select";
 import { useLang } from "./lang-provider";
+import { LetterLivePreview } from "./letter-live-preview";
 import { LetterTemplates } from "./letter-templates";
 import { SubmitButton } from "./submit-button";
 import { Field, fieldClass, secondaryBtn } from "./ui";
 import { WarningCausePicker } from "./warning-cause-picker";
 
-export type LetterEmployee = { value: string; label: string; hint?: string | null; hasEmail: boolean; hasPhone: boolean; warnings: number };
+export type LetterEmployee = {
+  value: string;
+  label: string;
+  hint?: string | null;
+  hasEmail: boolean;
+  hasPhone: boolean;
+  warnings: number;
+  nameEn?: string | null;
+  employeeNumber?: string;
+  jobTitle?: string | null;
+  jobTitleEn?: string | null;
+  gender?: string | null;
+};
 
 export function LetterForm({
   action,
@@ -34,6 +48,7 @@ export function LetterForm({
   companyTemplates,
   warningCauses = [],
   initialClauseCode = "",
+  previewHeader,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employees: LetterEmployee[];
@@ -56,38 +71,58 @@ export function LetterForm({
   warningCauses?: WarningCause[];
   /** Prefill from /letters/new?clause=OMAN-618-08 */
   initialClauseCode?: string;
+  /** Company / sponsor letterhead for the live document preview. */
+  previewHeader: DocHeader;
 }) {
   const { lang, t } = useLang();
   const saved = savedDraft?.content;
   const [selected, setSelected] = useState<string[]>(defaultEmployeeIds);
   const [kind, setKind] = useState<LetterKind>(defaultKind);
   const [reason, setReason] = useState(request?.details || "");
-  const [subject, setSubject] = useState(saved ? saved.subject : request?.subject || LETTER_TEMPLATES[defaultKind].subject);
-  const [subjectEn, setSubjectEn] = useState(saved ? saved.subjectEn : LETTER_TEMPLATES[defaultKind].subjectEn);
+  const fillTpl = (text: string, detail: string) => text.replaceAll("{reason}", detail.trim() || "…………");
+  const initialTpl = LETTER_TEMPLATES[defaultKind];
+  const [subject, setSubject] = useState(saved ? saved.subject : request?.subject || fillTpl(initialTpl.subject, request?.details || ""));
+  const [subjectEn, setSubjectEn] = useState(saved ? saved.subjectEn : fillTpl(initialTpl.subjectEn, request?.details || ""));
   const auto = Boolean(LETTER_KIND[kind].auto);
   const autoKinds = LETTER_KINDS.filter((option) => LETTER_KIND[option].auto);
-  const [body, setBody] = useState(saved?.body || "");
-  const [bodyEn, setBodyEn] = useState(saved?.bodyEn || "");
+  const [body, setBody] = useState(saved?.body || (LETTER_KIND[defaultKind].auto ? "" : fillTpl(initialTpl.body, request?.details || "")));
+  const [bodyEn, setBodyEn] = useState(saved?.bodyEn || (LETTER_KIND[defaultKind].auto ? "" : fillTpl(initialTpl.bodyEn, request?.details || "")));
   const [scheduleDate, setScheduleDate] = useState(savedDraft?.scheduleDate || "");
+  const [issuedAt, setIssuedAt] = useState(saved?.issuedAt || today);
+  const [addressee, setAddressee] = useState(saved?.addressee || request?.addressee || "");
+  const [purpose, setPurpose] = useState(saved?.purpose || "");
+  const [endDate, setEndDate] = useState(saved?.endDate || "");
   const [note, setNote] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [drafting, startDraft] = useTransition();
+  const [previewing, startPreview] = useTransition();
   const [ownTemplates, setOwnTemplates] = useState(companyTemplates);
   const [clauseCode, setClauseCode] = useState(saved?.clauseCode || "");
   const [occurrence, setOccurrence] = useState<1 | 2 | 3 | 4>(1);
+  const [autoPreview, setAutoPreview] = useState<{ subject: string; subjectEn: string; body: string; bodyEn: string; addressee: string | null; error: string | null } | null>(null);
   const blanks = auto ? [] : blanksIn(subject, subjectEn, body, bodyEn);
   const showCauses = !auto && (LETTER_KIND[kind].group === "discipline" || LETTER_KIND[kind].warning);
 
   const chosen = employees.filter((employee) => selected.includes(employee.value));
   const single = chosen.length === 1 ? chosen[0] : null;
+  const previewPerson = chosen[0] || null;
   const suggested = single ? nextWarningKind(single.warnings) : null;
   const withEmail = chosen.filter((employee) => employee.hasEmail).length;
   const withPhone = chosen.filter((employee) => employee.hasPhone).length;
 
   const chooseKind = (next: LetterKind) => {
-    const before = LETTER_TEMPLATES[kind];
     setKind(next);
-    if (!subject || subject === before.subject) setSubject(LETTER_TEMPLATES[next].subject);
-    if (!subjectEn || subjectEn === before.subjectEn) setSubjectEn(LETTER_TEMPLATES[next].subjectEn);
+    if (LETTER_KIND[next].auto) {
+      setSubject("");
+      setSubjectEn("");
+      setBody("");
+      setBodyEn("");
+      return;
+    }
+    const tpl = LETTER_TEMPLATES[next];
+    setSubject(fillTpl(tpl.subject, reason));
+    setSubjectEn(fillTpl(tpl.subjectEn, reason));
+    setBody(fillTpl(tpl.body, reason));
+    setBodyEn(fillTpl(tpl.bodyEn, reason));
   };
 
   const applyCause = (cause: WarningCause | null, reasonAr: string) => {
@@ -114,6 +149,75 @@ export function LetterForm({
     applyCause(cause, formatCauseReason(cause, 1).ar);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot prefill from ?clause=
   }, [initialClauseCode, warningCauses]);
+
+  useEffect(() => {
+    if (!auto || !previewPerson) {
+      setAutoPreview(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      startPreview(async () => {
+        const result = await previewComposedLetter({
+          kind,
+          employeeId: previewPerson.value,
+          addressee,
+          purpose,
+          endDate,
+          issuedAt,
+        });
+        if (cancelled) return;
+        if (result.error) {
+          setAutoPreview({ subject: "", subjectEn: "", body: "", bodyEn: "", addressee: null, error: result.error });
+          return;
+        }
+        setAutoPreview({
+          subject: result.subject || "",
+          subjectEn: result.subjectEn || "",
+          body: result.body || "",
+          bodyEn: result.bodyEn || "",
+          addressee: result.addressee || null,
+          error: null,
+        });
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [auto, kind, previewPerson?.value, addressee, purpose, endDate, issuedAt]);
+
+  const previewLetter = useMemo(() => {
+    const person = previewPerson;
+    const placeholder = t("اسم الموظف", "Employee name");
+    const subjectAr = auto ? autoPreview?.subject || pick(LETTER_KIND[kind].label, "ar") : subject || pick(LETTER_KIND[kind].label, "ar");
+    const subjectEnVal = auto ? autoPreview?.subjectEn || pick(LETTER_KIND[kind].label, "en") : subjectEn || pick(LETTER_KIND[kind].label, "en");
+    const bodyAr = auto ? autoPreview?.body || (previewing ? t("جارٍ تجهيز المعاينة…", "Preparing preview…") : t("اختر موظفاً لعرض نص الشهادة من ملفه.", "Choose an employee to preview the certificate from their file.")) : body || fillTpl(LETTER_TEMPLATES[kind].body, reason);
+    const bodyEnVal = auto ? autoPreview?.bodyEn || "" : bodyEn || fillTpl(LETTER_TEMPLATES[kind].bodyEn, reason);
+    return {
+      kind,
+      refNo: "HR-····-····",
+      issuedAt: parseDateInput(issuedAt) || new Date(),
+      subject: subjectAr,
+      subjectEn: subjectEnVal,
+      body: bodyAr,
+      bodyEn: bodyEnVal || null,
+      addressee: auto ? autoPreview?.addressee || addressee || null : null,
+      addresseeEn: null,
+      signatoryName: signatoryName || null,
+      signatoryTitle: signatoryTitle || null,
+      acknowledgedAt: null,
+      cancelledAt: null,
+      employee: {
+        fullName: person?.label || placeholder,
+        nameEn: person?.nameEn || null,
+        employeeNumber: person?.employeeNumber || person?.hint || "—",
+        jobTitle: person?.jobTitle || t("المسمى الوظيفي", "Job title"),
+        jobTitleEn: person?.jobTitleEn || null,
+        gender: person?.gender || null,
+      },
+    };
+  }, [auto, autoPreview, body, bodyEn, issuedAt, kind, previewPerson, previewing, reason, signatoryName, signatoryTitle, subject, subjectEn, t, addressee, lang]);
 
   const draft = () =>
     startDraft(async () => {
@@ -143,6 +247,8 @@ export function LetterForm({
     <form action={action} className="space-y-6">
       {request ? <input type="hidden" name="requestId" value={request.id} /> : null}
       {savedDraft ? <input type="hidden" name="draftId" value={savedDraft.id} /> : null}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
+      <div className="min-w-0 space-y-6">
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-slate-800">{t("١. الموظف ونوع الخطاب", "1. Employee and letter type")}</h2>
         <div className="min-w-0 space-y-1.5">
@@ -227,7 +333,7 @@ export function LetterForm({
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("تاريخ الخطاب", "Letter date")}>
-            <input className={`${fieldClass} w-full`} type="date" name="issuedAt" defaultValue={saved?.issuedAt || today} required />
+            <input className={`${fieldClass} w-full`} type="date" name="issuedAt" value={issuedAt} onChange={(event) => setIssuedAt(event.target.value)} required />
           </Field>
         </div>
       </section>
@@ -270,7 +376,7 @@ export function LetterForm({
                         : t("اتركه فارغاً لـ «إلى من يهمه الأمر».", "Leave empty for “To whom it may concern”.")
                 }
               >
-                <input className={`${fieldClass} w-full`} name="addressee" defaultValue={saved?.addressee || request?.addressee || ""} maxLength={160} />
+                <input className={`${fieldClass} w-full`} name="addressee" value={addressee} onChange={(event) => setAddressee(event.target.value)} maxLength={160} />
               </Field>
             ) : null}
             {kind === "NOC" || kind === "EMBASSY" ? (
@@ -283,7 +389,7 @@ export function LetterForm({
                     : t("مثل: السفر خارج السلطنة، أو استخراج رخصة قيادة.", "e.g. travelling abroad, or getting a driving licence.")
                 }
               >
-                <input className={`${fieldClass} w-full`} name="purpose" defaultValue={saved?.purpose || request?.details || ""} maxLength={400} required />
+                <input className={`${fieldClass} w-full`} name="purpose" value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={400} required />
               </Field>
             ) : null}
             {kind === "CLEARANCE" ? (
@@ -296,7 +402,7 @@ export function LetterForm({
             ) : null}
             {kind === "EXPERIENCE_CERTIFICATE" ? (
               <Field label={t("تاريخ انتهاء العمل (اختياري)", "End of service (optional)")} hint={t("اتركه فارغاً إن كان الموظف لا يزال على رأس عمله.", "Leave empty if the employee still works here.")}>
-                <input className={`${fieldClass} w-full`} type="date" name="endDate" defaultValue={saved?.endDate || ""} />
+                <input className={`${fieldClass} w-full`} type="date" name="endDate" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
               </Field>
             ) : null}
           </div>
@@ -314,7 +420,22 @@ export function LetterForm({
             "Pick a ready cause above or briefly describe what happened, then pick a ready template, ask the AI to draft it, or write the text yourself.",
           )}
         >
-          <textarea className={`${fieldClass} min-h-20 w-full`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1500} />
+          <textarea
+            className={`${fieldClass} min-h-20 w-full`}
+            value={reason}
+            onChange={(event) => {
+              const next = event.target.value;
+              setReason(next);
+              if (!auto && (body.includes("…………") || !body.trim() || body === fillTpl(LETTER_TEMPLATES[kind].body, reason))) {
+                const tpl = LETTER_TEMPLATES[kind];
+                setSubject(fillTpl(tpl.subject, next));
+                setSubjectEn(fillTpl(tpl.subjectEn, next));
+                setBody(fillTpl(tpl.body, next));
+                setBodyEn(fillTpl(tpl.bodyEn, next));
+              }
+            }}
+            maxLength={1500}
+          />
         </Field>
         <LetterTemplates
           kind={kind}
@@ -436,7 +557,7 @@ export function LetterForm({
             <>
               <SubmitButton variant="secondary" name="intent" value="preview" formNoValidate pendingLabel={t("جارٍ العمل...", "Working...")}>
                 <Eye size={16} />
-                {t("معاينة قبل الإصدار", "Preview before issuing")}
+                {t("معاينة كاملة في المسودات", "Full preview in drafts")}
               </SubmitButton>
               <SubmitButton variant="secondary" name="intent" value="draft" formNoValidate pendingLabel={t("جارٍ العمل...", "Working...")}>
                 <Archive size={16} />
@@ -464,6 +585,26 @@ export function LetterForm({
             </SubmitButton>
           </div>
         )}
+      </div>
+      </div>
+
+      <aside className="min-w-0 xl:sticky xl:top-4 xl:self-start">
+        <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
+          <LetterLivePreview
+            letter={previewLetter}
+            header={previewHeader}
+            note={
+              auto && autoPreview?.error
+                ? autoPreview.error
+                : chosen.length > 1
+                  ? t("المعاينة لأول موظف مختار؛ يصدر لكل منهم خطاب مستقل.", "Preview shows the first selected employee; each gets their own letter.")
+                  : !previewPerson
+                    ? t("اختر موظفاً لترى اسمه على المستند.", "Choose an employee to see their name on the document.")
+                    : null
+            }
+          />
+        </div>
+      </aside>
       </div>
     </form>
   );

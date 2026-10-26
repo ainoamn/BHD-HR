@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Inbox, ScrollText } from "lucide-react";
 import { Tr } from "@/components/ai-translate";
 import { Flash } from "@/components/flash";
 import { LetterForm } from "@/components/letter-form";
+import { headerFor } from "@/components/salary-docs";
 import { Card, PageHeader } from "@/components/ui";
 import { can, requirePermission } from "@/lib/auth";
 import { channelReady } from "@/lib/delivery";
@@ -36,7 +37,7 @@ export default async function NewLetterPage({
   const [employees, warnings, templates, companyCauses] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: user.companyId, status: { not: "TERMINATED" } },
-      select: { id: true, fullName: true, nameEn: true, employeeNumber: true, email: true, phone: true },
+      select: { id: true, fullName: true, nameEn: true, employeeNumber: true, email: true, phone: true, jobTitle: true, jobTitleEn: true, gender: true },
       orderBy: { fullName: "asc" },
     }),
     prisma.letter.groupBy({
@@ -110,6 +111,11 @@ export default async function NewLetterPage({
             hasEmail: Boolean(employee.email?.includes("@")),
             hasPhone: Boolean(normalizePhone(employee.phone)),
             warnings: warningCount.get(employee.id) || 0,
+            nameEn: employee.nameEn,
+            employeeNumber: employee.employeeNumber,
+            jobTitle: employee.jobTitle,
+            jobTitleEn: employee.jobTitleEn,
+            gender: employee.gender,
           }))}
           defaultEmployeeIds={preselected}
           defaultKind={kind}
@@ -124,6 +130,7 @@ export default async function NewLetterPage({
           companyTemplates={templates.map((item) => ({ ...item, subjectEn: item.subjectEn || "", bodyEn: item.bodyEn || "" }))}
           warningCauses={warningCauses(companyCauses)}
           initialClauseCode={sp.clause || ""}
+          previewHeader={headerFor({}, user.company)}
         />
       </Card>
     </div>

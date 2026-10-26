@@ -1,0 +1,13 @@
+---
+description: After finishing product work, always document, commit, and push to main
+alwaysApply: true
+---
+
+# ارفع ووثّق وانشر دائماً
+
+بعد إنجاز أي ميزة أو إصلاح للمستخدم في هذا المستودع:
+
+1. حدّث التوثيق المناسب: `docs/BHD-HR-DEPLOYMENT-LOG.md` (قسم جديد)، و`BHD-HR-HANDOFF.md` (رقم القسم وcommit)، وباختصار `BHD-HR-USER-GUIDE.md` و/أو `BHD-HR-TECHNICAL.md` إن لزم.
+2. نفّذ `tsc` عند تغيير الكود، ثم `git add` و`git commit` برسالة عربية موجزة (لماذا)، ثم `git push` إلى `main` (النشر على Vercel تلقائي).
+3. لا تسأل «هل أرفع؟» — افعل ذلك افتراضياً ما لم يطلب المستخدم صراحة الإبقاء محلياً أو عدم الدفع.
+4. أعد رقم commit النهائي في التسليم بعد الدفع.

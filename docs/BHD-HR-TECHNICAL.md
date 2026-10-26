@@ -185,6 +185,7 @@ src/
   - مستوى الإنذار المقترح من عدد الإنذارات غير الملغاة خلال 365 يوماً (`nextWarningKind`).
   - **مسببات جاهزة** (`oman-labour`، `WarningCausePicker`): بنود القرار 618/2024 (+ `CompanyPenaltyCause`) تملأ `{reason}` وتحفظ `Letter.clauseCode`/`clauseTitle`. مكتبة اطّلاع في `/regulations` مع `CompanyPolicy` للنظام الداخلي.
   - **اختيار النوع في النموذج** (`LetterForm`): قائمة منسدلة لكل مجموعة (`WRITTEN_GROUPS` + الشهادات الجاهزة) بدل شبكة أزرار؛ القسم النشط مميّز و«المختار الآن» يظهر تحتها.
+  - **معاينة حية** (`LetterLivePreview`، `previewComposedLetter`): عمود بجانب النموذج يعرض `LetterSheet` فور اختيار النوع؛ المكتوب يُحدَّث محلياً، والشهادات الجاهزة عبر `composeLetters`.
   - الصياغة: `draftLetter` (ذكاء اصطناعي، يعيد عربي وإنجليزي) أو `LETTER_TEMPLATES` مع `{reason}`.
   - لكل قناة مختارة تُنشأ `LetterDelivery` بحالة `PENDING` إن كان للموظف بريد صحيح / هاتف. ثم `sendPendingCopies` يرسل ما قناته مفعّلة فقط. «إرسال النسخ المنتظرة الآن» في الإعدادات (`sendPendingLetterCopies`، للمسؤول) يرسل المتراكم بعد التفعيل. **كود الإرسال (Resend و Meta) لم يُختبر على مزوّد حقيقي بعد؛ اختبره بخطاب لموظف تجريبي فور ضبط المتغيرات.**
   - المشاركة اليدوية تعمل دائماً: `wa.me` و`mailto:` ونسخ الرابط من صفحة الخطاب.

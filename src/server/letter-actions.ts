@@ -237,6 +237,68 @@ export async function sendPendingLetterCopies() {
   });
 }
 
+/** Live compose for the new-letter form preview (especially auto / certificate kinds). */
+export async function previewComposedLetter(input: {
+  kind: string;
+  employeeId: string;
+  subject?: string;
+  subjectEn?: string;
+  body?: string;
+  bodyEn?: string;
+  addressee?: string;
+  purpose?: string;
+  endDate?: string;
+  issuedAt?: string;
+}): Promise<{
+  subject?: string;
+  subjectEn?: string | null;
+  body?: string;
+  bodyEn?: string | null;
+  addressee?: string | null;
+  addresseeEn?: string | null;
+  error?: string;
+}> {
+  const { lang, t } = await getI18n();
+  const user = await getSessionUser();
+  if (!user || !can(user, "letters.create")) return { error: t("ليست لديك صلاحية إصدار الخطابات", "You cannot issue letters") };
+  if (!isLetterKind(input.kind) || !input.employeeId) return { error: t("اختر الموظف ونوع الخطاب", "Choose the employee and letter type") };
+  const content = {
+    subject: String(input.subject || "").slice(0, 200),
+    subjectEn: String(input.subjectEn || "").slice(0, 200),
+    body: String(input.body || "").slice(0, 8000),
+    bodyEn: String(input.bodyEn || "").slice(0, 8000),
+    addressee: String(input.addressee || "").slice(0, 160),
+    purpose: String(input.purpose || "").slice(0, 400),
+    endDate: String(input.endDate || "").slice(0, 12),
+    issuedAt: String(input.issuedAt || "").slice(0, 12),
+    signatoryName: "",
+    signatoryTitle: "",
+    channels: [],
+    clauseCode: "",
+    clauseTitle: "",
+  };
+  const composed = await composeLetters({
+    companyId: user.companyId,
+    company: user.company,
+    kind: input.kind,
+    employeeIds: [input.employeeId],
+    content,
+    canSalary: can(user, "salaries.view"),
+    allowBlanks: true,
+  });
+  if ("error" in composed) return { error: composed.error[lang] };
+  const text = composed.items[0]?.text;
+  if (!text) return { error: t("تعذرت المعاينة", "Preview failed") };
+  return {
+    subject: text.subject,
+    subjectEn: text.subjectEn,
+    body: text.body,
+    bodyEn: text.bodyEn,
+    addressee: text.addressee,
+    addresseeEn: text.addresseeEn,
+  };
+}
+
 /** AI draft for the new-letter form. */
 export async function draftLetter(input: { kind: string; reason: string; employeeId?: string }): Promise<{ subject?: string; subjectEn?: string; body?: string; bodyEn?: string; error?: string }> {
   const { t } = await getI18n();
