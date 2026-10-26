@@ -24,7 +24,16 @@ export type LetterSheetData = {
   signatoryTitle: string | null;
   acknowledgedAt: Date | null;
   cancelledAt: Date | null;
-  employee: { fullName: string; nameEn: string | null; employeeNumber: string; jobTitle: string | null; jobTitleEn: string | null; gender?: string | null };
+  employee: {
+    fullName: string;
+    nameEn: string | null;
+    employeeNumber: string;
+    jobTitle: string | null;
+    jobTitleEn: string | null;
+    /** Civil / national ID (الرقم المدني). */
+    idNumber?: string | null;
+    gender?: string | null;
+  };
 };
 
 export function Bi({ ar, en }: { ar: React.ReactNode; en: React.ReactNode }) {
@@ -67,11 +76,52 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
   const female = employee.gender === "FEMALE";
   const jobAr = termText(employee.jobTitle, employee.jobTitleEn, "ar");
   const jobEn = termText(employee.jobTitle, employee.jobTitleEn, "en");
+  const civilId = employee.idNumber?.trim() || "";
   const addressee = letter.addressee?.trim();
   const addresseeAr = addressee ? (addressee.startsWith("السادة") ? addressee : `السادة / ${addressee} المحترمين`) : "إلى من يهمه الأمر";
   const addresseeEn = letter.addresseeEn?.trim() || addressee;
   const nameEn = header.nameEn && header.nameEn !== header.name ? header.nameEn : null;
   const employeeEn = employee.nameEn || employee.fullName;
+  const identityAr = (
+    <span className="letter-doc__identity">
+      <span>
+        اسم الموظف: <strong>{employee.fullName}</strong>
+      </span>
+      <span>
+        الرقم الوظيفي: <bdi className="letter-doc__num">{employee.employeeNumber}</bdi>
+      </span>
+      {jobAr ? (
+        <span>
+          المسمى الوظيفي: <strong>{jobAr}</strong>
+        </span>
+      ) : null}
+      {civilId ? (
+        <span>
+          الرقم المدني: <bdi className="letter-doc__num">{civilId}</bdi>
+        </span>
+      ) : null}
+    </span>
+  );
+  const identityEn = (
+    <span className="letter-doc__identity">
+      <span>
+        Employee name: <strong>{employeeEn}</strong>
+      </span>
+      <span>
+        Employee No.: <bdi className="letter-doc__num">{employee.employeeNumber}</bdi>
+      </span>
+      {jobEn ? (
+        <span>
+          Job title: <strong>{jobEn}</strong>
+        </span>
+      ) : null}
+      {civilId ? (
+        <span>
+          Civil ID: <bdi className="letter-doc__num">{civilId}</bdi>
+        </span>
+      ) : null}
+    </span>
+  );
   const subjectAr = letter.subject || kind.ar;
   const subjectEn = letter.subjectEn || kind.en;
   const en = Boolean(letter.bodyEn);
@@ -164,7 +214,10 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
 
       <div className="letter-doc__body">
         {document ? (
-          <Para className="letter-doc__strong" ar={addresseeAr} en={en ? (addresseeEn ? `To: ${addresseeEn}` : "To whom it may concern") : undefined} />
+          <>
+            <Para className="letter-doc__strong" ar={addresseeAr} en={en ? (addresseeEn ? `To: ${addresseeEn}` : "To whom it may concern") : undefined} />
+            <Para ar={identityAr} en={en ? identityEn : undefined} />
+          </>
         ) : (
           <Para
             ar={
@@ -172,20 +225,14 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
                 {female ? "الفاضلة / " : "الفاضل / "}
                 <strong>{employee.fullName}</strong>
                 {female ? " المحترمة" : " المحترم"}
-                <span className="letter-doc__note">
-                  الرقم الوظيفي: <bdi className="letter-doc__num">{employee.employeeNumber}</bdi>
-                  {jobAr ? ` · ${jobAr}` : ""}
-                </span>
+                {identityAr}
               </>
             }
             en={
               en ? (
                 <>
                   To: <strong>{employeeEn}</strong>
-                  <span className="letter-doc__note">
-                    Employee No. {employee.employeeNumber}
-                    {jobEn ? ` · ${jobEn}` : ""}
-                  </span>
+                  {identityEn}
                 </>
               ) : undefined
             }

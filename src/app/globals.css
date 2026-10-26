@@ -869,6 +869,18 @@ textarea:focus-visible {
   color: var(--doc-muted);
   font-size: 0.85em;
 }
+.letter-doc__identity {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.35rem;
+  color: var(--doc-muted);
+  font-size: 0.9em;
+  line-height: 1.45;
+}
+.letter-doc__identity strong {
+  color: var(--doc-ink);
+  font-weight: 700;
+}
 .letter-doc__heading {
   display: flex;
   flex-wrap: wrap;

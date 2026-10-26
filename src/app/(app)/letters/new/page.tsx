@@ -37,7 +37,7 @@ export default async function NewLetterPage({
   const [employees, warnings, templates, companyCauses] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: user.companyId, status: { not: "TERMINATED" } },
-      select: { id: true, fullName: true, nameEn: true, employeeNumber: true, email: true, phone: true, jobTitle: true, jobTitleEn: true, gender: true },
+      select: { id: true, fullName: true, nameEn: true, employeeNumber: true, email: true, phone: true, jobTitle: true, jobTitleEn: true, idNumber: true, gender: true },
       orderBy: { fullName: "asc" },
     }),
     prisma.letter.groupBy({
@@ -111,10 +111,12 @@ export default async function NewLetterPage({
             hasEmail: Boolean(employee.email?.includes("@")),
             hasPhone: Boolean(normalizePhone(employee.phone)),
             warnings: warningCount.get(employee.id) || 0,
+            fullName: employee.fullName,
             nameEn: employee.nameEn,
             employeeNumber: employee.employeeNumber,
             jobTitle: employee.jobTitle,
             jobTitleEn: employee.jobTitleEn,
+            idNumber: employee.idNumber,
             gender: employee.gender,
           }))}
           defaultEmployeeIds={preselected}

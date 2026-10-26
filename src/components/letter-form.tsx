@@ -25,10 +25,12 @@ export type LetterEmployee = {
   hasEmail: boolean;
   hasPhone: boolean;
   warnings: number;
+  fullName?: string;
   nameEn?: string | null;
   employeeNumber?: string;
   jobTitle?: string | null;
   jobTitleEn?: string | null;
+  idNumber?: string | null;
   gender?: string | null;
 };
 
@@ -242,11 +244,12 @@ export function LetterForm({
       acknowledgedAt: null,
       cancelledAt: null,
       employee: {
-        fullName: person?.label || placeholder,
+        fullName: person?.fullName || person?.label || placeholder,
         nameEn: person?.nameEn || null,
         employeeNumber: person?.employeeNumber || person?.hint || "—",
-        jobTitle: person?.jobTitle || t("المسمى الوظيفي", "Job title"),
+        jobTitle: person?.jobTitle || null,
         jobTitleEn: person?.jobTitleEn || null,
+        idNumber: person?.idNumber || null,
         gender: person?.gender || null,
       },
     };
