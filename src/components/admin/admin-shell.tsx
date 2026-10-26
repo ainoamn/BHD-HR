@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Activity, ArrowRight, Building2, CreditCard, Crown, History, LayoutDashboard, Layers, Menu, Search, Settings2, Users, X } from "lucide-react";
+import { Activity, ArrowRight, Building2, CreditCard, Crown, History, LayoutDashboard, Layers, Menu, PartyPopper, Search, Settings2, Users, X } from "lucide-react";
 import { GetForm } from "@/components/get-form";
 import { useLang } from "@/components/lang-provider";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,11 @@ const GROUPS: { ar: string; en: string; items: Item[] }[] = [
       { href: "/admin/payments", ar: "المدفوعات", en: "Payments", icon: CreditCard, badge: "payments" },
       { href: "/admin/plans", ar: "الباقات", en: "Plans", icon: Layers },
     ],
+  },
+  {
+    ar: "التواصل",
+    en: "Outreach",
+    items: [{ href: "/admin/greetings", ar: "التهاني المجدولة", en: "Scheduled greetings", icon: PartyPopper }],
   },
   {
     ar: "النظام",

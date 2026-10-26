@@ -29,7 +29,7 @@ type Payload = {
 const escapeHtml = (value: string) => value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!);
 
 /** Plain-text email through Resend; throws when the provider rejects it. Check channelReady("EMAIL") first. */
-export async function sendEmailMessage(message: { to: string; subject: string; text: string; dir?: "rtl" | "ltr" }) {
+export async function sendEmailMessage(message: { to: string; subject: string; text: string; html?: string; dir?: "rtl" | "ltr" }) {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
@@ -38,7 +38,9 @@ export async function sendEmailMessage(message: { to: string; subject: string; t
       to: [message.to],
       subject: message.subject,
       text: message.text,
-      html: `<div dir="${message.dir || "rtl"}" style="font-family:Arial,sans-serif;line-height:1.8;white-space:pre-line">${escapeHtml(message.text)}</div>`,
+      html:
+        message.html ||
+        `<div dir="${message.dir || "rtl"}" style="font-family:Arial,sans-serif;line-height:1.8;white-space:pre-line">${escapeHtml(message.text)}</div>`,
     }),
   });
   if (!response.ok) throw new Error(`Email ${response.status}: ${(await response.text()).slice(0, 300)}`);

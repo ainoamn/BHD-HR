@@ -287,6 +287,60 @@ model PlatformLog {
   @@index([companyId, createdAt])
 }
 
+/// Platform-wide scheduled greeting / occasion notice (admin console). Designs a card with AI and emails a filtered audience.
+model PlatformGreeting {
+  id           String                    @id @default(cuid())
+  /// Short occasion name, e.g. العيد الوطني.
+  title        String
+  /// What the occasion means (shown to AI and optionally in the message).
+  meaning      String
+  /// Free-text brief that drives the AI design.
+  brief        String
+  scheduledFor DateTime
+  /// Audience filter: { all?, genders?, omanis?, expats?, nationalities?, youthMaxAge?, companyIds? }.
+  audience     Json
+  /// DRAFT | READY | SCHEDULED | SENT | FAILED | CANCELLED
+  status       String                    @default("DRAFT")
+  subjectAr    String?
+  subjectEn    String?
+  bodyAr       String?
+  bodyEn       String?
+  imagePrompt  String?
+  currentVersionId String?               @unique
+  currentVersion   PlatformGreetingVersion? @relation("GreetingCurrent", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions     PlatformGreetingVersion[] @relation("GreetingVersions")
+  sentAt       DateTime?
+  sentCount    Int                       @default(0)
+  lastError    String?
+  createdById  String?
+  createdByName String?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  @@index([status, scheduledFor])
+}
+
+model PlatformGreetingVersion {
+  id          String   @id @default(cuid())
+  greetingId  String
+  greeting    PlatformGreeting @relation("GreetingVersions", fields: [greetingId], references: [id], onDelete: Cascade)
+  currentOf   PlatformGreeting? @relation("GreetingCurrent")
+  /// Public token for `/api/greetings/img/<token>` (email clients need no admin session).
+  token       String   @unique
+  subjectAr   String
+  subjectEn   String
+  bodyAr      String
+  bodyEn      String
+  imagePrompt String
+  mime        String   @default("image/png")
+  imageData   Bytes
+  /// Admin note that requested this revision (empty for the first design).
+  reviseNote  String?
+  createdAt   DateTime @default(now())
+
+  @@index([greetingId, createdAt])
+}
+
 /// Access to one company (workspace). userId stays empty for an invitation until that email signs in.
 model Membership {
   id          String    @id @default(cuid())

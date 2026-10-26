@@ -109,6 +109,20 @@ export function parseDateInput(value?: string | null) {
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
 
+/** `datetime-local` value interpreted as Asia/Muscat (UTC+4). */
+export function parseDateTimeInput(value?: string | null) {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!match) return parseDateInput(value);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
+  return new Date(Date.UTC(year, month - 1, day, hour - 4, minute, 0));
+}
+
 export function toDateInput(value?: Date | string | null) {
   if (!value) return "";
   const date = new Date(value);

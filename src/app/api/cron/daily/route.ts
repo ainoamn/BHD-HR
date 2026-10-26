@@ -5,6 +5,7 @@ import { channelReady, sendEmailMessage, sendPendingCopies } from "@/lib/deliver
 import { BACKUP_GRACE_HOURS, backupStatus, recordError } from "@/lib/errors";
 import { issueDueLetterDrafts } from "@/lib/letter-drafts";
 import { purgeOldLogins } from "@/lib/login-events";
+import { sendDueGreetings } from "@/lib/greetings";
 import { remindExpiringDocuments } from "@/lib/notify";
 import { permissionsFor } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
 
 async function runDaily(origin: string) {
   const scheduledLetters = await issueDueLetterDrafts(origin);
+  const scheduledGreetings = await sendDueGreetings(origin);
   const emailReady = channelReady("EMAIL");
   const companies = await prisma.company.findMany({ include: { memberships: { where: { acceptedAt: { not: null }, role: { in: ["ADMIN", "MANAGER"] } }, include: { user: true } } } });
   const results: { company: string; sent: number; failed: number; briefs: number; errors: number }[] = [];
@@ -72,5 +74,5 @@ async function runDaily(origin: string) {
   const paymentsSettled = await settleStalePayments();
   const subscriptionReminders = await remindSubscriptions(origin);
   const loginsPurged = await purgeOldLogins();
-  return { ok: true, emailReady, scheduledLetters, results, backupOverdue: backup.overdue, limitsCleared, expiryReminders, paymentsSettled, subscriptionReminders, loginsPurged };
+  return { ok: true, emailReady, scheduledLetters, scheduledGreetings, results, backupOverdue: backup.overdue, limitsCleared, expiryReminders, paymentsSettled, subscriptionReminders, loginsPurged };
 }

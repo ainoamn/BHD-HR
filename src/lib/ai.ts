@@ -612,3 +612,80 @@ export async function aiTranslateMany(texts: string[], to: Lang) {
     return texts.map(() => null);
   }
 }
+
+export type GreetingDesign = {
+  subjectAr: string;
+  subjectEn: string;
+  bodyAr: string;
+  bodyEn: string;
+  imagePrompt: string;
+  accent: string;
+  accent2: string;
+};
+
+/** Copy + image prompt for a platform greeting card (Omani HR / BHD tone). */
+export async function aiGreetingDesign(input: {
+  title: string;
+  meaning: string;
+  brief: string;
+  reviseNote?: string | null;
+  previousPrompt?: string | null;
+}): Promise<GreetingDesign | null> {
+  const { text } = await generateText({
+    model: MODEL,
+    temperature: 0.55,
+    system: [
+      "You design bilingual (Arabic + English) congratulatory messages for BHD HR, a platform used by companies in the Sultanate of Oman.",
+      "Tone: warm, respectful, professional; suitable for employees. Arabic in Modern Standard Arabic with Omani/Gulf warmth.",
+      "Do not invent company-specific facts. Mention the occasion naturally. Keep body 2–4 short sentences each language.",
+      "imagePrompt must be a detailed English prompt for an AI image model: elegant greeting card, no photorealistic faces of real people, space for logos at corners, readable composition, festive for the occasion, Omani/Gulf cultural taste when relevant, unique each time (vary palette/motifs).",
+      'Reply JSON only: {"subjectAr":"…","subjectEn":"…","bodyAr":"…","bodyEn":"…","imagePrompt":"…","accent":"#0f766e","accent2":"#b45309"}',
+    ].join(" "),
+    prompt: JSON.stringify({
+      occasion: input.title,
+      meaning: input.meaning,
+      designBrief: input.brief,
+      reviseNote: input.reviseNote || undefined,
+      previousImagePrompt: input.previousPrompt || undefined,
+      variationSeed: Date.now(),
+    }),
+  });
+  const parsed = parseJson<Record<string, unknown>>(text, "{");
+  if (!parsed) return null;
+  const pick = (key: string, max: number) => (typeof parsed[key] === "string" ? String(parsed[key]).trim().slice(0, max) : "");
+  const subjectAr = pick("subjectAr", 150);
+  const bodyAr = pick("bodyAr", 2000);
+  const imagePrompt = pick("imagePrompt", 2000);
+  if (!subjectAr || !bodyAr || !imagePrompt) return null;
+  return {
+    subjectAr,
+    subjectEn: pick("subjectEn", 150) || subjectAr,
+    bodyAr,
+    bodyEn: pick("bodyEn", 2000) || bodyAr,
+    imagePrompt,
+    accent: /^#[0-9a-fA-F]{6}$/.test(pick("accent", 7)) ? pick("accent", 7) : "#0f766e",
+    accent2: /^#[0-9a-fA-F]{6}$/.test(pick("accent2", 7)) ? pick("accent2", 7) : "#b45309",
+  };
+}
+
+const IMAGE_MODEL = process.env.AI_IMAGE_MODEL || "google/gemini-2.5-flash-image";
+
+/** Generate a greeting-card image; returns null when the model/gateway cannot produce one. */
+export async function aiGreetingImage(prompt: string): Promise<{ bytes: Buffer; mime: string } | null> {
+  try {
+    const result = await generateText({
+      model: IMAGE_MODEL,
+      prompt: [
+        "Create a single high-quality digital greeting card image (landscape ~4:3).",
+        "Leave clean corner areas for logos. No QR codes, no watermarks, no real brand logos except generic ornamental frames.",
+        "Arabic calligraphy accents are welcome when they fit; do not invent readable long Arabic paragraphs.",
+        prompt,
+      ].join("\n"),
+    });
+    const file = result.files?.find((item) => item.mediaType?.startsWith("image/"));
+    if (!file?.uint8Array?.length) return null;
+    return { bytes: Buffer.from(file.uint8Array), mime: file.mediaType || "image/png" };
+  } catch {
+    return null;
+  }
+}
