@@ -82,11 +82,9 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
   const addresseeEn = letter.addresseeEn?.trim() || addressee;
   const nameEn = header.nameEn && header.nameEn !== header.name ? header.nameEn : null;
   const employeeEn = employee.nameEn || employee.fullName;
+  /** Name stays in the salutation / addressee line only — not repeated here. */
   const identityAr = (
     <span className="letter-doc__identity">
-      <span>
-        اسم الموظف: <strong>{employee.fullName}</strong>
-      </span>
       <span>
         الرقم الوظيفي: <bdi className="letter-doc__num">{employee.employeeNumber}</bdi>
       </span>
@@ -104,9 +102,6 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
   );
   const identityEn = (
     <span className="letter-doc__identity">
-      <span>
-        Employee name: <strong>{employeeEn}</strong>
-      </span>
       <span>
         Employee No.: <bdi className="letter-doc__num">{employee.employeeNumber}</bdi>
       </span>
@@ -216,7 +211,22 @@ export function LetterSheet({ letter, header, seal }: { letter: LetterSheetData;
         {document ? (
           <>
             <Para className="letter-doc__strong" ar={addresseeAr} en={en ? (addresseeEn ? `To: ${addresseeEn}` : "To whom it may concern") : undefined} />
-            <Para ar={identityAr} en={en ? identityEn : undefined} />
+            <Para
+              ar={
+                <>
+                  بخصوص الموظف: <strong>{employee.fullName}</strong>
+                  {identityAr}
+                </>
+              }
+              en={
+                en ? (
+                  <>
+                    Concerning: <strong>{employeeEn}</strong>
+                    {identityEn}
+                  </>
+                ) : undefined
+              }
+            />
           </>
         ) : (
           <Para
