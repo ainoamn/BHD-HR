@@ -13,12 +13,13 @@ import { isLetterKind, LETTER_KIND, WARNING_KINDS, WARNING_LOOKBACK_DAYS, type L
 import { normalizePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime, toDateInput, todayInputValue } from "@/lib/utils";
+import { warningCauses } from "@/lib/oman-labour";
 import { createLetters } from "@/server/letter-actions";
 
 export default async function NewLetterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ employeeId?: string; kind?: string; requestId?: string; draftId?: string; error?: string; message?: string }>;
+  searchParams: Promise<{ employeeId?: string; kind?: string; requestId?: string; draftId?: string; clause?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
   const user = await requirePermission("letters.create", "/letters");
@@ -32,7 +33,7 @@ export default async function NewLetterPage({
         include: { employee: { select: { fullName: true, nameEn: true } } },
       })
     : null;
-  const [employees, warnings, templates] = await Promise.all([
+  const [employees, warnings, templates, companyCauses] = await Promise.all([
     prisma.employee.findMany({
       where: { companyId: user.companyId, status: { not: "TERMINATED" } },
       select: { id: true, fullName: true, nameEn: true, employeeNumber: true, email: true, phone: true },
@@ -48,6 +49,10 @@ export default async function NewLetterPage({
       select: { id: true, kind: true, title: true, subject: true, subjectEn: true, body: true, bodyEn: true, createdByName: true },
       orderBy: { createdAt: "desc" },
       take: 200,
+    }),
+    prisma.companyPenaltyCause.findMany({
+      where: { companyId: user.companyId, active: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
   const warningCount = new Map(warnings.map((row) => [row.employeeId, row._count._all]));
@@ -117,6 +122,8 @@ export default async function NewLetterPage({
           savedDraft={draft ? { id: draft.id, content: readDraftContent(draft.content), scheduleDate: toDateInput(draft.scheduledFor) } : null}
           tomorrow={toDateInput(new Date(muscatToday().getTime() + 86400000))}
           companyTemplates={templates.map((item) => ({ ...item, subjectEn: item.subjectEn || "", bodyEn: item.bodyEn || "" }))}
+          warningCauses={warningCauses(companyCauses)}
+          initialClauseCode={sp.clause || ""}
         />
       </Card>
     </div>

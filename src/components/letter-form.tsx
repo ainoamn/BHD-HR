@@ -1,11 +1,12 @@
 "use client";
 
 import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { blanksIn } from "@/lib/letter-library";
 import { LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
 import type { DraftContent } from "@/lib/letter-drafts";
+import { formatCauseReason, type WarningCause } from "@/lib/oman-labour";
 import { cn } from "@/lib/utils";
 import { draftLetter, type SavedLetterTemplate } from "@/server/letter-actions";
 import { EmployeeMultiSelect } from "./employee-multi-select";
@@ -13,6 +14,7 @@ import { useLang } from "./lang-provider";
 import { LetterTemplates } from "./letter-templates";
 import { SubmitButton } from "./submit-button";
 import { Field, fieldClass, secondaryBtn } from "./ui";
+import { WarningCausePicker } from "./warning-cause-picker";
 
 export type LetterEmployee = { value: string; label: string; hint?: string | null; hasEmail: boolean; hasPhone: boolean; warnings: number };
 
@@ -30,6 +32,8 @@ export function LetterForm({
   savedDraft,
   tomorrow,
   companyTemplates,
+  warningCauses = [],
+  initialClauseCode = "",
 }: {
   action: (formData: FormData) => void | Promise<void>;
   employees: LetterEmployee[];
@@ -48,6 +52,10 @@ export function LetterForm({
   tomorrow: string;
   /** The company's own wordings (LetterTemplate), all kinds. */
   companyTemplates: SavedLetterTemplate[];
+  /** Ready disciplinary causes (Oman MD 618/2024 + company). */
+  warningCauses?: WarningCause[];
+  /** Prefill from /letters/new?clause=OMAN-618-08 */
+  initialClauseCode?: string;
 }) {
   const { lang, t } = useLang();
   const saved = savedDraft?.content;
@@ -64,7 +72,10 @@ export function LetterForm({
   const [note, setNote] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [drafting, startDraft] = useTransition();
   const [ownTemplates, setOwnTemplates] = useState(companyTemplates);
+  const [clauseCode, setClauseCode] = useState(saved?.clauseCode || "");
+  const [occurrence, setOccurrence] = useState<1 | 2 | 3 | 4>(1);
   const blanks = auto ? [] : blanksIn(subject, subjectEn, body, bodyEn);
+  const showCauses = !auto && (LETTER_KIND[kind].group === "discipline" || LETTER_KIND[kind].warning);
 
   const chosen = employees.filter((employee) => selected.includes(employee.value));
   const single = chosen.length === 1 ? chosen[0] : null;
@@ -78,6 +89,31 @@ export function LetterForm({
     if (!subject || subject === before.subject) setSubject(LETTER_TEMPLATES[next].subject);
     if (!subjectEn || subjectEn === before.subjectEn) setSubjectEn(LETTER_TEMPLATES[next].subjectEn);
   };
+
+  const applyCause = (cause: WarningCause | null, reasonAr: string) => {
+    setClauseCode(cause?.code || "");
+    if (!cause) return;
+    setReason(reasonAr);
+    const nextKind = LETTER_KIND[cause.defaultKind] ? cause.defaultKind : kind;
+    const tpl = LETTER_TEMPLATES[nextKind];
+    const fill = (text: string) => text.replaceAll("{reason}", reasonAr);
+    setKind(nextKind);
+    setSubject(fill(tpl.subject));
+    setSubjectEn(fill(tpl.subjectEn));
+    setBody(fill(tpl.body));
+    setBodyEn(fill(tpl.bodyEn));
+    setNote({ tone: "ok", text: t("أُدرج المسبب في نص الإنذار. راجعه قبل الإصدار.", "The cause was placed in the warning text. Review it before issuing.") });
+  };
+
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !initialClauseCode || !warningCauses.length) return;
+    const cause = warningCauses.find((item) => item.code === initialClauseCode);
+    if (!cause) return;
+    prefilled.current = true;
+    applyCause(cause, formatCauseReason(cause, 1).ar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot prefill from ?clause=
+  }, [initialClauseCode, warningCauses]);
 
   const draft = () =>
     startDraft(async () => {
@@ -242,11 +278,14 @@ export function LetterForm({
       ) : (
       <section className="space-y-3 border-t border-slate-100 pt-5">
         <h2 className="text-sm font-bold text-slate-800">{t("٢. المحتوى", "2. Content")}</h2>
+        {showCauses && warningCauses.length ? (
+          <WarningCausePicker causes={warningCauses} value={clauseCode} occurrence={occurrence} onSelect={applyCause} onOccurrence={setOccurrence} />
+        ) : null}
         <Field
           label={t("السبب أو التفاصيل", "Reason or details")}
           hint={t(
-            "اكتب باختصار ما حدث أو المناسبة (مثل: تأخر عن الدوام 3 مرات في أكتوبر)، ثم اختر نموذجاً جاهزاً فيُدرج فيه، أو اطلب الصياغة الذكية، أو اكتب النص بنفسك.",
-            "Briefly describe what happened or the occasion (e.g. late three times in October), then pick a ready template to place it in, ask the AI to draft it, or write the text yourself.",
+            "اختر مسبباً جاهزاً أعلاه أو اكتب باختصار ما حدث، ثم اختر نموذجاً جاهزاً فيُدرج فيه، أو اطلب الصياغة الذكية، أو اكتب النص بنفسك.",
+            "Pick a ready cause above or briefly describe what happened, then pick a ready template, ask the AI to draft it, or write the text yourself.",
           )}
         >
           <textarea className={`${fieldClass} min-h-20 w-full`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1500} />

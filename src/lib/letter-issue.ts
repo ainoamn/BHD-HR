@@ -44,6 +44,9 @@ export async function issueLetter(input: {
   addresseeEn?: string | null;
   signatoryName?: string | null;
   signatoryTitle?: string | null;
+  /** Ready cause from Oman sanctions schedule or company policy. */
+  clauseCode?: string | null;
+  clauseTitle?: string | null;
   /** id null = issued by the system on its own (an automatic request letter). */
   user: { id: string | null; name: string };
   channels: Channel[];
@@ -69,6 +72,8 @@ export async function issueLetter(input: {
     addresseeEn: clip(input.addresseeEn || "", 200),
     signatoryName: clip(input.signatoryName || "", 120) || company?.signatoryName || input.user.name,
     signatoryTitle: clip(input.signatoryTitle || "", 120) || company?.signatoryTitle || null,
+    clauseCode: clip(input.clauseCode || "", 64) || null,
+    clauseTitle: clip(input.clauseTitle || "", 400) || null,
     signedByName: input.user.name,
   };
 

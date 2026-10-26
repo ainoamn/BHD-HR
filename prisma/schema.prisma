@@ -96,6 +96,10 @@ model Company {
   letters              Letter[]
   letterDrafts         LetterDraft[]
   letterTemplates      LetterTemplate[]
+  /// Company-written policies shown on /regulations (اطّلاع) alongside Oman labour library.
+  companyPolicies      CompanyPolicy[]
+  /// Extra warning causes beyond the built-in Oman MD 618/2024 schedule.
+  companyPenaltyCauses CompanyPenaltyCause[]
   briefs               DailyBrief[]
   jobOpenings          JobOpening[]
   candidates           Candidate[]
@@ -1103,6 +1107,9 @@ model Letter {
   signatureNo    String?
   signatureUrl   String?
   stampUrl       String?
+  /// Selected ready cause when issuing a warning (e.g. OMAN-618-08); see src/lib/oman-labour.
+  clauseCode     String?
+  clauseTitle    String?
   request        EmployeeRequest?
   deliveries     LetterDelivery[]
   createdAt      DateTime         @default(now())
@@ -1111,6 +1118,48 @@ model Letter {
   @@unique([companyId, refNo])
   @@unique([companyId, signatureNo])
   @@index([employeeId])
+  @@index([companyId, clauseCode])
+}
+
+/// Internal company policy document shown on the اطّلاع (/regulations) page.
+model CompanyPolicy {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  titleAr     String
+  titleEn     String?
+  bodyAr      String
+  bodyEn      String?
+  /// Optional short label (e.g. "دليل الموظف 2026").
+  sourceNote  String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId, active])
+}
+
+/// Company-specific warning cause selectable when issuing a disciplinary letter.
+model CompanyPenaltyCause {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  code        String
+  titleAr     String
+  titleEn     String?
+  detailAr    String?
+  detailEn    String?
+  /// Suggested Letter.kind (WARNING_1, DEDUCTION_NOTICE, …).
+  defaultKind String   @default("WARNING_1")
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId, active])
 }
 
 /// A letter written in /letters/new but not issued: kept in the drafts, or scheduled to issue on `scheduledFor`

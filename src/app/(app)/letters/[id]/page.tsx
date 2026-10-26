@@ -75,6 +75,20 @@ export default async function LetterPage({ params, searchParams }: { params: Pro
               {nameOf}
             </Link>
             <dl className="mt-3 space-y-1.5 text-sm">
+              {letter.clauseCode ? (
+                <div className="rounded-xl bg-orange-50 px-3 py-2 ring-1 ring-inset ring-orange-200">
+                  <dt className="text-xs font-semibold text-orange-900">{t("مسبب من لائحة الجزاءات", "Cause from sanctions schedule")}</dt>
+                  <dd className="mt-0.5 text-sm font-semibold text-orange-950">
+                    <span className="tabular" dir="ltr">
+                      {letter.clauseCode}
+                    </span>
+                    {letter.clauseTitle ? ` — ${letter.clauseTitle}` : null}
+                  </dd>
+                  <Link href="/regulations?tab=penalties" className="mt-1 inline-block text-xs font-semibold text-orange-900 underline underline-offset-4">
+                    {t("اطّلاع على اللوائح", "Browse regulations")}
+                  </Link>
+                </div>
+              ) : null}
               <div className="flex justify-between gap-2">
                 <dt className="text-slate-500">{t("أصدره", "Issued by")}</dt>
                 <dd className="text-end">{letter.createdByName || "—"}</dd>

@@ -213,19 +213,28 @@ export type DefaultLeaveSeed = {
  * Keys `annual` / `sick` / `compensatory` / `other` stay fixed (attendance legacy mapping).
  * Sick ceiling follows Labour Law tracking practice (up to 182 days/year with graded pay handled in payroll policy).
  */
+/**
+ * Aligned with RD 53/2023 and indicative work regulation MD 619/2024 (ch. leave).
+ * Keys `annual` / `sick` / `compensatory` / `other` stay fixed for attendance legacy mapping.
+ */
 export const DEFAULT_LEAVE_TYPES: DefaultLeaveSeed[] = [
-  { key: "annual", nameAr: "الإجازة السنوية", nameEn: "Annual leave", days: 30, cycle: "YEARLY", carryCap: 15, sortOrder: 0 },
+  { key: "annual", nameAr: "الإجازة السنوية", nameEn: "Annual leave", days: 30, cycle: "YEARLY", carryCap: 30, sortOrder: 0 },
   { key: "sick", nameAr: "الإجازة المرضية", nameEn: "Sick leave", days: 182, cycle: "YEARLY", carryCap: null, sortOrder: 1 },
   { key: "compensatory", nameAr: "الإجازة التعويضية", nameEn: "Compensatory leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 2 },
-  { key: "maternity", nameAr: "إجازة الأمومة", nameEn: "Maternity leave", days: 98, cycle: "ONCE", carryCap: null, sortOrder: 3 },
+  { key: "maternity", nameAr: "إجازة الوضع", nameEn: "Maternity leave", days: 98, cycle: "ONCE", carryCap: null, sortOrder: 3 },
   { key: "paternity", nameAr: "إجازة الأبوة", nameEn: "Paternity leave", days: 7, cycle: "ONCE", carryCap: null, sortOrder: 4 },
   { key: "marriage", nameAr: "إجازة الزواج", nameEn: "Marriage leave", days: 3, cycle: "ONCE", carryCap: null, sortOrder: 5 },
-  { key: "bereavement", nameAr: "إجازة الوفاة", nameEn: "Bereavement leave", days: 3, cycle: "ONCE", carryCap: null, sortOrder: 6 },
-  { key: "hajj", nameAr: "إجازة الحج", nameEn: "Hajj leave", days: 14, cycle: "ONCE", carryCap: null, sortOrder: 7 },
-  { key: "emergency", nameAr: "إجازة طارئة", nameEn: "Emergency leave", days: 5, cycle: "YEARLY", carryCap: null, sortOrder: 8 },
-  { key: "exam", nameAr: "إجازة امتحانات", nameEn: "Exam leave", days: 14, cycle: "YEARLY", carryCap: null, sortOrder: 9 },
-  { key: "unpaid", nameAr: "إجازة بدون راتب", nameEn: "Unpaid leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 10 },
-  { key: "other", nameAr: "إجازات أخرى", nameEn: "Other leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 11 },
+  { key: "bereavement", nameAr: "إجازة وفاة الأقارب (أب/أم/جد/جدة/أخ/أخت)", nameEn: "Bereavement (parents, grandparents, siblings)", days: 3, cycle: "ONCE", carryCap: null, sortOrder: 6 },
+  { key: "bereavement_close", nameAr: "إجازة وفاة الزوج/الزوجة أو الأبناء", nameEn: "Bereavement (spouse or children)", days: 10, cycle: "ONCE", carryCap: null, sortOrder: 7 },
+  { key: "bereavement_uncle", nameAr: "إجازة وفاة العم/العمة/الخال/الخالة", nameEn: "Bereavement (uncle/aunt)", days: 2, cycle: "ONCE", carryCap: null, sortOrder: 8 },
+  { key: "iddah_muslim", nameAr: "عدة الوفاة (مسلمة)", nameEn: "Iddah (Muslim widow)", days: 130, cycle: "ONCE", carryCap: null, sortOrder: 9 },
+  { key: "iddah_other", nameAr: "عدة الوفاة (غير مسلمة)", nameEn: "Iddah (non-Muslim widow)", days: 14, cycle: "ONCE", carryCap: null, sortOrder: 10 },
+  { key: "hajj", nameAr: "إجازة الحج", nameEn: "Hajj leave", days: 15, cycle: "ONCE", carryCap: null, sortOrder: 11 },
+  { key: "exam", nameAr: "إجازة امتحانات", nameEn: "Exam leave", days: 15, cycle: "YEARLY", carryCap: null, sortOrder: 12 },
+  { key: "companion", nameAr: "إجازة مرافقة مريض", nameEn: "Companion / patient escort leave", days: 15, cycle: "YEARLY", carryCap: null, sortOrder: 13 },
+  { key: "emergency", nameAr: "إجازة طارئة", nameEn: "Emergency leave", days: 5, cycle: "YEARLY", carryCap: null, sortOrder: 14 },
+  { key: "unpaid", nameAr: "إجازة بدون راتب", nameEn: "Unpaid leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 15 },
+  { key: "other", nameAr: "إجازات أخرى", nameEn: "Other leave", days: 0, cycle: "ONCE", carryCap: null, sortOrder: 16 },
 ];
 
 export type DefaultAllowanceSeed = {

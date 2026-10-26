@@ -23,6 +23,7 @@ const HELP_FOR_PATH: [string, string][] = [
   ["/documents/custody", "custody"],
   ["/documents", "documents"],
   ["/letters", "letters"],
+  ["/regulations", "letters"],
   ["/recruitment", "recruitment"],
   ["/performance", "performance"],
   ["/assets", "assets"],

@@ -27,6 +27,9 @@ export type DraftContent = {
   signatoryName: string;
   signatoryTitle: string;
   channels: Channel[];
+  /** Ready warning cause from Oman MD 618/2024 or company policy (src/lib/oman-labour). */
+  clauseCode: string;
+  clauseTitle: string;
 };
 
 export const DRAFT_STATUS: Record<string, { ar: string; en: string; tone: string }> = {
@@ -55,6 +58,8 @@ export function readLetterForm(formData: FormData) {
     signatoryName: text("signatoryName", 120),
     signatoryTitle: text("signatoryTitle", 120),
     channels: CHANNELS.filter((channel) => formData.get(`send${channel}`) === "1"),
+    clauseCode: text("clauseCode", 64),
+    clauseTitle: text("clauseTitle", 400),
   };
   return {
     kind: req(formData, "kind"),
@@ -78,6 +83,8 @@ export function readDraftContent(value: Prisma.JsonValue): DraftContent {
     signatoryName: text("signatoryName"),
     signatoryTitle: text("signatoryTitle"),
     channels: Array.isArray(raw.channels) ? CHANNELS.filter((channel) => (raw.channels as unknown[]).includes(channel)) : [],
+    clauseCode: text("clauseCode"),
+    clauseTitle: text("clauseTitle"),
   };
 }
 
@@ -154,6 +161,8 @@ export async function issueComposed(composed: Composed, input: { companyId: stri
       ...text,
       signatoryName: input.content.signatoryName,
       signatoryTitle: input.content.signatoryTitle,
+      clauseCode: input.content.clauseCode || null,
+      clauseTitle: input.content.clauseTitle || null,
       user: input.user,
       channels: input.content.channels,
       requestId: input.requestId,
