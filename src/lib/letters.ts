@@ -43,13 +43,28 @@ export type LetterKind = (typeof LETTER_KINDS)[number];
 /** Where a kind sits in the letter form: discipline, recognition, career and pay, notices and circulars, or ready documents. */
 export type LetterGroup = "discipline" | "recognition" | "career" | "hr" | "ready";
 
+export const LETTER_GROUPS = ["discipline", "recognition", "career", "hr", "ready"] as const;
+
+/**
+ * Per document-type serial: refNo = `{code}-{year}-{####}` (e.g. WRN-2026-0001 for warnings).
+ * Each group has its own sequence so stats can count thanks vs warnings vs certificates, etc.
+ */
+export const LETTER_GROUP: Record<LetterGroup, { label: Bi; code: string; tone: string }> = {
+  discipline: { label: { ar: "إنذارات وجزاءات وتحقيق", en: "Warnings, penalties and hearings" }, code: "WRN", tone: "red" },
+  recognition: { label: { ar: "الشكر والتقدير والتهاني", en: "Appreciation, congratulations and welcome" }, code: "APR", tone: "green" },
+  career: { label: { ar: "الترقيات والرواتب والعقود", en: "Promotions, pay and contracts" }, code: "CAR", tone: "teal" },
+  hr: { label: { ar: "الإجازات والتعاميم والإشعارات", en: "Leave, circulars and notices" }, code: "NTC", tone: "sky" },
+  ready: { label: { ar: "شهادات وخطابات جاهزة", en: "Ready certificates and letters" }, code: "CRT", tone: "navy" },
+};
+
 /** Groups of written kinds in the order the letter form shows them. */
-export const WRITTEN_GROUPS: { key: Exclude<LetterGroup, "ready">; label: Bi }[] = [
-  { key: "discipline", label: { ar: "إنذارات وجزاءات وتحقيق", en: "Warnings, penalties and hearings" } },
-  { key: "recognition", label: { ar: "الشكر والتقدير والتهاني", en: "Appreciation, congratulations and welcome" } },
-  { key: "career", label: { ar: "الترقيات والرواتب والعقود", en: "Promotions, pay and contracts" } },
-  { key: "hr", label: { ar: "الإجازات والتعاميم والإشعارات", en: "Leave, circulars and notices" } },
-];
+export const WRITTEN_GROUPS: { key: Exclude<LetterGroup, "ready">; label: Bi }[] = (
+  ["discipline", "recognition", "career", "hr"] as const
+).map((key) => ({ key, label: LETTER_GROUP[key].label }));
+
+export function isLetterGroup(value: string): value is LetterGroup {
+  return (LETTER_GROUPS as readonly string[]).includes(value);
+}
 
 /**
  * `auto`: the text is written from the employee's file (src/lib/letter-docs.ts), not typed.
@@ -100,6 +115,24 @@ export const LETTER_KIND: Record<
 
 export function isLetterKind(value: string): value is LetterKind {
   return (LETTER_KINDS as readonly string[]).includes(value);
+}
+
+export function letterGroupOf(kind: string): LetterGroup {
+  return isLetterKind(kind) ? LETTER_KIND[kind].group : "hr";
+}
+
+export function letterGroupCode(kind: string) {
+  return LETTER_GROUP[letterGroupOf(kind)].code;
+}
+
+/** Prefix for the next refNo of this kind, e.g. `WRN-2026-`. */
+export function letterRefPrefix(kind: string, issuedAt: Date) {
+  const year = new Date(issuedAt.getTime() + 4 * 3600_000).getUTCFullYear();
+  return `${letterGroupCode(kind)}-${year}-`;
+}
+
+export function kindsInGroup(group: LetterGroup): LetterKind[] {
+  return LETTER_KINDS.filter((kind) => LETTER_KIND[kind].group === group);
 }
 
 /** Kinds written by hand in the letter form; the rest are generated from the employee's file. */

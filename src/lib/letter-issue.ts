@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { writeAudit } from "./audit";
 import type { Channel } from "./delivery";
-import { LETTER_KIND, type LetterKind } from "./letters";
+import { LETTER_KIND, letterRefPrefix, type LetterKind } from "./letters";
 import { letterFingerprint, newVerifyToken, nextSignatureNo } from "./letter-seal";
 import { normalizePhone } from "./phone";
 import { prisma } from "./prisma";
@@ -9,9 +9,9 @@ import { clip, isUniqueError } from "./utils";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** HR-2026-0001: per company and year. */
-async function nextRefNo(companyId: string, issuedAt: Date) {
-  const prefix = `HR-${issuedAt.getUTCFullYear()}-`;
+/** WRN-2026-0001 / APR-2026-0001 / …: per company, letter group (document type), and Muscat year. */
+async function nextRefNo(companyId: string, kind: LetterKind, issuedAt: Date) {
+  const prefix = letterRefPrefix(kind, issuedAt);
   const last = await prisma.letter.findFirst({
     where: { companyId, refNo: { startsWith: prefix } },
     orderBy: { refNo: "desc" },
@@ -80,7 +80,7 @@ export async function issueLetter(input: {
   for (let attempt = 0; ; attempt += 1) {
     try {
       const signedAt = new Date();
-      const [refNo, signatureNo] = await Promise.all([nextRefNo(input.companyId, input.issuedAt), nextSignatureNo(input.companyId, signedAt)]);
+      const [refNo, signatureNo] = await Promise.all([nextRefNo(input.companyId, input.kind, input.issuedAt), nextSignatureNo(input.companyId, signedAt)]);
       const letter = await prisma.letter.create({
         data: {
           ...content,

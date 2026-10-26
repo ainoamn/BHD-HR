@@ -5,7 +5,7 @@ import { Archive, BadgeCheck, CalendarClock, CircleAlert, Eye, FileText, LoaderC
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { blanksIn } from "@/lib/letter-library";
-import { isLetterKind, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterGroup, type LetterKind } from "@/lib/letters";
+import { isLetterKind, LETTER_GROUP, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterGroup, type LetterKind } from "@/lib/letters";
 import type { DraftContent } from "@/lib/letter-drafts";
 import { formatCauseReason, type WarningCause } from "@/lib/oman-labour";
 import { cn, parseDateInput } from "@/lib/utils";
@@ -93,21 +93,21 @@ export function LetterForm({
     return [
       ...WRITTEN_GROUPS.map((group) => ({
         key: group.key as LetterGroup,
-        heading: pick(group.label, lang),
+        heading: `${LETTER_GROUP[group.key].code} — ${pick(group.label, lang)}`,
         hint:
           group.key === "discipline"
-            ? t("إنذار، لفت نظر، تحقيق، خصم…", "Warning, notice, hearing, deduction…")
+            ? t("إنذار، لفت نظر، تحقيق، خصم… الرقم: WRN-السنة-####", "Warning, notice, hearing… number: WRN-year-####")
             : group.key === "recognition"
-              ? t("شكر، تهنئة، ترحيب، تعزية…", "Thanks, congratulations, welcome, condolences…")
+              ? t("شكر، تهنئة، ترحيب… الرقم: APR-السنة-####", "Thanks, congratulations… number: APR-year-####")
               : group.key === "career"
-                ? t("ترقية، راتب، عقد، إنهاء…", "Promotion, pay, contract, termination…")
-                : t("إجازة، تعميم، تذكير، خطاب…", "Leave, circular, reminder, letter…"),
+                ? t("ترقية، راتب، عقد… الرقم: CAR-السنة-####", "Promotion, pay, contract… number: CAR-year-####")
+                : t("إجازة، تعميم، تذكير… الرقم: NTC-السنة-####", "Leave, circular, reminder… number: NTC-year-####"),
         options: WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === group.key),
       })),
       {
         key: "ready" as LetterGroup,
-        heading: t("شهادات وخطابات جاهزة", "Ready certificates and letters"),
-        hint: t("شهادة راتب، خبرة، عدم ممانعة…", "Salary, experience, NOC…"),
+        heading: `${LETTER_GROUP.ready.code} — ${pick(LETTER_GROUP.ready.label, lang)}`,
+        hint: t("شهادة راتب، خبرة، عدم ممانعة… الرقم: CRT-السنة-####", "Salary, experience, NOC… number: CRT-year-####"),
         options: ready,
       },
     ];
@@ -303,7 +303,7 @@ export function LetterForm({
     const bodyEnVal = auto ? autoPreview?.bodyEn || "" : bodyEn || fillTpl(LETTER_TEMPLATES[kind].bodyEn, reason);
     return {
       kind,
-      refNo: "HR-····-····",
+      refNo: `${LETTER_GROUP[LETTER_KIND[kind].group].code}-····-····`,
       issuedAt: parseDateInput(issuedAt) || new Date(),
       subject: subjectAr,
       subjectEn: subjectEnVal,

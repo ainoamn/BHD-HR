@@ -12,7 +12,7 @@ import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { composeLetters, DRAFT_STATUS, muscatToday, OPEN_DRAFT, readDraftContent } from "@/lib/letter-drafts";
 import { blanksIn } from "@/lib/letter-library";
-import { LETTER_KIND, type LetterKind } from "@/lib/letters";
+import { LETTER_GROUP, LETTER_KIND, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatDateTime, parseDateInput, toDateInput } from "@/lib/utils";
 import { deleteLetterDraft, issueLetterDraft, scheduleLetterDraft } from "@/server/letter-actions";
@@ -93,7 +93,7 @@ export default async function LetterDraftPage({
               <LetterSheet
                 letter={{
                   kind: draft.kind,
-                  refNo: "HR-····-····",
+                  refNo: `${LETTER_GROUP[meta.group].code}-····-····`,
                   issuedAt: letterDay,
                   ...shown.text,
                   signatoryName: content.signatoryName || user.company.signatoryName || user.name,

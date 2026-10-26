@@ -10,7 +10,19 @@ import { columnHiddenFields, compareNumber, compareText, includesText, readSort 
 import { pick } from "@/lib/i18n";
 import { getI18n } from "@/lib/lang";
 import { DRAFT_STATUS, issueDueLetterDrafts, readDraftContent } from "@/lib/letter-drafts";
-import { LETTER_KIND, LETTER_KINDS, WARNING_KINDS, isLetterKind, letterState, type LetterKind } from "@/lib/letters";
+import {
+  isLetterGroup,
+  isLetterKind,
+  kindsInGroup,
+  LETTER_GROUP,
+  LETTER_GROUPS,
+  LETTER_KIND,
+  LETTER_KINDS,
+  WARNING_KINDS,
+  letterState,
+  type LetterGroup,
+  type LetterKind,
+} from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
 import { requestOrigin } from "@/lib/request-origin";
 import { formatDate } from "@/lib/utils";
@@ -22,6 +34,7 @@ export default async function LettersPage({
 }: {
   searchParams: Promise<{
     kind?: string;
+    group?: string;
     employeeId?: string;
     q?: string;
     state?: string;
@@ -44,6 +57,7 @@ export default async function LettersPage({
   await issueDueLetterDrafts(await requestOrigin(), user.companyId);
   const draftsView = sp.view === "drafts";
   const kind = sp.kind === "warnings" ? "warnings" : isLetterKind(sp.kind || "") ? sp.kind! : "";
+  const group = !kind && isLetterGroup(sp.group || "") ? (sp.group as LetterGroup) : "";
   const state = ["unconfirmed", "pending", "cancelled"].includes(sp.state || "") ? sp.state! : "";
   const q = (sp.q || "").trim().slice(0, 100);
   const yearStart = new Date(Date.UTC(new Date().getFullYear(), 0, 1));
@@ -52,6 +66,7 @@ export default async function LettersPage({
   const and: Prisma.LetterWhereInput[] = [];
   if (kind === "warnings") and.push({ kind: { in: WARNING_KINDS } });
   else if (kind) and.push({ kind });
+  else if (group) and.push({ kind: { in: kindsInGroup(group) } });
   if (sp.employeeId) and.push({ employeeId: sp.employeeId });
   if (q) and.push({ OR: [{ refNo: { contains: q, mode: "insensitive" } }, { subject: { contains: q, mode: "insensitive" } }, { employee: { fullName: { contains: q, mode: "insensitive" } } }] });
   if (state === "unconfirmed") and.push({ acknowledgedAt: null, cancelledAt: null });
@@ -59,7 +74,7 @@ export default async function LettersPage({
   if (state === "cancelled") and.push({ cancelledAt: { not: null } });
   if (and.length) where.AND = and;
 
-  const [letters, employees, yearCount, warningsYear, unconfirmed, pendingCopies, drafts] = await Promise.all([
+  const [letters, employees, yearCount, kindYearCounts, unconfirmed, pendingCopies, drafts] = await Promise.all([
     prisma.letter.findMany({
       where: draftsView ? { id: "" } : where,
       include: { employee: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true } }, deliveries: { select: { status: true } } },
@@ -68,7 +83,11 @@ export default async function LettersPage({
     }),
     prisma.employee.findMany({ where: { companyId: user.companyId }, select: { id: true, fullName: true, nameEn: true }, orderBy: { fullName: "asc" } }),
     prisma.letter.count({ where: { companyId: user.companyId, issuedAt: { gte: yearStart }, cancelledAt: null } }),
-    prisma.letter.count({ where: { companyId: user.companyId, issuedAt: { gte: yearStart }, cancelledAt: null, kind: { in: WARNING_KINDS } } }),
+    prisma.letter.groupBy({
+      by: ["kind"],
+      where: { companyId: user.companyId, issuedAt: { gte: yearStart }, cancelledAt: null },
+      _count: { _all: true },
+    }),
     prisma.letter.count({ where: { companyId: user.companyId, acknowledgedAt: null, cancelledAt: null } }),
     prisma.letterDelivery.count({ where: { status: "PENDING", letter: { companyId: user.companyId, cancelledAt: null } } }),
     prisma.letterDraft.findMany({
@@ -77,6 +96,12 @@ export default async function LettersPage({
       take: 200,
     }),
   ]);
+  const groupYearCounts = Object.fromEntries(LETTER_GROUPS.map((key) => [key, 0])) as Record<LetterGroup, number>;
+  for (const row of kindYearCounts) {
+    const g = isLetterKind(row.kind) ? LETTER_KIND[row.kind].group : null;
+    if (g) groupYearCounts[g] += row._count._all;
+  }
+  const warningsYear = kindYearCounts.filter((row) => (WARNING_KINDS as readonly string[]).includes(row.kind)).reduce((sum, row) => sum + row._count._all, 0);
   const openDrafts = drafts.filter((draft) => draft.status !== "ISSUED").length;
   const draftNames = draftsView
     ? new Map(
@@ -87,7 +112,7 @@ export default async function LettersPage({
       )
     : new Map();
   const nameOf = (employee: { fullName: string; nameEn: string | null }) => (lang === "en" && employee.nameEn ? employee.nameEn : employee.fullName);
-  const filtered = Boolean(kind || sp.employeeId || q || state);
+  const filtered = Boolean(kind || group || sp.employeeId || q || state);
   const locale = lang === "en" ? "en" : "ar";
   const rows = letters
     .map((letter) => ({
@@ -154,6 +179,28 @@ export default async function LettersPage({
         />
       </div>
 
+      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {LETTER_GROUPS.map((key) => {
+          const meta = LETTER_GROUP[key];
+          const active = group === key;
+          return (
+            <Link
+              key={key}
+              href={active ? "/letters" : `/letters?group=${key}`}
+              className={`rounded-2xl px-3 py-3 ring-1 ring-inset transition ${
+                active ? "bg-teal-50 ring-teal-300" : "bg-surface ring-slate-200 hover:ring-teal-200"
+              }`}
+            >
+              <p className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <span dir="ltr">{meta.code}</span>
+                <span className="tabular text-base font-bold text-slate-900">{groupYearCounts[key]}</span>
+              </p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">{pick(meta.label, lang)}</p>
+            </Link>
+          );
+        })}
+      </div>
+
       {draftsView ? (
         <Card id="drafts" className="scroll-mt-20">
           <SectionTitle
@@ -216,13 +263,24 @@ export default async function LettersPage({
             </span>
           </label>
           <label className="min-w-0 space-y-1.5 text-xs font-medium text-slate-500">
-            {t("النوع", "Type")}
-            <select name="kind" defaultValue={kind} className={`${fieldClass} block w-full sm:w-auto`}>
+            {t("نوع المستند", "Document type")}
+            <select name="group" defaultValue={group} className={`${fieldClass} block w-full sm:w-auto`}>
+              <option value="">{t("الكل", "All")}</option>
+              {LETTER_GROUPS.map((value) => (
+                <option key={value} value={value}>
+                  {LETTER_GROUP[value].code} — {pick(LETTER_GROUP[value].label, lang)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-0 space-y-1.5 text-xs font-medium text-slate-500">
+            {t("النوع الفرعي", "Subtype")}
+            <select name="kind" defaultValue={kind === "warnings" ? "warnings" : kind} className={`${fieldClass} block w-full sm:w-auto`}>
               <option value="">{t("الكل", "All")}</option>
               <option value="warnings">{t("كل الإنذارات", "All warnings")}</option>
               {LETTER_KINDS.map((value) => (
                 <option key={value} value={value}>
-                  {pick(LETTER_KIND[value].label, lang)}
+                  {LETTER_GROUP[LETTER_KIND[value].group].code} · {pick(LETTER_KIND[value].label, lang)}
                 </option>
               ))}
             </select>
