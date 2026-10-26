@@ -4,7 +4,7 @@ import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { blanksIn } from "@/lib/letter-library";
-import { LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
+import { isLetterKind, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
 import type { DraftContent } from "@/lib/letter-drafts";
 import { formatCauseReason, type WarningCause } from "@/lib/oman-labour";
 import { cn } from "@/lib/utils";
@@ -151,40 +151,66 @@ export function LetterForm({
           <span className="block text-xs leading-5 text-slate-500">{t("عند اختيار أكثر من موظف يُصدر لكل منهم خطاب مستقل برقم خاص.", "With several employees, each one gets a separate letter with its own number.")}</span>
         </div>
         <input type="hidden" name="kind" value={kind} />
-        {(
-          [
-            ...WRITTEN_GROUPS.map((group) => [pick(group.label, lang), WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === group.key)] as const),
-            [t("شهادات وخطابات جاهزة (تُكتب تلقائياً من ملف الموظف)", "Ready certificates and letters (written from the employee's file)"), autoKinds],
-          ] as const
-        ).map(([heading, options]) => (
-          <div key={heading} className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500">{heading}</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {options.map((option) => {
-                const meta = LETTER_KIND[option];
-                const locked = Boolean(meta.salary) && !allowSalary;
-                const Icon = meta.warning || option === "NOTICE" ? TriangleAlert : meta.auto ? ScrollText : FileText;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={kind === option}
-                    disabled={locked}
-                    title={locked ? t("يحتاج صلاحية عرض الرواتب", "Needs the view-salaries permission") : undefined}
-                    onClick={() => chooseKind(option)}
-                    className={cn(
-                      "flex min-h-12 items-center gap-2 rounded-xl px-3 py-2 text-start text-sm font-semibold ring-1 ring-inset transition disabled:cursor-not-allowed disabled:opacity-50",
-                      kind === option ? "bg-teal-700 text-white ring-teal-700" : "bg-surface text-slate-700 ring-slate-200 hover:bg-slate-50",
-                    )}
+        <div className="space-y-3 rounded-2xl bg-slate-50/80 p-4 ring-1 ring-inset ring-slate-200">
+          <p className="text-xs font-semibold text-slate-500">{t("اختر نوع الخطاب من القسم المناسب", "Choose the letter type from the matching section")}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ...WRITTEN_GROUPS.map((group) => ({
+                  key: group.key,
+                  heading: pick(group.label, lang),
+                  options: WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === group.key),
+                  tone: group.key === "discipline" ? "warning" : "default",
+                })),
+                {
+                  key: "ready",
+                  heading: t("شهادات وخطابات جاهزة", "Ready certificates and letters"),
+                  options: autoKinds,
+                  tone: "ready" as const,
+                },
+              ] as const
+            ).map((section) => {
+              const active = section.options.includes(kind);
+              const Icon = section.tone === "warning" ? TriangleAlert : section.tone === "ready" ? ScrollText : FileText;
+              return (
+                <label key={section.key} className={cn("block space-y-1.5 rounded-xl bg-white p-3 ring-1 ring-inset transition", active ? "ring-teal-600 shadow-sm" : "ring-slate-200")}>
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                    <Icon size={14} className={section.tone === "warning" ? "text-orange-500" : "text-teal-700"} />
+                    {section.heading}
+                  </span>
+                  <select
+                    className={cn(fieldClass, "w-full", active && "font-semibold text-teal-900")}
+                    value={active ? kind : ""}
+                    aria-label={section.heading}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      if (isLetterKind(next)) chooseKind(next);
+                    }}
                   >
-                    <Icon size={16} className={cn("shrink-0", kind === option ? "text-white" : meta.warning || option === "NOTICE" ? "text-orange-500" : "text-teal-700")} />
-                    {pick(meta.label, lang)}
-                  </button>
-                );
-              })}
-            </div>
+                    <option value="">{active ? t("— غيّر النوع —", "— Change type —") : t("— اختر من هذه القائمة —", "— Choose from this list —")}</option>
+                    {section.options.map((option) => {
+                      const meta = LETTER_KIND[option];
+                      const locked = Boolean(meta.salary) && !allowSalary;
+                      return (
+                        <option key={option} value={option} disabled={locked}>
+                          {pick(meta.label, lang)}
+                          {locked ? t(" (يتطلب صلاحية الرواتب)", " (needs pay permission)") : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              );
+            })}
           </div>
-        ))}
+          <p className="flex items-center gap-2 text-sm text-slate-700">
+            <span className="text-slate-500">{t("المختار الآن:", "Selected:")}</span>
+            <span className="inline-flex items-center gap-1.5 font-bold text-teal-900">
+              {LETTER_KIND[kind].warning || kind === "NOTICE" ? <TriangleAlert size={15} className="text-orange-500" /> : LETTER_KIND[kind].auto ? <ScrollText size={15} className="text-teal-700" /> : <FileText size={15} className="text-teal-700" />}
+              {pick(LETTER_KIND[kind].label, lang)}
+            </span>
+          </p>
+        </div>
         {single && (LETTER_KIND[kind].warning || kind === "NOTICE") ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
             <span>
