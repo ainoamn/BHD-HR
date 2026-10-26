@@ -4,7 +4,7 @@ import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { blanksIn } from "@/lib/letter-library";
-import { isLetterKind, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterKind } from "@/lib/letters";
+import { isLetterKind, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningKind, WRITTEN_GROUPS, WRITTEN_KINDS, type LetterGroup, type LetterKind } from "@/lib/letters";
 import type { DraftContent } from "@/lib/letter-drafts";
 import { formatCauseReason, type WarningCause } from "@/lib/oman-labour";
 import { cn, parseDateInput } from "@/lib/utils";
@@ -78,13 +78,38 @@ export function LetterForm({
   const saved = savedDraft?.content;
   const [selected, setSelected] = useState<string[]>(defaultEmployeeIds);
   const [kind, setKind] = useState<LetterKind>(defaultKind);
+  const [category, setCategory] = useState<LetterGroup>(LETTER_KIND[defaultKind].group);
   const [reason, setReason] = useState(request?.details || "");
   const fillTpl = (text: string, detail: string) => text.replaceAll("{reason}", detail.trim() || "…………");
   const initialTpl = LETTER_TEMPLATES[defaultKind];
   const [subject, setSubject] = useState(saved ? saved.subject : request?.subject || fillTpl(initialTpl.subject, request?.details || ""));
   const [subjectEn, setSubjectEn] = useState(saved ? saved.subjectEn : fillTpl(initialTpl.subjectEn, request?.details || ""));
   const auto = Boolean(LETTER_KIND[kind].auto);
-  const autoKinds = LETTER_KINDS.filter((option) => LETTER_KIND[option].auto);
+  const kindSections = useMemo(() => {
+    const ready = LETTER_KINDS.filter((option) => LETTER_KIND[option].auto);
+    return [
+      ...WRITTEN_GROUPS.map((group) => ({
+        key: group.key as LetterGroup,
+        heading: pick(group.label, lang),
+        hint:
+          group.key === "discipline"
+            ? t("إنذار، لفت نظر، تحقيق، خصم…", "Warning, notice, hearing, deduction…")
+            : group.key === "recognition"
+              ? t("شكر، تهنئة، ترحيب، تعزية…", "Thanks, congratulations, welcome, condolences…")
+              : group.key === "career"
+                ? t("ترقية، راتب، عقد، إنهاء…", "Promotion, pay, contract, termination…")
+                : t("إجازة، تعميم، تذكير، خطاب…", "Leave, circular, reminder, letter…"),
+        options: WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === group.key),
+      })),
+      {
+        key: "ready" as LetterGroup,
+        heading: t("شهادات وخطابات جاهزة", "Ready certificates and letters"),
+        hint: t("شهادة راتب، خبرة، عدم ممانعة…", "Salary, experience, NOC…"),
+        options: ready,
+      },
+    ];
+  }, [lang, t]);
+  const categoryOptions = kindSections.find((section) => section.key === category)?.options ?? [];
   const [body, setBody] = useState(saved?.body || (LETTER_KIND[defaultKind].auto ? "" : fillTpl(initialTpl.body, request?.details || "")));
   const [bodyEn, setBodyEn] = useState(saved?.bodyEn || (LETTER_KIND[defaultKind].auto ? "" : fillTpl(initialTpl.bodyEn, request?.details || "")));
   const [scheduleDate, setScheduleDate] = useState(savedDraft?.scheduleDate || "");
@@ -111,6 +136,7 @@ export function LetterForm({
 
   const chooseKind = (next: LetterKind) => {
     setKind(next);
+    setCategory(LETTER_KIND[next].group);
     if (LETTER_KIND[next].auto) {
       setSubject("");
       setSubjectEn("");
@@ -123,6 +149,13 @@ export function LetterForm({
     setSubjectEn(fillTpl(tpl.subjectEn, reason));
     setBody(fillTpl(tpl.body, reason));
     setBodyEn(fillTpl(tpl.bodyEn, reason));
+  };
+
+  const chooseCategory = (next: LetterGroup) => {
+    setCategory(next);
+    const options = kindSections.find((section) => section.key === next)?.options ?? [];
+    const first = options.find((option) => !(LETTER_KIND[option].salary && !allowSalary));
+    if (first) chooseKind(first);
   };
 
   const applyCause = (cause: WarningCause | null, reasonAr: string) => {
@@ -258,61 +291,55 @@ export function LetterForm({
         </div>
         <input type="hidden" name="kind" value={kind} />
         <div className="space-y-3 rounded-2xl bg-slate-50/80 p-4 ring-1 ring-inset ring-slate-200">
-          <p className="text-xs font-semibold text-slate-500">{t("اختر نوع الخطاب من القسم المناسب", "Choose the letter type from the matching section")}</p>
+          <p className="text-xs font-semibold text-slate-500">{t("اختر نوع المستند ثم النوع الفرعي", "Choose the document type, then the subtype")}</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ...WRITTEN_GROUPS.map((group) => ({
-                  key: group.key,
-                  heading: pick(group.label, lang),
-                  options: WRITTEN_KINDS.filter((option) => LETTER_KIND[option].group === group.key),
-                  tone: group.key === "discipline" ? "warning" : "default",
-                })),
-                {
-                  key: "ready",
-                  heading: t("شهادات وخطابات جاهزة", "Ready certificates and letters"),
-                  options: autoKinds,
-                  tone: "ready" as const,
-                },
-              ] as const
-            ).map((section) => {
-              const active = section.options.includes(kind);
-              const Icon = section.tone === "warning" ? TriangleAlert : section.tone === "ready" ? ScrollText : FileText;
-              return (
-                <label key={section.key} className={cn("block space-y-1.5 rounded-xl bg-white p-3 ring-1 ring-inset transition", active ? "ring-teal-600 shadow-sm" : "ring-slate-200")}>
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                    <Icon size={14} className={section.tone === "warning" ? "text-orange-500" : "text-teal-700"} />
+            <Field
+              label={t("١. نوع المستند *", "1. Document type *")}
+              hint={kindSections.find((section) => section.key === category)?.hint}
+            >
+              <select
+                className={fieldClass}
+                value={category}
+                aria-label={t("نوع المستند", "Document type")}
+                onChange={(event) => chooseCategory(event.target.value as LetterGroup)}
+              >
+                {kindSections.map((section) => (
+                  <option key={section.key} value={section.key}>
                     {section.heading}
-                  </span>
-                  <select
-                    className={cn(fieldClass, "w-full", active && "font-semibold text-teal-900")}
-                    value={active ? kind : ""}
-                    aria-label={section.heading}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      if (isLetterKind(next)) chooseKind(next);
-                    }}
-                  >
-                    <option value="">{active ? t("— غيّر النوع —", "— Change type —") : t("— اختر من هذه القائمة —", "— Choose from this list —")}</option>
-                    {section.options.map((option) => {
-                      const meta = LETTER_KIND[option];
-                      const locked = Boolean(meta.salary) && !allowSalary;
-                      return (
-                        <option key={option} value={option} disabled={locked}>
-                          {pick(meta.label, lang)}
-                          {locked ? t(" (يتطلب صلاحية الرواتب)", " (needs pay permission)") : ""}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
-              );
-            })}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("٢. النوع الفرعي *", "2. Subtype *")}>
+              <select
+                className={cn(fieldClass, "font-semibold text-teal-900")}
+                value={categoryOptions.includes(kind) ? kind : ""}
+                aria-label={t("النوع الفرعي", "Subtype")}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  if (isLetterKind(next)) chooseKind(next);
+                }}
+              >
+                {!categoryOptions.includes(kind) ? <option value="">{t("— اختر النوع الفرعي —", "— Choose subtype —")}</option> : null}
+                {categoryOptions.map((option) => {
+                  const meta = LETTER_KIND[option];
+                  const locked = Boolean(meta.salary) && !allowSalary;
+                  return (
+                    <option key={option} value={option} disabled={locked}>
+                      {pick(meta.label, lang)}
+                      {locked ? t(" (يتطلب صلاحية الرواتب)", " (needs pay permission)") : ""}
+                    </option>
+                  );
+                })}
+              </select>
+            </Field>
           </div>
-          <p className="flex items-center gap-2 text-sm text-slate-700">
+          <p className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
             <span className="text-slate-500">{t("المختار الآن:", "Selected:")}</span>
             <span className="inline-flex items-center gap-1.5 font-bold text-teal-900">
               {LETTER_KIND[kind].warning || kind === "NOTICE" ? <TriangleAlert size={15} className="text-orange-500" /> : LETTER_KIND[kind].auto ? <ScrollText size={15} className="text-teal-700" /> : <FileText size={15} className="text-teal-700" />}
+              {kindSections.find((section) => section.key === category)?.heading}
+              <span className="font-normal text-slate-400">/</span>
               {pick(LETTER_KIND[kind].label, lang)}
             </span>
           </p>
