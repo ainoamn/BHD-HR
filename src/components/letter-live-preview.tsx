@@ -27,8 +27,8 @@ export function LetterLivePreview({
       <p className="text-xs leading-5 text-slate-500">
         {t("الرقم المرجعي والتوقيع الإلكتروني ورمز QR تُضاف عند الإصدار الفعلي.", "The reference number, e-signature and QR are added when you issue.")}
       </p>
-      <div className="overflow-auto rounded-2xl bg-slate-200/60 p-2 ring-1 ring-inset ring-slate-300 max-h-[min(70vh,52rem)]">
-        <div className="mx-auto w-full max-w-[22rem] origin-top scale-[0.92] sm:max-w-none sm:scale-100">
+      <div className="overflow-auto rounded-2xl bg-slate-200/70 p-3 ring-1 ring-inset ring-slate-300 max-h-[min(85vh,64rem)]">
+        <div className="mx-auto w-full max-w-[48rem]">
           <LetterSheet letter={letter} header={header} seal={null} />
         </div>
       </div>

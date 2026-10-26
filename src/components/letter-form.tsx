@@ -280,7 +280,7 @@ export function LetterForm({
     <form action={action} className="space-y-6">
       {request ? <input type="hidden" name="requestId" value={request.id} /> : null}
       {savedDraft ? <input type="hidden" name="draftId" value={savedDraft.id} /> : null}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(17rem,24rem)_minmax(0,1fr)]">
       <div className="min-w-0 space-y-6">
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-slate-800">{t("١. الموظف ونوع الخطاب", "1. Employee and letter type")}</h2>
@@ -615,7 +615,7 @@ export function LetterForm({
       </div>
       </div>
 
-      <aside className="min-w-0 xl:sticky xl:top-4 xl:self-start">
+      <aside className="min-w-0 lg:sticky lg:top-3 lg:self-start">
         <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
           <LetterLivePreview
             letter={previewLetter}
