@@ -30,3 +30,6 @@ blob-report
 tmp-*
 .vercel
 .neon
+
+.tmp/
+
