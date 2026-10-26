@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Tr } from "@/components/ai-translate";
 import { AccountCard } from "@/components/account-card";
+import { EmployeeTransferCard } from "@/components/employee-transfer-card";
 import { Flash } from "@/components/flash";
+import { previewTransferNumber } from "@/lib/employee-transfer";
 import { LeaveRangeForm } from "@/components/leave-range-form";
 import { SubmitButton } from "@/components/submit-button";
 import { Card, InfoItem as Info, SectionTitle, ToneBadge, fieldClass, linkAction, primaryBtn, secondaryBtn } from "@/components/ui";
@@ -105,7 +107,9 @@ export default async function EmployeePage({
       salaries: { orderBy: [{ year: "desc" }, { month: "desc" }] },
       allowances: { include: { allowanceType: true }, orderBy: { createdAt: "asc" } },
       manager: { select: { id: true, fullName: true, nameEn: true } },
-      reports: { where: { status: { not: "TERMINATED" } }, select: { id: true, fullName: true, nameEn: true }, orderBy: { fullName: "asc" } },
+      reports: { where: { status: { notIn: ["TERMINATED", "TRANSFERRED"] } }, select: { id: true, fullName: true, nameEn: true }, orderBy: { fullName: "asc" } },
+      transferredTo: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true, employer: { select: { name: true } } } },
+      transferredFrom: { select: { id: true, fullName: true, nameEn: true, employeeNumber: true, employer: { select: { name: true } } } },
       clockEntries: { orderBy: { day: "desc" }, take: 31 },
       _count: { select: { leaveRequests: { where: { status: "PENDING" } } } },
     },
@@ -135,6 +139,29 @@ export default async function EmployeePage({
     assets: can(user, "assets.view"),
     expenses: can(user, "expenses.view"),
   };
+  const transferEmployers =
+    allow.edit && employee.status !== "TRANSFERRED"
+      ? await Promise.all(
+          (
+            await prisma.employer.findMany({
+              where: { companyId: user.companyId },
+              select: { id: true, name: true, nameEn: true },
+              orderBy: { name: "asc" },
+            })
+          ).map(async (row) => ({
+            id: row.id,
+            name: lang === "en" && row.nameEn ? row.nameEn : row.name,
+            nextNumber: await previewTransferNumber(user.companyId, row.id),
+          })),
+        )
+      : [];
+  if (allow.edit && employee.status !== "TRANSFERRED") {
+    transferEmployers.unshift({
+      id: "",
+      name: t("بدون كفيل", "No sponsor"),
+      nextNumber: await previewTransferNumber(user.companyId, null),
+    });
+  }
   const warningSince = new Date(Date.now() - WARNING_LOOKBACK_DAYS * 86400000);
   const [notes, employeeTasks, taskEmployees, letters, openRequests] = await Promise.all([
     allow.tasks
@@ -1090,9 +1117,43 @@ export default async function EmployeePage({
             user={user}
             kind="employee"
             personId={employee.id}
-            person={{ name: employee.fullName, email: employee.email, phone: employee.phone, active: employee.status !== "TERMINATED" }}
+            person={{ name: employee.fullName, email: employee.email, phone: employee.phone, active: employee.status !== "TERMINATED" && employee.status !== "TRANSFERRED" }}
             hasReports={employee.reports.length > 0}
           />
+          {employee.status === "TRANSFERRED" && employee.transferredTo ? (
+            <Card className="border-orange-100 bg-orange-50/40">
+              <p className="text-sm font-bold text-orange-950">{t("منقول إلى ملف آخر", "Transferred to another file")}</p>
+              <p className="mt-1 text-xs leading-5 text-orange-900/90">
+                {t("هذا الملف يحفظ السجل المالي السابق. الملف النشط:", "This file keeps the previous financial history. Active file:")}
+              </p>
+              <Link href={`/employees/${employee.transferredTo.id}`} className={`${linkAction} mt-2 inline-flex`}>
+                {employee.transferredTo.employeeNumber}
+                {employee.transferredTo.employer ? ` · ${employee.transferredTo.employer.name}` : ""}
+              </Link>
+            </Card>
+          ) : null}
+          {employee.transferredFrom ? (
+            <Card className="border-slate-200 bg-slate-50/60">
+              <p className="text-sm font-bold text-slate-800">{t("نُقل من ملف سابق", "Moved from a previous file")}</p>
+              <Link href={`/employees/${employee.transferredFrom.id}`} className={`${linkAction} mt-2 inline-flex`}>
+                {employee.transferredFrom.employeeNumber}
+                {employee.transferredFrom.employer ? ` · ${employee.transferredFrom.employer.name}` : ""}
+                {" · "}
+                {t("منقول", "Transferred")}
+              </Link>
+            </Card>
+          ) : null}
+          {allow.edit && employee.status !== "TRANSFERRED" && employee.status !== "TERMINATED" ? (
+            <Card id="transfer" className="scroll-mt-24">
+              <EmployeeTransferCard
+                employeeId={employee.id}
+                currentEmployerId={employee.employerId}
+                currentEmployerName={employerName}
+                currentNumber={employee.employeeNumber}
+                employers={transferEmployers}
+              />
+            </Card>
+          ) : null}
           {allow.edit ? (
             <Card id="portal" className="scroll-mt-24">
               <SectionTitle

@@ -370,6 +370,10 @@ model Employee {
   managerId          String?
   manager            Employee?           @relation("ReportsTo", fields: [managerId], references: [id], onDelete: SetNull)
   reports            Employee[]          @relation("ReportsTo")
+  /// After a sponsor-to-sponsor transfer: the old file points here; the new file has `transferredFromId`.
+  transferredToId    String?             @unique
+  transferredTo      Employee?           @relation("EmployeeTransfer", fields: [transferredToId], references: [id], onDelete: SetNull)
+  transferredFrom    Employee?           @relation("EmployeeTransfer")
   /// Own work schedule; empty = the company's default schedule.
   scheduleId         String?
   schedule           WorkSchedule?       @relation(fields: [scheduleId], references: [id], onDelete: SetNull)

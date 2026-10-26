@@ -605,6 +605,7 @@ sequenceDiagram
 - كل استعلام يقيّد بـ `companyId` من الجلسة: مباشرة (`Employee`، `Employer`، `Reminder`، `Salary`، `StoredFile`، `AuditLog`) أو عبر الموظف (`Attendance`، `EmployeeDocument`، `LeaveCredit`). الوصول بالمعرّف من منشأة أخرى يعطي «غير موجود».
 - `/files/<name>` يتحقق من `companyId` للملف. التنبيهات والتقويم والتقارير وسجل العمليات كلها للمنشأة النشطة فقط.
 - رقم الموظف تسلسله لكل كفيل (شركة) داخل المنشأة بصيغة `{employeeCode}-0001` (`numberScope` + `nextEmployeeNumber` / `rebuildEmployerEmployeeNumbers`)؛ رقم الإيصال تسلسله لكل منشأة.
+- **نقل بين الكفلاء** (`transferEmployeeToEmployer`، §83): الملف القديم يبقى عند كفيله برقمه وحالة `TRANSFERRED` مع الرواتب والحضور؛ ملف جديد بالبيانات الشخصية فقط و`transferredToId` يربطهما؛ لا ترحيل مالي.
 - مستخدم في أكثر من منشأة يرى قائمة منسدلة في الرأس للتبديل (`switchCompany` يرفض أي منشأة ليست من عضوياته). الكوكي `hr_company` تُكتب فقط عند التبديل وتُمسح عند الدخول والخروج.
 - إزالة عضو تقطع وصوله فوراً. إن لم تبقَ له أي عضوية تُنشأ له منشأته الخاصة في دخوله التالي.
 

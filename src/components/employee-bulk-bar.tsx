@@ -52,7 +52,10 @@ export function EmployeeBulkBar({
     op === "status"
       ? t(`تغيير حالة ${count} موظف؟`, `Change the status of ${count} employee(s)?`)
       : op === "employer"
-        ? t(`تغيير كفيل ${count} موظف؟`, `Change the sponsor of ${count} employee(s)?`)
+        ? t(
+            `نقل ${count} موظف إلى كفيل آخر؟ يُنشأ ملف جديد لكل منهم بلا رواتب سابقة، والملف الحالي يُعلَّم «منقول».`,
+            `Transfer ${count} employee(s) to another sponsor? Each gets a new file without past payroll; the current file is marked “Transferred”.`,
+          )
         : op === "schedule"
           ? t(`تغيير جدول دوام ${count} موظف؟`, `Change the schedule of ${count} employee(s)?`)
           : undefined;
@@ -70,7 +73,7 @@ export function EmployeeBulkBar({
         {canEdit ? (
           <>
             <option value="status">{t("تغيير الحالة", "Change status")}</option>
-            <option value="employer">{t("تغيير الكفيل", "Change sponsor")}</option>
+            <option value="employer">{t("نقل إلى كفيل / شركة", "Transfer to sponsor / company")}</option>
             {schedules.length ? <option value="schedule">{t("تغيير جدول الدوام", "Change work schedule")}</option> : null}
             <option value="accounts">{t("فتح حسابات دخول لمن ليس له حساب", "Open sign-in accounts for those without")}</option>
           </>

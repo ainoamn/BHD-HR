@@ -20,14 +20,24 @@ export const STATUS_LABEL: Record<string, Bi> = {
   INACTIVE: { ar: "غير نشط", en: "Inactive" },
   VACATION: { ar: "إجازة", en: "On leave" },
   TERMINATED: { ar: "منتهي الخدمة", en: "Terminated" },
+  /** Kept on the previous sponsor after a transfer; financial history stays on this file. */
+  TRANSFERRED: { ar: "منقول", en: "Transferred" },
 };
 
-export const STATUS_TONE: Record<string, "green" | "amber" | "slate" | "red"> = {
+export const STATUS_TONE: Record<string, "green" | "amber" | "slate" | "red" | "orange"> = {
   ACTIVE: "green",
   VACATION: "amber",
   INACTIVE: "slate",
   TERMINATED: "red",
+  TRANSFERRED: "orange",
 };
+
+/** Service ended for headcount / payroll / org: terminated or transferred to another sponsor. */
+export const ENDED_EMPLOYEE_STATUSES = ["TERMINATED", "TRANSFERRED"] as const;
+
+export function isEndedEmployeeStatus(status: string) {
+  return (ENDED_EMPLOYEE_STATUSES as readonly string[]).includes(status);
+}
 
 export const GENDER_LABEL: Record<string, Bi> = {
   MALE: { ar: "ذكر", en: "Male" },

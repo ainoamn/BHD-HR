@@ -9,6 +9,7 @@ import { readIds } from "@/lib/employee-filter";
 import { openMissingEmployeeAccounts } from "@/server/account-actions";
 import { readAllowanceRows, readEmployeeInput, readLeaveDays } from "@/lib/employee-input";
 import { employeeNumberScope, nextEmployeeNumber } from "@/lib/employee-number";
+import { transferEmployeeToEmployer } from "@/lib/employee-transfer";
 import { getHrCatalog } from "@/lib/hr-catalog";
 import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
@@ -290,6 +291,59 @@ export async function updateEmployee(formData: FormData) {
   go(`/employees/${id}`, { message: t("تم حفظ البيانات", "Saved") });
 }
 
+/** Move the employee to another sponsor: old file stays TRANSFERRED with financial history; new file gets personal data only. */
+export async function transferEmployee(formData: FormData) {
+  const user = await requirePermission("employees.edit", "/employees");
+  const { t } = await getI18n();
+  const id = req(formData, "id");
+  const back = `/employees/${id}`;
+  const value = str(formData, "employerId");
+  const toEmployerId = value ? value : null;
+  if (toEmployerId) {
+    const employer = await prisma.employer.findFirst({ where: { id: toEmployerId, companyId: user.companyId }, select: { id: true } });
+    if (!employer) go(back, { error: t("الكفيل غير موجود", "Sponsor not found") });
+  }
+  const room = await fitsLimit(user.companyId, "employees");
+  if (!room.ok) go(back, { error: limitMessage("employees", room, t) });
+  try {
+    const result = await transferEmployeeToEmployer({ companyId: user.companyId, employeeId: id, toEmployerId });
+    if (result.unchanged) go(back, { error: t("اختر كفيلاً مختلفاً عن الحالي", "Choose a sponsor different from the current one") });
+    await writeAudit({
+      userId: user.id,
+      employeeId: result.toEmployeeId,
+      action: "EMPLOYEE_TRANSFER",
+      message: t(
+        `نقل ${result.fullName} من ${result.fromEmployerName || "بدون كفيل"} (${result.oldNumber}) إلى ${result.toEmployerName || "بدون كفيل"} (${result.newNumber}) — الملف السابق منقول بلا ترحيل مالي`,
+        `Transferred ${result.fullName} from ${result.fromEmployerName || "no sponsor"} (${result.oldNumber}) to ${result.toEmployerName || "no sponsor"} (${result.newNumber}) — previous file kept without financial carry-over`,
+      ),
+    });
+    await writeAudit({
+      userId: user.id,
+      employeeId: result.fromEmployeeId,
+      action: "EMPLOYEE_TRANSFER",
+      message: t(
+        `عُلّم منقولاً إلى ${result.newNumber} / ${result.toEmployerName || "بدون كفيل"}`,
+        `Marked transferred to ${result.newNumber} / ${result.toEmployerName || "no sponsor"}`,
+      ),
+    });
+    refreshAll();
+    go(`/employees/${result.toEmployeeId}`, {
+      message: t(
+        `تم النقل. الملف الجديد ${result.newNumber}. الملف السابق «منقول» برقمه ${result.oldNumber} مع سجله المالي.`,
+        `Transferred. New file ${result.newNumber}. Previous file is “Transferred” as ${result.oldNumber} with its financial history.`,
+      ),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "already_transferred") {
+      go(back, { error: t("هذا الموظف منقول مسبقاً", "This employee was already transferred") });
+    }
+    if (error instanceof Error && error.message === "employee_not_found") {
+      go("/employees", { error: t("الموظف غير موجود", "Employee not found") });
+    }
+    throw error;
+  }
+}
+
 /** Retires the QR code on the employee's current card (lost or stolen); the old code then opens "not valid". */
 export async function renewBadgeToken(formData: FormData) {
   const user = await requirePermission("employees.edit", "/employees");
@@ -369,11 +423,29 @@ export async function bulkEmployees(formData: FormData) {
     ]);
     label = STATUS_LABEL[status].ar;
   } else if (op === "employer") {
-    const value = req(formData, "employerId");
-    const employer = value ? await prisma.employer.findFirst({ where: { id: value, companyId: user.companyId }, select: { id: true, name: true } }) : null;
-    if (value && !employer) go(back, { error: t("الكفيل غير موجود", "Sponsor not found") });
-    await prisma.employee.updateMany({ where: { companyId: user.companyId, id: { in: employees.map((employee) => employee.id) } }, data: { employerId: employer?.id ?? null } });
-    label = employer ? `الكفيل ${employer.name}` : "بدون كفيل";
+    const value = str(formData, "employerId");
+    const toEmployerId = value || null;
+    const employer = toEmployerId ? await prisma.employer.findFirst({ where: { id: toEmployerId, companyId: user.companyId }, select: { id: true, name: true } }) : null;
+    if (toEmployerId && !employer) go(back, { error: t("الكفيل غير موجود", "Sponsor not found") });
+    const transferable = employees.filter((employee) => employee.status !== "TRANSFERRED" && (employee.employerId || null) !== toEmployerId);
+    const room = await fitsLimit(user.companyId, "employees", transferable.length);
+    if (!room.ok) go(back, { error: limitMessage("employees", room, t) });
+    let moved = 0;
+    for (const employee of transferable) {
+      const result = await transferEmployeeToEmployer({ companyId: user.companyId, employeeId: employee.id, toEmployerId });
+      if (!result.unchanged) {
+        moved += 1;
+        await writeAudit({
+          userId: user.id,
+          employeeId: result.toEmployeeId,
+          action: "EMPLOYEE_TRANSFER",
+          message: `نقل جماعي: ${result.fullName} ${result.oldNumber} → ${result.newNumber}`,
+        });
+      }
+    }
+    label = employer ? `نقل إلى ${employer.name} (${moved})` : `نقل بلا كفيل (${moved})`;
+    refreshAll();
+    go(back, { message: t(`نُقل ${moved} موظف إلى ${employer?.name || "بدون كفيل"}`, `Transferred ${moved} employee(s) to ${employer?.name || "no sponsor"}`) });
   } else {
     const value = req(formData, "scheduleId");
     const schedule = value ? await prisma.workSchedule.findFirst({ where: { id: value, companyId: user.companyId }, select: { id: true, name: true } }) : null;

@@ -181,11 +181,11 @@ export async function requireAdmin(back = "/settings") {
 export const teamEmployeeIds = cache(async (companyId: string, role: string, employeeId: string | null, employerId: string | null) => {
   if (role === "EMPLOYER") {
     if (!employerId) return [];
-    const rows = await prisma.employee.findMany({ where: { companyId, employerId, status: { not: "TERMINATED" } }, select: { id: true } });
+    const rows = await prisma.employee.findMany({ where: { companyId, employerId, status: { notIn: ["TERMINATED", "TRANSFERRED"] } }, select: { id: true } });
     return rows.map((row) => row.id);
   }
   if (role !== "TEAM_MANAGER" || !employeeId) return [];
-  const all = await prisma.employee.findMany({ where: { companyId, status: { not: "TERMINATED" } }, select: { id: true, managerId: true } });
+  const all = await prisma.employee.findMany({ where: { companyId, status: { notIn: ["TERMINATED", "TRANSFERRED"] } }, select: { id: true, managerId: true } });
   const found = new Set<string>();
   let frontier = [employeeId];
   while (frontier.length) {

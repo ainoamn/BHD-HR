@@ -123,9 +123,9 @@ export function aiLockedMessage(t: (ar: string, en: string) => string) {
   return t("مزايا الذكاء الاصطناعي غير مشمولة في باقتك. رقِّ الباقة من صفحة الاشتراك.", "AI features are not in your plan. Upgrade from the subscription page.");
 }
 
-/** Employees that count against the plan: everyone whose service has not ended. */
+/** Employees that count against the plan: everyone whose service has not ended (terminated or transferred). */
 export function countedEmployees(companyId: string) {
-  return prisma.employee.count({ where: { companyId, status: { not: "TERMINATED" } } });
+  return prisma.employee.count({ where: { companyId, status: { notIn: ["TERMINATED", "TRANSFERRED"] } } });
 }
 
 /** Seats that count against the plan: staff memberships, accepted or still invited. */
