@@ -132,9 +132,21 @@ export const WARNING_KINDS: LetterKind[] = ["WARNING_1", "WARNING_2", "FINAL_WAR
 /** Warnings stay on record for this long when choosing the next level. */
 export const WARNING_LOOKBACK_DAYS = 365;
 
+/**
+ * Same-clause recurrence window under MD 618/2024: after 6 months the violation counts as a first offence again.
+ */
+export const CLAUSE_REPEAT_DAYS = 180;
+
 /** The next escalation level after `count` active warnings in the look-back period. */
 export function nextWarningKind(count: number): LetterKind {
   return count <= 0 ? "WARNING_1" : count === 1 ? "WARNING_2" : "FINAL_WARNING";
+}
+
+/** Suggested letter kind for the next issuance of the same penalty clause. */
+export function nextKindForClause(priorKinds: string[], defaultKind: LetterKind): LetterKind {
+  const warnCount = priorKinds.filter((kind) => (WARNING_KINDS as readonly string[]).includes(kind)).length;
+  if (warnCount > 0 || (WARNING_KINDS as readonly string[]).includes(defaultKind)) return nextWarningKind(warnCount);
+  return defaultKind;
 }
 
 /** Starting text per kind; `{reason}` is replaced by what the user typed. */

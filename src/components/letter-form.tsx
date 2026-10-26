@@ -1,6 +1,7 @@
 "use client";
 
-import { Archive, BadgeCheck, CalendarClock, Eye, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { Archive, BadgeCheck, CalendarClock, CircleAlert, Eye, FileText, LoaderCircle, Mail, MessageCircle, ScrollText, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { pick } from "@/lib/i18n";
 import { blanksIn } from "@/lib/letter-library";
@@ -8,7 +9,7 @@ import { isLetterKind, LETTER_KIND, LETTER_KINDS, LETTER_TEMPLATES, nextWarningK
 import type { DraftContent } from "@/lib/letter-drafts";
 import { formatCauseReason, type WarningCause } from "@/lib/oman-labour";
 import { cn, parseDateInput } from "@/lib/utils";
-import { draftLetter, previewComposedLetter, type SavedLetterTemplate } from "@/server/letter-actions";
+import { draftLetter, lookupClauseHistory, previewComposedLetter, type ClauseHistoryItem, type SavedLetterTemplate } from "@/server/letter-actions";
 import type { DocHeader } from "./salary-docs";
 import { EmployeeMultiSelect } from "./employee-multi-select";
 import { useLang } from "./lang-provider";
@@ -125,9 +126,16 @@ export function LetterForm({
   const [ownTemplates, setOwnTemplates] = useState(companyTemplates);
   const [clauseCode, setClauseCode] = useState(saved?.clauseCode || "");
   const [occurrence, setOccurrence] = useState<1 | 2 | 3 | 4>(1);
+  const [clauseHistory, setClauseHistory] = useState<{
+    items: ClauseHistoryItem[];
+    suggestedOccurrence: 1 | 2 | 3 | 4;
+    suggestedKind: LetterKind;
+    lookbackDays: number;
+  } | null>(null);
   const [autoPreview, setAutoPreview] = useState<{ subject: string; subjectEn: string; body: string; bodyEn: string; addressee: string | null; error: string | null } | null>(null);
   const blanks = auto ? [] : blanksIn(subject, subjectEn, body, bodyEn);
   const showCauses = !auto && (LETTER_KIND[kind].group === "discipline" || LETTER_KIND[kind].warning);
+  const kindMismatch = Boolean(clauseHistory?.items.length && clauseHistory.suggestedKind !== kind);
 
   const chosen = employees.filter((employee) => selected.includes(employee.value));
   const single = chosen.length === 1 ? chosen[0] : null;
@@ -160,19 +168,45 @@ export function LetterForm({
     if (first) chooseKind(first);
   };
 
-  const applyCause = (cause: WarningCause | null, reasonAr: string) => {
+  const applyCause = (cause: WarningCause | null, reasonAr: string, opts?: { kind?: LetterKind; occurrence?: 1 | 2 | 3 | 4; silent?: boolean }) => {
     setClauseCode(cause?.code || "");
-    if (!cause) return;
-    setReason(reasonAr);
-    const nextKind = LETTER_KIND[cause.defaultKind] ? cause.defaultKind : kind;
+    if (!cause) {
+      setClauseHistory(null);
+      return;
+    }
+    const nextOcc = opts?.occurrence ?? occurrence;
+    if (opts?.occurrence) setOccurrence(opts.occurrence);
+    const nextKind = opts?.kind && LETTER_KIND[opts.kind] ? opts.kind : LETTER_KIND[cause.defaultKind] ? cause.defaultKind : kind;
+    const filled = reasonAr || formatCauseReason(cause, nextOcc).ar;
     const tpl = LETTER_TEMPLATES[nextKind];
-    const fill = (text: string) => text.replaceAll("{reason}", reasonAr);
+    const fill = (text: string) => text.replaceAll("{reason}", filled);
+    setReason(filled);
     setKind(nextKind);
+    setCategory(LETTER_KIND[nextKind].group);
     setSubject(fill(tpl.subject));
     setSubjectEn(fill(tpl.subjectEn));
     setBody(fill(tpl.body));
     setBodyEn(fill(tpl.bodyEn));
-    setNote({ tone: "ok", text: t("أُدرج المسبب في نص الإنذار. راجعه قبل الإصدار.", "The cause was placed in the warning text. Review it before issuing.") });
+    if (!opts?.silent) {
+      setNote({ tone: "ok", text: t("أُدرج المسبب في نص الإنذار. راجعه قبل الإصدار.", "The cause was placed in the warning text. Review it before issuing.") });
+    }
+  };
+
+  const applySuggestedCorrection = () => {
+    if (!clauseHistory || !clauseCode) return;
+    const cause = warningCauses.find((item) => item.code === clauseCode);
+    if (!cause) return;
+    applyCause(cause, formatCauseReason(cause, clauseHistory.suggestedOccurrence).ar, {
+      kind: clauseHistory.suggestedKind,
+      occurrence: clauseHistory.suggestedOccurrence,
+    });
+    setNote({
+      tone: "ok",
+      text: t(
+        `صُحّح إلى «${LETTER_KIND[clauseHistory.suggestedKind].label.ar}» والمرة ${clauseHistory.suggestedOccurrence} وفق السجل.`,
+        `Corrected to “${LETTER_KIND[clauseHistory.suggestedKind].label.en}”, occurrence ${clauseHistory.suggestedOccurrence}, from history.`,
+      ),
+    });
   };
 
   const prefilled = useRef(false);
@@ -184,6 +218,44 @@ export function LetterForm({
     applyCause(cause, formatCauseReason(cause, 1).ar);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot prefill from ?clause=
   }, [initialClauseCode, warningCauses]);
+
+  useEffect(() => {
+    if (!clauseCode || !single || !showCauses) {
+      setClauseHistory(null);
+      return;
+    }
+    const cause = warningCauses.find((item) => item.code === clauseCode);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void lookupClauseHistory({ employeeId: single.value, clauseCode, defaultKind: cause?.defaultKind }).then((result) => {
+        if (cancelled || result.error) return;
+        setClauseHistory({
+          items: result.items,
+          suggestedOccurrence: result.suggestedOccurrence,
+          suggestedKind: result.suggestedKind,
+          lookbackDays: result.lookbackDays,
+        });
+        if (!result.items.length || !cause) return;
+        applyCause(cause, formatCauseReason(cause, result.suggestedOccurrence).ar, {
+          kind: result.suggestedKind,
+          occurrence: result.suggestedOccurrence,
+          silent: true,
+        });
+        setNote({
+          tone: "ok",
+          text: t(
+            `تنبيه: وُجد إنذار سابق بنفس المخالفة — عُدّل تلقائياً إلى المرة ${result.suggestedOccurrence} و«${LETTER_KIND[result.suggestedKind].label.ar}».`,
+            `Note: a prior letter for the same clause was found — auto-set to occurrence ${result.suggestedOccurrence} and “${LETTER_KIND[result.suggestedKind].label.en}”.`,
+          ),
+        });
+      });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when employee/clause change; applyCause uses latest templates
+  }, [clauseCode, single?.value, showCauses]);
 
   useEffect(() => {
     if (!auto || !previewPerson) {
@@ -441,7 +513,60 @@ export function LetterForm({
       <section className="space-y-3 border-t border-slate-100 pt-5">
         <h2 className="text-sm font-bold text-slate-800">{t("٢. المحتوى", "2. Content")}</h2>
         {showCauses && warningCauses.length ? (
-          <WarningCausePicker causes={warningCauses} value={clauseCode} occurrence={occurrence} onSelect={applyCause} onOccurrence={setOccurrence} />
+          <WarningCausePicker
+            causes={warningCauses}
+            value={clauseCode}
+            occurrence={occurrence}
+            onSelect={(cause, reasonAr) => applyCause(cause, reasonAr, cause ? { occurrence: 1 } : undefined)}
+            onOccurrence={(n) => {
+              setOccurrence(n);
+              const cause = warningCauses.find((item) => item.code === clauseCode);
+              if (cause) applyCause(cause, formatCauseReason(cause, n).ar, { occurrence: n, kind, silent: true });
+            }}
+          />
+        ) : null}
+        {clauseHistory?.items.length ? (
+          <div className="space-y-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-inset ring-amber-300" role="status">
+            <p className="flex items-start gap-2 font-bold">
+              <CircleAlert size={18} className="mt-0.5 shrink-0 text-amber-700" />
+              <span>
+                {t(
+                  `تنبيه: مُنح هذا الموظف إنذاراً / جزاءً مشابهاً سابقاً (${clauseHistory.items.length}) خلال آخر ${clauseHistory.lookbackDays} يوماً لنفس بند اللائحة.`,
+                  `Alert: this employee already received a similar sanction (${clauseHistory.items.length}) in the last ${clauseHistory.lookbackDays} days for the same clause.`,
+                )}
+              </span>
+            </p>
+            <ul className="ms-7 space-y-1.5">
+              {clauseHistory.items.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                  <Link href={`/letters/${item.id}`} className="tabular font-bold text-teal-900 underline underline-offset-4" dir="ltr">
+                    {item.refNo}
+                  </Link>
+                  <span className="text-amber-900/80">· {item.issuedAtLabel}</span>
+                  <span className="font-semibold">· {pick({ ar: item.kindLabelAr, en: item.kindLabelEn }, lang)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="ms-7 text-xs leading-5 text-amber-900/90">
+              {t(
+                `المقترح الآن: المرة ${clauseHistory.suggestedOccurrence} — «${LETTER_KIND[clauseHistory.suggestedKind].label.ar}» (وفق القرار 618/2024: تُعد مخالفة أولى بعد مضي 6 أشهر).`,
+                `Suggested now: occurrence ${clauseHistory.suggestedOccurrence} — “${LETTER_KIND[clauseHistory.suggestedKind].label.en}” (under MD 618/2024 a repeat after 6 months counts as first).`,
+              )}
+            </p>
+            {kindMismatch ? (
+              <div className="ms-7 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-red-800">
+                  {t(
+                    `النوع الحالي «${LETTER_KIND[kind].label.ar}» لا يطابق السجل.`,
+                    `Current type “${LETTER_KIND[kind].label.en}” does not match the record.`,
+                  )}
+                </span>
+                <button type="button" onClick={applySuggestedCorrection} className="rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-bold text-white">
+                  {t("تصحيح تلقائي", "Auto-correct")}
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : null}
         <Field
           label={t("السبب أو التفاصيل", "Reason or details")}

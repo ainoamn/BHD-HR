@@ -8,7 +8,7 @@ import { go, refreshAll } from "@/lib/http";
 import { getI18n } from "@/lib/lang";
 import { composeLetters, issueComposed, muscatToday, OPEN_DRAFT, readDraftContent, readLetterForm, type DraftContent } from "@/lib/letter-drafts";
 import { copyTarget } from "@/lib/letter-issue";
-import { isLetterKind, LETTER_KIND, type LetterKind } from "@/lib/letters";
+import { CLAUSE_REPEAT_DAYS, isLetterKind, LETTER_KIND, nextKindForClause, type LetterKind } from "@/lib/letters";
 import { prisma } from "@/lib/prisma";
 import { aiLockedMessage, aiOpen } from "@/lib/subscription";
 import { lookupByToken } from "@/lib/rate-limit";
@@ -235,6 +235,68 @@ export async function sendPendingLetterCopies() {
   go("/settings#channels", {
     message: t(`أُرسلت ${result.sent} نسخة${result.failed ? `، وتعذر ${result.failed}` : ""}`, `Sent ${result.sent} copies${result.failed ? `, ${result.failed} failed` : ""}`),
   });
+}
+
+export type ClauseHistoryItem = {
+  id: string;
+  refNo: string;
+  issuedAt: string;
+  issuedAtLabel: string;
+  kind: string;
+  kindLabelAr: string;
+  kindLabelEn: string;
+};
+
+/** Prior letters for the same penalty clause on one employee (MD 618/2024: 6-month window). */
+export async function lookupClauseHistory(input: {
+  employeeId: string;
+  clauseCode: string;
+  defaultKind?: string;
+}): Promise<{
+  items: ClauseHistoryItem[];
+  suggestedOccurrence: 1 | 2 | 3 | 4;
+  suggestedKind: LetterKind;
+  lookbackDays: number;
+  error?: string;
+}> {
+  const baseKind = isLetterKind(input.defaultKind || "") ? (input.defaultKind as LetterKind) : "WARNING_1";
+  const empty = { items: [] as ClauseHistoryItem[], suggestedOccurrence: 1 as const, suggestedKind: baseKind, lookbackDays: CLAUSE_REPEAT_DAYS };
+  const user = await getSessionUser();
+  if (!user || !can(user, "letters.create")) return { ...empty, error: "denied" };
+  const clauseCode = String(input.clauseCode || "").trim().slice(0, 64);
+  const employeeId = String(input.employeeId || "").trim();
+  if (!clauseCode || !employeeId) return empty;
+  const since = new Date(Date.now() - CLAUSE_REPEAT_DAYS * 86400000);
+  const rows = await prisma.letter.findMany({
+    where: {
+      companyId: user.companyId,
+      employeeId,
+      clauseCode,
+      cancelledAt: null,
+      issuedAt: { gte: since },
+    },
+    select: { id: true, refNo: true, issuedAt: true, kind: true },
+    orderBy: { issuedAt: "desc" },
+    take: 12,
+  });
+  const items = rows.map((row) => {
+    const meta = isLetterKind(row.kind) ? LETTER_KIND[row.kind] : LETTER_KIND.GENERAL;
+    return {
+      id: row.id,
+      refNo: row.refNo,
+      issuedAt: row.issuedAt.toISOString(),
+      issuedAtLabel: formatDate(row.issuedAt),
+      kind: row.kind,
+      kindLabelAr: meta.label.ar,
+      kindLabelEn: meta.label.en,
+    };
+  });
+  const suggestedKind = nextKindForClause(
+    items.map((item) => item.kind),
+    baseKind,
+  );
+  const suggestedOccurrence = Math.min(4, Math.max(1, items.length + 1)) as 1 | 2 | 3 | 4;
+  return { items, suggestedOccurrence, suggestedKind, lookbackDays: CLAUSE_REPEAT_DAYS };
 }
 
 /** Live compose for the new-letter form preview (especially auto / certificate kinds). */
