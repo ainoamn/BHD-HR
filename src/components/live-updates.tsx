@@ -78,7 +78,35 @@ export function LiveUpdates({ source }: { source?: { portal: string } | { task: 
         }
         if (due) {
           if (inTheMiddleOfSomething()) setWaiting(true);
-          else refresh();
+          else {
+            // Another tab may have rebound the shared hr_session cookie. If this
+            // window's identity Bearer disagrees, skip soft refresh and let BhdSilentSso
+            // restore this tab — otherwise the UI jumps to the other account.
+            try {
+              const [idRes, localRes] = await Promise.all([
+                fetch("https://id.bhd-om.com/api/auth/me", {
+                  cache: "no-store",
+                  credentials: "include",
+                  headers: (() => {
+                    const h: Record<string, string> = { Accept: "application/json" };
+                    const token = sessionStorage.getItem("bhd_window_token");
+                    if (token) h.Authorization = `Bearer ${token}`;
+                    return h;
+                  })(),
+                }),
+                fetch("/api/auth/me", { cache: "no-store", credentials: "include" }),
+              ]);
+              const idBody = (await idRes.json().catch(() => ({}))) as { user?: { id?: string } | null };
+              const localBody = (await localRes.json().catch(() => ({}))) as { user?: { id?: string } | null };
+              if (idBody.user?.id && localBody.user?.id && idBody.user.id !== localBody.user.id) {
+                due = false;
+                return;
+              }
+            } catch {
+              /* offline — refresh as usual */
+            }
+            refresh();
+          }
         }
       }
       while (recent.length && Date.now() - recent[0] > 60_000) recent.shift();

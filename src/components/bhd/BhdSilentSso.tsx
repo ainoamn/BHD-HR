@@ -1,12 +1,20 @@
 "use client";
 
-import { applyAccountIsolation, clearAccountRebindLock, isAccountRebindPending, isIdentityOrigin, productStartPath } from "@/lib/identity/client";
+import {
+  applyAccountIsolation,
+  clearAccountRebindLock,
+  isAccountRebindPending,
+  isIdentityOrigin,
+  productStartPath,
+} from "@/lib/identity/client";
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import { useEffect } from "react";
 
 /**
- * Sole auto-binder when identity window ≠ product session (ONE-BHD BhdSilentSso).
- * Uses window-handoff → start. Guarded per identity sub so refresh cannot loop/flicker.
+ * Keep THIS tab bound to its window identity Bearer.
+ * Product cookies (hr_session) are shared across tabs — when another tab switches,
+ * LiveUpdates may refresh this tab onto the other account. Re-check on an interval
+ * and on visibility; if identity Bearer ≠ product session, rebind back to the Bearer.
  */
 export function BhdSilentSso() {
   useEffect(() => {
@@ -26,13 +34,14 @@ export function BhdSilentSso() {
       return;
     }
 
-    if (isAccountRebindPending()) return;
-
     let cancelled = false;
+    let timer = 0;
 
-    void loadBhdIdentity().then(async (identity) => {
-      if (cancelled || !identity) return;
+    async function reconcile() {
+      if (cancelled || isAccountRebindPending()) return;
       try {
+        const identity = await loadBhdIdentity();
+        if (cancelled || !identity) return;
         const { ok, body } = await identity.me();
         if (cancelled || !ok || !body.user?.id) {
           clearAccountRebindLock();
@@ -50,7 +59,7 @@ export function BhdSilentSso() {
 
         const guardKey = `bhd-sso:${body.user.id}`;
         const last = Number(sessionStorage.getItem(guardKey) || "0");
-        if (last && Date.now() - last < 15_000) return;
+        if (last && Date.now() - last < 8_000) return;
         sessionStorage.setItem(guardKey, String(Date.now()));
 
         if (!local.user?.id) {
@@ -59,14 +68,26 @@ export function BhdSilentSso() {
           return;
         }
 
+        // Drift: shared product cookie belongs to another tab's switch — restore THIS window.
         await applyAccountIsolation(body.token, { force: true });
       } catch {
         clearAccountRebindLock();
       }
-    });
+    }
+
+    void reconcile();
+    const onVis = () => {
+      if (!document.hidden) void reconcile();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    timer = window.setInterval(() => {
+      if (!document.hidden) void reconcile();
+    }, 4_000);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVis);
+      window.clearInterval(timer);
     };
   }, []);
 
