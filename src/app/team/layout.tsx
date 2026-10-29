@@ -3,6 +3,7 @@ import Link from "next/link";
 import { KeyRound, LifeBuoy, LogOut, UserRound, Users } from "lucide-react";
 import { TranslateToggle } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
+import { BhdPrivacyGate } from "@/components/bhd/BhdPrivacyGate";
 import { BhdSessionMenu } from "@/components/bhd/BhdSessionMenu";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { LangToggle } from "@/components/lang-provider";
@@ -27,6 +28,7 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-dvh bg-slate-50">
+      <BhdPrivacyGate productSub={user.bhdSub} productEmail={user.email} />
       <header className="relative overflow-hidden bg-gradient-to-l from-ink-900 to-teal-800 text-white">
         <div className="higher-horizon pointer-events-none absolute -bottom-12 end-0 h-48 w-80 bg-[length:100%] opacity-[0.1]" aria-hidden="true" />
         <div className="page-wide relative flex flex-wrap items-start justify-between gap-3 px-4 pb-5 pt-5 sm:px-6">

@@ -4,6 +4,7 @@ import { CreditCard, KeyRound, Megaphone } from "lucide-react";
 import { TranslateToggle } from "@/components/ai-translate";
 import { AiWriteAssist } from "@/components/ai-write";
 import { AppFrame } from "@/components/app-frame";
+import { BhdPrivacyGate } from "@/components/bhd/BhdPrivacyGate";
 import { BhdSessionMenu } from "@/components/bhd/BhdSessionMenu";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { SiteFooter } from "@/components/bhd/site-footer";
@@ -140,6 +141,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }
       footer={<SiteFooter locale={lang} />}
     >
+      <BhdPrivacyGate productSub={user.bhdSub} productEmail={user.email} />
       {user.memberships.length > 1 ? (
         <div className="no-print mb-4 md:hidden">
           <CompanySwitcher

@@ -76,6 +76,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <h1 className="mt-1.5 text-2xl font-bold tracking-tight sm:text-3xl">
               {t(`أهلاً بك، ${firstName}`, `Welcome back, ${firstName}`)}
             </h1>
+            <p className="mt-1 text-sm font-medium text-teal-200/90" dir="ltr">
+              {user.email}
+            </p>
             <p className="mt-2 max-w-xl text-sm leading-7 text-white/65">
               {t(`${companyName} — ملخص ${monthLabel} ${year}`, `${companyName} — ${monthLabel} ${year} at a glance`)}
               {urgent > 0 ? (

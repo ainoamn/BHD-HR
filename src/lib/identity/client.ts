@@ -1,6 +1,14 @@
 import { DEFAULT_IDENTITY_ISSUER } from "@/lib/bhd/identity-public";
 import { getCachedCatalogApps } from "@/lib/bhd/catalog";
-import { captureWindowToken, windowFetchHeaders } from "@/lib/identity/window-session";
+import {
+  boundWindowToken,
+  captureAccountToken,
+  captureWindowToken,
+  readActiveAu,
+  setActiveAu,
+  tokenForAccount,
+  windowFetchHeaders,
+} from "@/lib/identity/window-session";
 
 export function pageOrigin() {
   return typeof window === "undefined" ? "" : window.location.origin.replace(/\/$/, "");
@@ -32,8 +40,13 @@ export async function identityFetch(path: string, init?: RequestInit) {
   const clone = response.clone();
   void clone
     .json()
-    .then((data: { token?: unknown } | null) => {
-      if (data && typeof data.token === "string") captureWindowToken(data.token);
+    .then((data: { token?: unknown; user?: { id?: string } | null } | null) => {
+      if (!data || typeof data.token !== "string") return;
+      const sub = typeof data.user?.id === "string" ? data.user.id : readActiveAu();
+      // Only capture when we know which account the token belongs to — never thrash
+      // the window token with a different account after a Google-style switch.
+      if (sub) captureAccountToken(sub, data.token);
+      else captureWindowToken(data.token);
     })
     .catch(() => undefined);
   return response;
@@ -44,17 +57,30 @@ export function currentReturnPath() {
   return `${window.location.pathname}${window.location.search || ""}` || "/";
 }
 
-/** Bust bfcache / soft RSC so the rebound session always remounts server UI. */
-export function cacheBustReturnPath(returnTo = "/") {
+/**
+ * Google authuser-style return path: bind tab to `au=<sub>` and bust caches with `_bhd=`.
+ */
+export function accountBoundReturnPath(returnTo = "/", sub?: string | null) {
   const path = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
+  const au = (sub || readActiveAu() || "").trim();
   try {
     const url = new URL(path, "https://bhd.local");
     url.searchParams.delete("_bhd");
+    if (au) url.searchParams.set("au", au);
+    else url.searchParams.delete("au");
     url.searchParams.set("_bhd", String(Date.now()));
     return `${url.pathname}${url.search}`;
   } catch {
-    return path.includes("?") ? `${path}&_bhd=${Date.now()}` : `${path}?_bhd=${Date.now()}`;
+    const base = path.includes("?") ? path : `${path}?`;
+    const join = base.endsWith("?") || base.endsWith("&") ? "" : "&";
+    const auPart = au ? `au=${encodeURIComponent(au)}&` : "";
+    return `${path.includes("?") ? path : `${path}?`}${join}${auPart}_bhd=${Date.now()}`.replace("?&", "?");
   }
+}
+
+/** Bust bfcache / soft RSC so the rebound session always remounts server UI. */
+export function cacheBustReturnPath(returnTo = "/", sub?: string | null) {
+  return accountBoundReturnPath(returnTo, sub);
 }
 
 export function productStartPath(returnTo = "/") {
@@ -94,16 +120,32 @@ export function isAccountRebindPending() {
   return Number.isFinite(at) && Date.now() - at < 15_000;
 }
 
-function markIsolationPending() {
-  sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
+/** Full-viewport privacy veil — previous account pixels must never stay visible. */
+export function paintPrivacyVeil(message = "جاري عزل بيانات الحساب…") {
+  if (typeof document === "undefined") return;
   try {
     document.documentElement.dataset.bhdSwitching = "1";
+    let veil = document.getElementById("bhd-privacy-veil");
+    if (!veil) {
+      veil = document.createElement("div");
+      veil.id = "bhd-privacy-veil";
+      veil.setAttribute("role", "status");
+      veil.style.cssText =
+        "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#092d24;color:#fff;font:600 1rem/1.5 system-ui,sans-serif;padding:1.5rem;text-align:center";
+      document.body.appendChild(veil);
+    }
+    veil.textContent = message;
   } catch {
     /* ignore */
   }
 }
 
-function rebindWithWindowToken(token: string, returnTo: string) {
+function markIsolationPending() {
+  sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
+  paintPrivacyVeil();
+}
+
+function rebindWithWindowToken(token: string, returnTo: string, sub?: string | null) {
   const form = document.createElement("form");
   form.method = "POST";
   form.action = "/api/auth/bhd/rebind";
@@ -113,7 +155,7 @@ function rebindWithWindowToken(token: string, returnTo: string) {
   tokenInput.value = token;
   const returnInput = document.createElement("input");
   returnInput.name = "returnTo";
-  returnInput.value = cacheBustReturnPath(returnTo);
+  returnInput.value = accountBoundReturnPath(returnTo, sub);
   form.append(tokenInput, returnInput);
   document.body.appendChild(form);
   form.submit();
@@ -122,23 +164,34 @@ function rebindWithWindowToken(token: string, returnTo: string) {
 /**
  * Switch window identity Bearer only (no BhdIdentity.switchAccount auto-isolate).
  * Product isolation is always applyAccountIsolation afterward.
+ *
+ * Persists shared bhd_id (X-BHD-Persist-Cookie) so linked BHD apps open as this
+ * account — Google-style cross-app follow — while ?au= keeps other tabs bound.
  */
 export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; token?: string; userId?: string }> {
   if (!sub) return { ok: false };
+  paintPrivacyVeil();
   const response = await identityFetch("/api/auth/switch", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-BHD-Persist-Cookie": "1",
+    },
     body: JSON.stringify({ sub }),
   });
   const body = (await response.json().catch(() => ({}))) as {
     token?: string;
     user?: { id?: string } | null;
   };
-  if (typeof body.token === "string") captureWindowToken(body.token);
+  const userId = typeof body.user?.id === "string" ? body.user.id : sub;
+  if (typeof body.token === "string") {
+    captureAccountToken(userId, body.token);
+    setActiveAu(userId);
+  }
   return {
     ok: response.ok,
     token: typeof body.token === "string" ? body.token : undefined,
-    userId: body.user?.id,
+    userId,
   };
 }
 
@@ -146,26 +199,31 @@ export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; t
  * Bind this product tab to THIS window's identity account only.
  *
  * PRIMARY path: POST /api/auth/bhd/rebind with the window Bearer.
- * Why: Bearer switch does NOT rewrite shared `bhd_id`. OAuth `/start` without a handoff
- * ticket therefore issues a code for the *previous* shared cookie — product data stays,
- * while the window identity already shows the new account (privacy leak).
+ * Why: Bearer switch alone is not enough — product cookies must rewrite too.
  *
  * Handoff→start is only for bootstrap when no window token exists.
  */
-export async function applyAccountIsolation(token?: string | null, options?: { force?: boolean }) {
+export async function applyAccountIsolation(
+  token?: string | null,
+  options?: { force?: boolean; sub?: string | null },
+) {
   if (typeof window === "undefined") return;
   if (!options?.force && isAccountRebindPending()) return;
+  const sub = (options?.sub || readActiveAu() || "").trim();
+  if (sub) setActiveAu(sub);
   const here = currentReturnPath();
   if (isIdentityOrigin()) {
-    window.location.reload();
+    const next = accountBoundReturnPath(here, sub);
+    window.location.assign(next);
     return;
   }
   markIsolationPending();
-  const windowToken = token || sessionStorage.getItem("bhd_window_token") || "";
+  const windowToken =
+    token || (sub ? tokenForAccount(sub) : "") || boundWindowToken() || sessionStorage.getItem("bhd_window_token") || "";
 
-  // Authoritative: rewrite hr_session from this window's Bearer (never shared bhd_id).
+  // Authoritative: rewrite hr_session from this window's Bearer (never shared bhd_id alone).
   if (windowToken) {
-    rebindWithWindowToken(windowToken, here);
+    rebindWithWindowToken(windowToken, here, sub);
     return;
   }
 
@@ -173,7 +231,10 @@ export async function applyAccountIsolation(token?: string | null, options?: { f
   try {
     const response = await identityFetch("/api/auth/window-handoff", { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { ticket?: string };
-    const start = new URL(productStartPath(cacheBustReturnPath(here)), window.location.origin).toString();
+    const start = new URL(
+      productStartPath(accountBoundReturnPath(here, sub)),
+      window.location.origin,
+    ).toString();
     if (response.ok && data.ticket) {
       const handoff = new URL("/auth/handoff", DEFAULT_IDENTITY_ISSUER);
       handoff.searchParams.set("ticket", data.ticket);
@@ -186,7 +247,9 @@ export async function applyAccountIsolation(token?: string | null, options?: { f
   }
 
   // Last resort: clear product session then OIDC start (still must not skip logout).
-  window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(cacheBustReturnPath(here)))}`);
+  window.location.assign(
+    `/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(accountBoundReturnPath(here, sub)))}`,
+  );
 }
 
 /** Call after a successful matched page load so the next switch can rebind again. */
@@ -195,6 +258,7 @@ export function clearAccountRebindLock() {
   sessionStorage.removeItem(REBIND_LOCK);
   try {
     delete document.documentElement.dataset.bhdSwitching;
+    document.getElementById("bhd-privacy-veil")?.remove();
   } catch {
     /* ignore */
   }

@@ -83,13 +83,21 @@ export function LiveUpdates({ source }: { source?: { portal: string } | { task: 
             // window's identity Bearer disagrees, skip soft refresh and let BhdSilentSso
             // restore this tab — otherwise the UI jumps to the other account.
             try {
+              const au = sessionStorage.getItem("bhd_active_au") || "";
+              let token = "";
+              try {
+                const map = JSON.parse(sessionStorage.getItem("bhd_account_tokens") || "{}") as Record<string, string>;
+                if (au && map[au]) token = map[au];
+              } catch {
+                /* ignore */
+              }
+              if (!token) token = sessionStorage.getItem("bhd_window_token") || "";
               const [idRes, localRes] = await Promise.all([
                 fetch("https://id.bhd-om.com/api/auth/me", {
                   cache: "no-store",
                   credentials: "include",
                   headers: (() => {
                     const h: Record<string, string> = { Accept: "application/json" };
-                    const token = sessionStorage.getItem("bhd_window_token");
                     if (token) h.Authorization = `Bearer ${token}`;
                     return h;
                   })(),
@@ -98,7 +106,12 @@ export function LiveUpdates({ source }: { source?: { portal: string } | { task: 
               ]);
               const idBody = (await idRes.json().catch(() => ({}))) as { user?: { id?: string } | null };
               const localBody = (await localRes.json().catch(() => ({}))) as { user?: { id?: string } | null };
-              if (idBody.user?.id && localBody.user?.id && idBody.user.id !== localBody.user.id) {
+              // Skip soft refresh if identity ≠ product OR this tab's ?au= binding disagrees.
+              if (
+                (idBody.user?.id && localBody.user?.id && idBody.user.id !== localBody.user.id) ||
+                (au && localBody.user?.id && localBody.user.id !== au) ||
+                (au && idBody.user?.id && idBody.user.id !== au)
+              ) {
                 due = false;
                 return;
               }

@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Rebind the product session to this window's identity Bearer account.
- * This is the privacy-critical path: shared `bhd_id` must never decide the product user
- * after a Bearer window switch (see docs/BHD-ACCOUNT-ISOLATION.md).
+ * Privacy-critical: shared bhd_id must never decide the product user after a
+ * Bearer window switch. Google-style: returnTo keeps ?au=<sub> so the tab stays bound.
  */
 async function profileFromWindowToken(token: string): Promise<IdentityProfile> {
   const issuer = identityIssuer();
@@ -35,9 +35,22 @@ async function profileFromWindowToken(token: string): Promise<IdentityProfile> {
   };
 }
 
+/** Ensure returnTo carries Google-style au=<sub> and a fresh _bhd cache buster. */
+function bindReturnPath(returnTo: string, sub: string) {
+  const safe = safeReturnPath(returnTo);
+  try {
+    const url = new URL(safe, "https://bhd.local");
+    url.searchParams.set("au", sub);
+    url.searchParams.set("_bhd", String(Date.now()));
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return safe;
+  }
+}
+
 function redirectHome(origin: string, returnTo: string) {
   const response = NextResponse.redirect(new URL(returnTo, origin), 303);
-  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   response.headers.set("Pragma", "no-cache");
   return response;
 }
@@ -71,17 +84,19 @@ async function rebind(request: Request) {
 
   try {
     const profile = await profileFromWindowToken(token);
+    const boundReturn = bindReturnPath(returnTo, profile.sub);
     const current = await getSessionUser();
     // Always clear company scope so the rebound user cannot inherit the prior workspace cookie.
     if (current?.bhdSub && current.bhdSub === profile.sub) {
-      const response = redirectHome(origin, returnTo);
+      // Still re-stamp session + name/picture from identity so the UI cannot keep a stale face.
+      const user = await signInBhdUser(profile, requestMeta(request));
+      const response = redirectHome(origin, boundReturn);
       response.cookies.delete(COMPANY_COOKIE);
-      // Re-stamp the session so browsers do not keep a stale document for the same URL.
-      response.cookies.set(SESSION_COOKIE, signSession(current), sessionCookieOptions());
+      response.cookies.set(SESSION_COOKIE, signSession(user), sessionCookieOptions());
       return response;
     }
     const user = await signInBhdUser(profile, requestMeta(request));
-    const response = redirectHome(origin, returnTo);
+    const response = redirectHome(origin, boundReturn);
     response.cookies.delete(COMPANY_COOKIE);
     response.cookies.set(SESSION_COOKIE, signSession(user), sessionCookieOptions());
     return response;

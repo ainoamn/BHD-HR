@@ -7,9 +7,11 @@ import {
   addAccountUrl,
   applyAccountIsolation,
   isAccountRebindPending,
+  paintPrivacyVeil,
   productStartPath,
   switchWindowAccount,
 } from "@/lib/identity/client";
+import { setActiveAu } from "@/lib/identity/window-session";
 import { BhdAppSwitcher, type BhdSwitcherUser } from "./BhdAppSwitcher";
 
 function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwitcherUser): BhdSwitcherUser | null {
@@ -25,7 +27,7 @@ function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwit
 
 /**
  * Header account menu. Product session is the source of truth for the active face/email
- * (prevents flicker from the other window's cookie). BhdSilentSso owns auto-rebind.
+ * until PrivacyGate confirms identity ≡ product. Switch paints a full privacy veil first.
  */
 export function BhdSessionMenu({
   user,
@@ -43,8 +45,8 @@ export function BhdSessionMenu({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    // Always mirror the product session — never flash another account's email here.
     setActive(user);
+    if (user.id) setActiveAu(user.id);
     if (!identityLinked) setAccounts(user.id ? [user] : []);
   }, [identityLinked, user]);
 
@@ -68,7 +70,6 @@ export function BhdSessionMenu({
             name: identityUser.name || user.name,
             picture: identityUser.picture ?? user.picture,
             username: identityUser.username ?? user.username,
-            // email stays from product session to avoid cross-window flicker
             email: user.email,
             id: user.id,
           });
@@ -95,9 +96,10 @@ export function BhdSessionMenu({
     }
     try {
       setBusy(true);
+      paintPrivacyVeil();
       const { ok, body } = await identity.signOut(false);
       if (ok && body.user) {
-        await applyAccountIsolation(body.token);
+        await applyAccountIsolation(body.token, { force: true, sub: body.user.id });
         return;
       }
     } catch {
@@ -111,6 +113,7 @@ export function BhdSessionMenu({
       window.location.assign("/api/auth/bhd/logout?local=1");
       return;
     }
+    paintPrivacyVeil();
     const end = new URL("https://id.bhd-om.com/oauth/end-session");
     end.searchParams.set("client_id", "bhd-hr");
     end.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/`);
@@ -123,13 +126,16 @@ export function BhdSessionMenu({
       if (!sub || sub === active.id || busy || isAccountRebindPending()) return;
       try {
         setBusy(true);
+        paintPrivacyVeil("جاري التبديل وعزل بيانات الحساب السابق…");
         // Hide previous account data immediately (privacy) until handoff finishes.
         setAccounts([]);
         setActive({ id: "", name: "…", email: "…", picture: null });
         const switched = await switchWindowAccount(sub);
         if (switched.ok) {
-          // force: ignore a stale rebind lock so the new Bearer always rewrites hr_session
-          await applyAccountIsolation(switched.token, { force: true });
+          await applyAccountIsolation(switched.token, {
+            force: true,
+            sub: switched.userId || sub,
+          });
           return;
         }
       } catch {

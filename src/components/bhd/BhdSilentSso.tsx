@@ -5,16 +5,17 @@ import {
   clearAccountRebindLock,
   isAccountRebindPending,
   isIdentityOrigin,
+  paintPrivacyVeil,
   productStartPath,
 } from "@/lib/identity/client";
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
+import { boundWindowToken, readActiveAu, setActiveAu } from "@/lib/identity/window-session";
 import { useEffect } from "react";
 
 /**
- * Keep THIS tab bound to its window identity Bearer.
+ * Keep THIS tab bound to its ?au= / window Bearer (Google authuser model).
  * Product cookies (hr_session) are shared across tabs — when another tab switches,
- * LiveUpdates may refresh this tab onto the other account. Re-check on an interval
- * and on visibility; if identity Bearer ≠ product session, rebind back to the Bearer.
+ * restore this tab to its bound account instead of adopting the shared cookie.
  */
 export function BhdSilentSso() {
   useEffect(() => {
@@ -40,6 +41,9 @@ export function BhdSilentSso() {
     async function reconcile() {
       if (cancelled || isAccountRebindPending()) return;
       try {
+        const au = readActiveAu();
+        if (au) setActiveAu(au);
+
         const identity = await loadBhdIdentity();
         if (cancelled || !identity) return;
         const { ok, body } = await identity.me();
@@ -48,16 +52,31 @@ export function BhdSilentSso() {
           return;
         }
 
+        const identityId = body.user.id;
+        const targetAu = au || identityId;
+
+        // Tab is bound to a different account than the current Bearer — rebind to bound token.
+        if (au && identityId !== au) {
+          const token = boundWindowToken();
+          if (token) {
+            paintPrivacyVeil();
+            await applyAccountIsolation(token, { force: true, sub: au });
+            return;
+          }
+        }
+
         const localResponse = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
-        const local = (await localResponse.json().catch(() => ({}))) as { user?: { id?: string } | null };
+        const local = (await localResponse.json().catch(() => ({}))) as {
+          user?: { id?: string; email?: string } | null;
+        };
         if (cancelled) return;
 
-        if (local.user?.id && local.user.id === body.user.id) {
+        if (local.user?.id && local.user.id === identityId && local.user.id === targetAu) {
           clearAccountRebindLock();
           return;
         }
 
-        const guardKey = `bhd-sso:${body.user.id}`;
+        const guardKey = `bhd-sso:${targetAu || identityId}`;
         const last = Number(sessionStorage.getItem(guardKey) || "0");
         if (last && Date.now() - last < 8_000) return;
         sessionStorage.setItem(guardKey, String(Date.now()));
@@ -68,8 +87,11 @@ export function BhdSilentSso() {
           return;
         }
 
-        // Drift: shared product cookie belongs to another tab's switch — restore THIS window.
-        await applyAccountIsolation(body.token, { force: true });
+        paintPrivacyVeil();
+        await applyAccountIsolation(boundWindowToken() || body.token, {
+          force: true,
+          sub: targetAu || identityId,
+        });
       } catch {
         clearAccountRebindLock();
       }
