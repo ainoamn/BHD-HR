@@ -1,14 +1,11 @@
 "use client";
 
-import { BhdAppIcon } from "./BhdAppIcon";
-import { gatewayApps, type BhdApp } from "@/lib/bhd/apps";
+import { BhdProgramsGrid } from "./BhdProgramsGrid";
 import { BHD_PORTAL_ORIGIN, type UiLocale } from "@/lib/bhd/identity-public";
-import { useBhdCatalog } from "@/lib/identity/use-bhd-catalog";
 
 const FOOTER_COPY = {
   ar: {
     programs: "برامجنا",
-    allApps: "كل التطبيقات وشرحها",
     about: "عن الشركة",
     brand: "هوية الشركة",
     apps: "برامجنا",
@@ -22,7 +19,6 @@ const FOOTER_COPY = {
   },
   en: {
     programs: "Our programs",
-    allApps: "All apps and guides",
     about: "About",
     brand: "Brand",
     apps: "Programs",
@@ -36,37 +32,14 @@ const FOOTER_COPY = {
   },
 } as const;
 
-function programHref(app: BhdApp) {
-  if (app.id === "office") return `${BHD_PORTAL_ORIGIN}/products/bhd-office`;
-  if (app.homeUrl) return app.homeUrl;
-  if (app.id === "bhd-r") return "https://r.bhd-om.com/ar";
-  return `${app.origin.replace(/\/$/, "")}/`;
-}
-
 export function SiteFooter({ locale }: { locale: UiLocale }) {
   const t = FOOTER_COPY[locale];
   const isArabic = locale === "ar";
-  const catalogApps = useBhdCatalog();
-  const programs = gatewayApps(catalogApps).filter((app) => app.id !== "portal");
   const site = (path: string) => `${BHD_PORTAL_ORIGIN}${path}`;
   return (
     <footer className="site-footer no-print" lang={locale} dir={isArabic ? "rtl" : "ltr"}>
-      <div className="footer-wrap footer-programs">
-        <div className="footer-programs-head">
-          <p>{t.programs}</p>
-          <a href={site("/apps")}>{t.allApps}</a>
-        </div>
-        <div className="footer-programs-grid">
-          {programs.map((app) => {
-            const label = isArabic ? app.nameAr : app.nameEn;
-            return (
-              <a key={app.id} href={programHref(app)} className="footer-program" title={label}>
-                <BhdAppIcon id={app.id} title={label} logoUrl={app.logoUrl} soft={app.soft} accent={app.accent} />
-                <span>{label}</span>
-              </a>
-            );
-          })}
-        </div>
+      <div className="footer-wrap">
+        <BhdProgramsGrid locale={locale} />
       </div>
       <div className="footer-wrap footer-top">
         <div className="footer-brand">

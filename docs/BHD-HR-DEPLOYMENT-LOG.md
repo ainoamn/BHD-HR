@@ -1639,3 +1639,19 @@
 **القاعدة:** بلا تغيير مخطط.
 
 **الخطوات:** `tsc`، الدفع إلى `main`.
+
+---
+
+## 90. مطابقة أمر ربط المنتج الحي (isolate + CSP + شبكة الرئيسية) (2026-10-29)
+
+**المطلوب:** تطبيق [BHD-CURSOR-PRODUCT-WIRE.md](https://id.bhd-om.com/docs/BHD-CURSOR-PRODUCT-WIRE.md): عزل عبر `isolate`، CSP، ونفس الكتالوج في الرأس والفوتر والرئيسية.
+
+| # | ما نُفّذ |
+|---|---|
+| 1 | `applyAccountIsolation` يفضّل `BhdIdentity.isolate` (window-handoff→start)؛ التبديل يمسح state المحلي فوراً دون إعادة ربط مزدوجة |
+| 2 | CSP في `next.config.ts` لـ script/connect/img على `id.bhd-om.com` |
+| 3 | `BhdProgramsGrid` مشترك للفوتر وصفحة `/welcome`؛ نسخ دليل الوكيل محلياً |
+
+**القاعدة:** بلا تغيير مخطط.
+
+**الخطوات:** `tsc`، الدفع إلى `main`.

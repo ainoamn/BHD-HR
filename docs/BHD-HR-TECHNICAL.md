@@ -804,7 +804,7 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 | إعادة الربط | `POST /api/auth/bhd/rebind` من رمز النافذة؛ قفل واحد على العميل؛ `BhdSilentSso` فقط يعيد الربط تلقائياً (§87–§88) |
 | `BHD-SESSION-POLICY.md` | بلا خمول ولا KeepAlive؛ المدة من الهوية الحيّة؛ نوافذ متعددة على الأم |
 | `BHD-COPY-TO-PRODUCTS.md` / `BHD-SECURITY-PROTECTION.md` | نسخ الوثائق؛ الحماية على الهوية و`/recover` |
-| `BHD-APP-SWITCHER.md` | شكل المشغّل؛ الكتالوج الحي من `/api/bhd/catalog` (`useBhdCatalog`) مع احتياط `apps.ts`؛ شعارات `logoUrl` (§89) |
+| `BHD-APP-SWITCHER.md` / `BHD-CURSOR-PRODUCT-WIRE.md` | مشغّل+فوتر+رئيسية من الكتالوج الحي؛ `isolate` للعزل؛ CSP للهوية (§89–§90) |
 | `BHD-ACCOUNT-SWITCHER.md` | شكل البطاقة + §5 سرعة بلا وميض: تبديل من JSON، `workspacePath` مباشرة، ميدلوير→`start` بلا جلسة فقط |
 | `BHD-UNIFIED-LOGIN-AND-APPS.md` §0.1 و§0.2 و§0.5 | الألوان؛ حسابات متعددة من الرأس؛ فوتر «برامجنا» |
 | `BHD-BRAND-IDENTITY.md` | الشعار الرسمي بنسخة الحبر في الواجهة والنسخة الفاتحة في الفوتر |

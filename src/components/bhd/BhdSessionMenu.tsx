@@ -113,9 +113,13 @@ export function BhdSessionMenu({
       }
       try {
         setBusy(true);
+        // Drop prior account paint immediately — isolate (inside switchAccount) rebinds the product.
+        setActive({ id: "", name: "", email: "", picture: null });
+        setAccounts([]);
         const { ok, body } = await identity.switchAccount(sub);
         if (ok) {
-          applyAccountIsolation(body.token);
+          // Live script already called isolate(); only fall back if navigation did not start.
+          if (!identity.isolate) applyAccountIsolation(body.token);
           return;
         }
       } catch {

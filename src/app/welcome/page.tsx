@@ -32,6 +32,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { BhdProgramsGrid } from "@/components/bhd/BhdProgramsGrid";
 import { SiteFooter } from "@/components/bhd/site-footer";
 import { MarketingHeader, PricingSection } from "@/components/marketing";
 import { getI18n } from "@/lib/lang";
@@ -396,6 +397,12 @@ export default async function Welcome({ searchParams }: { searchParams: Promise<
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-white/10 bg-ink-950 px-4 py-12 sm:px-6">
+        <div className="footer-wrap mx-auto max-w-6xl">
+          <BhdProgramsGrid locale={lang} />
         </div>
       </section>
 

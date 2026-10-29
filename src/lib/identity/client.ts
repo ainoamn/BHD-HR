@@ -1,5 +1,6 @@
 import { DEFAULT_IDENTITY_ISSUER } from "@/lib/bhd/identity-public";
 import { getCachedCatalogApps } from "@/lib/bhd/catalog";
+import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import { captureWindowToken, windowFetchHeaders } from "@/lib/identity/window-session";
 
 export function pageOrigin() {
@@ -81,10 +82,26 @@ export function isAccountRebindPending() {
   return Number.isFinite(at) && Date.now() - at < 12_000;
 }
 
+function rebindWithWindowToken(token: string, returnTo: string) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = "/api/auth/bhd/rebind";
+  form.style.display = "none";
+  const tokenInput = document.createElement("input");
+  tokenInput.name = "token";
+  tokenInput.value = token;
+  const returnInput = document.createElement("input");
+  returnInput.name = "returnTo";
+  returnInput.value = returnTo;
+  form.append(tokenInput, returnInput);
+  document.body.appendChild(form);
+  form.submit();
+}
+
 /**
- * After switch/logout-this: bind product session to THIS window's identity token, then load the page.
- * Never opens /login?add=1. Must not keep the previous product user's cookie/data (privacy).
- * Deduped: only one rebind at a time so refresh/switch cannot stack navigations.
+ * Bind this product tab to the window identity account only (privacy).
+ * Prefers BhdIdentity.isolate (window-handoff → start). Falls back to /api/auth/bhd/rebind.
+ * Deduped so refresh/switch cannot stack navigations.
  */
 export function applyAccountIsolation(token?: string | null) {
   if (typeof window === "undefined") return;
@@ -96,23 +113,21 @@ export function applyAccountIsolation(token?: string | null) {
   }
   sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
   const windowToken = token || sessionStorage.getItem("bhd_window_token") || "";
-  if (windowToken) {
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "/api/auth/bhd/rebind";
-    form.style.display = "none";
-    const tokenInput = document.createElement("input");
-    tokenInput.name = "token";
-    tokenInput.value = windowToken;
-    const returnInput = document.createElement("input");
-    returnInput.name = "returnTo";
-    returnInput.value = here;
-    form.append(tokenInput, returnInput);
-    document.body.appendChild(form);
-    form.submit();
-    return;
-  }
-  window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
+
+  void loadBhdIdentity(800).then((identity) => {
+    if (identity?.isolate) {
+      void identity.isolate().catch(() => {
+        if (windowToken) rebindWithWindowToken(windowToken, here);
+        else window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
+      });
+      return;
+    }
+    if (windowToken) {
+      rebindWithWindowToken(windowToken, here);
+      return;
+    }
+    window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
+  });
 }
 
 /** Call after a successful matched page load so the next switch can rebind again. */

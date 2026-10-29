@@ -92,3 +92,7 @@
 - [x] `/api/auth/me` بلا `Set-Cookie`
 - [x] لا `BroadcastChannel` ولا `SessionKeepAlive`
 - [x] رابط الاستعادة `https://id.bhd-om.com/recover`
+- [x] كتالوج حي للرأس والفوتر والرئيسية (`useBhdCatalog` / `BhdProgramsGrid`)
+- [x] عزل التبديل عبر `BhdIdentity.isolate` (handoff) مع احتياط rebind
+- [x] CSP: `script-src` / `connect-src` / `img-src` لـ `https://id.bhd-om.com`
+- [x] دليل الوكيل [`BHD-CURSOR-PRODUCT-WIRE.md`](./BHD-CURSOR-PRODUCT-WIRE.md)

@@ -32,6 +32,9 @@ export type BhdIdentityApi = {
   runtime: () => Promise<{ session?: { maxAgeSec?: number }; catalog?: BhdCatalogBody }>;
   catalog: () => Promise<BhdCatalogBody>;
   me: () => Promise<BhdIdentityResult>;
+  /** window-handoff → auth/handoff → product /api/auth/bhd/start (clears prior product session). */
+  isolate: () => Promise<void>;
+  /** Calls isolate() automatically when ok — do not also rebind locally. */
   switchAccount: (sub: string) => Promise<BhdIdentityResult>;
   signOut: (all?: boolean) => Promise<BhdIdentityResult>;
   captureToken: (token?: string | null) => void;

@@ -54,7 +54,7 @@ export function BhdSilentSso() {
           window.location.replace(identity.productStart(here) || productStartPath(here));
           return;
         }
-        // Mismatch: rebind from window token (once).
+        // Mismatch: isolate (handoff→start) or rebind — never keep prior product data.
         applyAccountIsolation(body.token);
       } catch {
         clearAccountRebindLock();
