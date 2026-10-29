@@ -8,12 +8,18 @@ export type BhdApp = {
   origin: string;
   /** مسار نسبي داخل المنتج بعد SSO — مساحة عمل العميل وليس الصفحة التسويقية. */
   workspacePath: string;
+  homePath?: string;
   startUrl: string | null;
   mode: BhdAppMode;
   enabled: boolean;
   mark: string;
   accent: string;
   soft: string;
+  /** شعار مرفوع من لوحة الهوية — إن وُجد يُعرض بدل الرسم المحلي. */
+  logoUrl?: string | null;
+  homeUrl?: string;
+  workspaceUrl?: string;
+  sortOrder?: number;
 };
 
 export const BHD_APP_SWITCHER_SPEC = "bhd-appswitcher.v1";
@@ -24,12 +30,10 @@ function ssoStart(origin: string, workspacePath: string) {
 }
 
 /**
- * كتالوج مجمد — يُنسخ حرفياً إلى كل منتجات BHD.
- * workspacePath = لوحة العميل بعد التعرّف عبر الهوية (ليس /admin إلا للمكتب الداخلي).
- * النقر يفتح workspacePath مباشرة. start فقط إن لم توجد جلسة منتج (ميدلوير المنتج).
- * انظر docs/BHD-PRODUCT-SSO-ADMIN.md وdocs/BHD-APP-SWITCHER.md
+ * احتياط محلي فقط إن تعذّر `/api/bhd/catalog`.
+ * المصدر الحي: لوحة https://id.bhd-om.com/admin#apps عبر bhd-identity.js.
  */
-export const BHD_APPS: BhdApp[] = [
+export const BHD_APPS_FALLBACK: BhdApp[] = [
   {
     id: "account",
     clientId: null,
@@ -43,6 +47,8 @@ export const BHD_APPS: BhdApp[] = [
     mark: "حـ",
     accent: "#092d24",
     soft: "#e8f4f1",
+    logoUrl: "https://id.bhd-om.com/api/bhd/icons/account",
+    sortOrder: 0,
   },
   {
     id: "portal",
@@ -57,6 +63,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "B",
     accent: "#075c45",
     soft: "#e6f1ec",
+    sortOrder: 1,
   },
   {
     id: "wazen",
@@ -71,6 +78,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "و",
     accent: "#126b63",
     soft: "#e8f4f1",
+    sortOrder: 2,
   },
   {
     id: "hisaby",
@@ -85,6 +93,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "ح",
     accent: "#075c45",
     soft: "#e6f1ec",
+    sortOrder: 3,
   },
   {
     id: "nasab",
@@ -99,6 +108,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "ن",
     accent: "#8a3c45",
     soft: "#f6e9eb",
+    sortOrder: 4,
   },
   {
     id: "bhd-r",
@@ -113,6 +123,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "R",
     accent: "#a66b2d",
     soft: "#f8efe4",
+    sortOrder: 5,
   },
   {
     id: "store",
@@ -127,6 +138,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "م",
     accent: "#315d89",
     soft: "#e9f0f7",
+    sortOrder: 6,
   },
   {
     id: "office",
@@ -141,6 +153,7 @@ export const BHD_APPS: BhdApp[] = [
     mark: "B",
     accent: "#283b4d",
     soft: "#e9edf0",
+    sortOrder: 7,
   },
   {
     id: "hr",
@@ -155,11 +168,15 @@ export const BHD_APPS: BhdApp[] = [
     mark: "HR",
     accent: "#3d5a45",
     soft: "#e7efe9",
+    sortOrder: 8,
   },
 ];
 
-export function gatewayApps(): BhdApp[] {
-  return BHD_APPS.filter((app) => app.enabled && app.id !== "account");
+/** @deprecated استخدم الكتالوج الحي عبر useBhdCatalog / fetchIdentityCatalog. */
+export const BHD_APPS = BHD_APPS_FALLBACK;
+
+export function gatewayApps(apps: BhdApp[] = BHD_APPS_FALLBACK): BhdApp[] {
+  return apps.filter((app) => app.enabled && app.id !== "account");
 }
 
 function samePortalOrigin(pageOrigin?: string) {
@@ -180,11 +197,12 @@ export function workspaceUrlForApp(app: BhdApp, pageOrigin?: string): string {
       const here = pageOrigin.replace(/\/$/, "");
       if (here === "https://id.bhd-om.com" || samePortalOrigin(pageOrigin)) return app.workspacePath;
     }
-    return `${app.origin.replace(/\/$/, "")}${app.workspacePath}`;
+    return app.workspaceUrl || `${app.origin.replace(/\/$/, "")}${app.workspacePath}`;
   }
   if (app.id === "portal" && samePortalOrigin(pageOrigin)) {
     return app.workspacePath;
   }
+  if (app.workspaceUrl) return app.workspaceUrl;
   if (app.origin) {
     return `${app.origin.replace(/\/$/, "")}${app.workspacePath || "/"}`;
   }
@@ -199,6 +217,6 @@ export function startUrlForApp(app: BhdApp): string | null {
   return app.startUrl;
 }
 
-export function hopOrigins(): string[] {
-  return [...new Set(BHD_APPS.filter((app) => app.enabled && app.origin).map((app) => app.origin.replace(/\/$/, "")))];
+export function hopOrigins(apps: BhdApp[] = BHD_APPS_FALLBACK): string[] {
+  return [...new Set(apps.filter((app) => app.enabled && app.origin).map((app) => app.origin.replace(/\/$/, "")))];
 }

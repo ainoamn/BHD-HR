@@ -78,7 +78,8 @@ src/
     ui.tsx               عناصر الواجهة المشتركة (انظر «نظام الواجهة» أدناه)
     ...                  النماذج والمطبوعات
   lib/
-    bhd/apps.ts          كتالوج تطبيقات BHD المجمّد — منسوخ حرفياً، لا يُعدّل هنا
+    bhd/apps.ts          احتياط مشغّل التطبيقات؛ المصدر الحي catalog.ts ← /api/bhd/catalog
+    bhd/catalog.ts       قراءة وتطبيع كتالوج الهوية الحي
     bhd/identity.ts      إعدادات OIDC، PKCE، تبديل الرمز، التحقق من id_token
     auth.ts              جلسة المنتج، المنشأة النشطة، الأدوار، can / requireUser / requirePermission / requireAdmin
     permissions.ts       الوحدات والعمليات، قوالب الأدوار، normalizePermissions (آمن للمتصفح)
@@ -803,12 +804,12 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 | إعادة الربط | `POST /api/auth/bhd/rebind` من رمز النافذة؛ قفل واحد على العميل؛ `BhdSilentSso` فقط يعيد الربط تلقائياً (§87–§88) |
 | `BHD-SESSION-POLICY.md` | بلا خمول ولا KeepAlive؛ المدة من الهوية الحيّة؛ نوافذ متعددة على الأم |
 | `BHD-COPY-TO-PRODUCTS.md` / `BHD-SECURITY-PROTECTION.md` | نسخ الوثائق؛ الحماية على الهوية و`/recover` |
-| `BHD-APP-SWITCHER.md` | كتالوج مجمد يشمل `hr` (§4.1)؛ `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher`/`BhdSessionMenu` |
+| `BHD-APP-SWITCHER.md` | شكل المشغّل؛ الكتالوج الحي من `/api/bhd/catalog` (`useBhdCatalog`) مع احتياط `apps.ts`؛ شعارات `logoUrl` (§89) |
 | `BHD-ACCOUNT-SWITCHER.md` | شكل البطاقة + §5 سرعة بلا وميض: تبديل من JSON، `workspacePath` مباشرة، ميدلوير→`start` بلا جلسة فقط |
 | `BHD-UNIFIED-LOGIN-AND-APPS.md` §0.1 و§0.2 و§0.5 | الألوان؛ حسابات متعددة من الرأس؛ فوتر «برامجنا» |
 | `BHD-BRAND-IDENTITY.md` | الشعار الرسمي بنسخة الحبر في الواجهة والنسخة الفاتحة في الفوتر |
 
-**ما يبقى قراراً في ONE-BHD:** إضافة BHD-HR إلى الكتالوج المجمّد `apps.ts` (فيظهر في مشغّل كل المنتجات) وقلب `mode` إلى `sso`. هذا لا يُعدّل من هذا المستودع.
+**ما يبقى قراراً في لوحة الهوية:** إدارة المواقع من [`/admin#apps`](https://id.bhd-om.com/admin#apps) (أسماء، روابط، شعارات، ترتيب، إظهار). المنتجات تقرأ الكتالوج حيّاً ولا تنسخ قائمة مجمّدة.
 
 ---
 

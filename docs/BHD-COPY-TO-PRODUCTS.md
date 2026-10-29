@@ -13,8 +13,8 @@
 | `docs/BHD-ACCOUNT-SWITCHER.md` | بطاقة الحساب |
 | `docs/BHD-PRODUCT-SSO-ADMIN.md` | SSO صامت + أدمن محلي |
 | `docs/BHD-UNIFIED-LOGIN-AND-APPS.md` | الدليل المرجعي |
-| `app/lib/bhd/apps.ts` | الكتالوج المجمد (انظر §4) |
-| أيقونات `BhdAppIcon` إن تغيّرت العلامات | نفس المسار في المنتج |
+| `app/lib/bhd/apps.ts` | احتياط محلي فقط — المصدر الحي `/api/bhd/catalog` (انظر §4) |
+| أيقونات `BhdAppIcon` | تدعم `logoUrl` من الكتالوج الحي |
 
 الهوية: `https://id.bhd-om.com` — الإدارة: `https://id.bhd-om.com/admin`
 
@@ -76,7 +76,11 @@
 
 ## 4. هل تتغيّر الأيقونات والروابط تلقائياً في كل المواقع؟
 
-**لا.** كتالوج `BHD_APPS` في `apps.ts` **مجمّد ومنسوخ**. المصدر المعتمد: `https://id.bhd-om.com/api/bhd/catalog` (`spec: bhd-appswitcher.v1`, `autoPush: false`).
+**نعم — عبر الكتالوج الحي.** تُدار الشاشة من [`/admin#apps`](https://id.bhd-om.com/admin#apps) وتُقرأ من `https://id.bhd-om.com/api/bhd/catalog` (`spec: bhd-appswitcher.v1`, `live: true`, `autoPush: true`).
+
+المنتج يحمّل `bhd-identity.js` (يستدعي `catalog()` ويُرسل حدث `bhd-catalog` كل ~20ث) أو يقرأ الكتالوج مباشرة. النسخة المحلية في `apps.ts` **احتياط** فقط إن تعذّر الاتصال — لن تتحدث وحدها.
+
+لوحة التحكم لكل موقع: المسمّى عربي/إنجليزي، الأصل + الرئيسية + مساحة العمل، الشعار، الترتيب، الإظهار/الإخفاء.
 
 ---
 

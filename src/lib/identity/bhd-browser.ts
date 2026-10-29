@@ -20,9 +20,17 @@ export type BhdIdentityResult = {
   body: BhdIdentityMeBody;
 };
 
+export type BhdCatalogBody = {
+  spec?: string;
+  live?: boolean;
+  apps?: Array<Record<string, unknown>>;
+  hops?: string[];
+};
+
 export type BhdIdentityApi = {
   issuer: string;
-  runtime: () => Promise<{ session?: { maxAgeSec?: number } }>;
+  runtime: () => Promise<{ session?: { maxAgeSec?: number }; catalog?: BhdCatalogBody }>;
+  catalog: () => Promise<BhdCatalogBody>;
   me: () => Promise<BhdIdentityResult>;
   switchAccount: (sub: string) => Promise<BhdIdentityResult>;
   signOut: (all?: boolean) => Promise<BhdIdentityResult>;

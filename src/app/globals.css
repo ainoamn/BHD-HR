@@ -1154,10 +1154,12 @@ textarea:focus-visible {
   overflow: hidden;
 }
 
-.bhd-app-icon svg {
+.bhd-app-icon svg,
+.bhd-app-icon img {
   display: block;
   width: 72%;
   height: 72%;
+  object-fit: contain;
 }
 
 .bhd-switcher-slot {

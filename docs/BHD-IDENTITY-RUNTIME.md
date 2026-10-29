@@ -25,8 +25,9 @@
 | تحميل السكربت | `src/app/layout.tsx` → `Script` من `IDENTITY_SCRIPT_URL` |
 | مدة كوكي المنتج | `sessionCookieOptions()` ← `identitySessionMaxAgeSec()` من `/api/bhd/runtime` |
 | الرأس / التبديل / الخروج | `BhdSessionMenu` عبر `BhdIdentity.me` / `switchAccount` / `signOut` |
+| مشغّل التطبيقات / الفوتر | `useBhdCatalog` ← `BhdIdentity.catalog()` + حدث `bhd-catalog` من `/api/bhd/catalog`؛ الإدارة [`/admin#apps`](https://id.bhd-om.com/admin#apps) |
 | SSO صامت | `BhdSilentSso` عبر `BhdIdentity.me` ثم `/api/auth/bhd/start` |
-| ما يبقى محلياً | `start` / `callback` / `logout` فقط (سر العميل على الخادم) |
+| ما يبقى محلياً | `start` / `callback` / `logout` + احتياط `apps.ts` إن تعذّر الكتالوج |
 
 إن وُجد CSP لاحقاً: اسمح بـ `script-src https://id.bhd-om.com` و`connect-src https://id.bhd-om.com`.
 

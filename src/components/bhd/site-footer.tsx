@@ -1,6 +1,9 @@
+"use client";
+
 import { BhdAppIcon } from "./BhdAppIcon";
 import { gatewayApps, type BhdApp } from "@/lib/bhd/apps";
 import { BHD_PORTAL_ORIGIN, type UiLocale } from "@/lib/bhd/identity-public";
+import { useBhdCatalog } from "@/lib/identity/use-bhd-catalog";
 
 const FOOTER_COPY = {
   ar: {
@@ -35,6 +38,7 @@ const FOOTER_COPY = {
 
 function programHref(app: BhdApp) {
   if (app.id === "office") return `${BHD_PORTAL_ORIGIN}/products/bhd-office`;
+  if (app.homeUrl) return app.homeUrl;
   if (app.id === "bhd-r") return "https://r.bhd-om.com/ar";
   return `${app.origin.replace(/\/$/, "")}/`;
 }
@@ -42,7 +46,8 @@ function programHref(app: BhdApp) {
 export function SiteFooter({ locale }: { locale: UiLocale }) {
   const t = FOOTER_COPY[locale];
   const isArabic = locale === "ar";
-  const programs = gatewayApps().filter((app) => app.id !== "portal");
+  const catalogApps = useBhdCatalog();
+  const programs = gatewayApps(catalogApps).filter((app) => app.id !== "portal");
   const site = (path: string) => `${BHD_PORTAL_ORIGIN}${path}`;
   return (
     <footer className="site-footer no-print" lang={locale} dir={isArabic ? "rtl" : "ltr"}>
@@ -56,7 +61,7 @@ export function SiteFooter({ locale }: { locale: UiLocale }) {
             const label = isArabic ? app.nameAr : app.nameEn;
             return (
               <a key={app.id} href={programHref(app)} className="footer-program" title={label}>
-                <BhdAppIcon id={app.id} title={label} />
+                <BhdAppIcon id={app.id} title={label} logoUrl={app.logoUrl} soft={app.soft} accent={app.accent} />
                 <span>{label}</span>
               </a>
             );

@@ -1,5 +1,5 @@
-import { BHD_APPS } from "@/lib/bhd/apps";
 import { DEFAULT_IDENTITY_ISSUER } from "@/lib/bhd/identity-public";
+import { getCachedCatalogApps } from "@/lib/bhd/catalog";
 import { captureWindowToken, windowFetchHeaders } from "@/lib/identity/window-session";
 
 export function pageOrigin() {
@@ -54,7 +54,7 @@ export function allowedBhdUrl(value: string) {
     const url = new URL(value);
     if (url.protocol !== "https:" && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url.origin)) return "";
     if (url.origin === DEFAULT_IDENTITY_ISSUER) return url.toString();
-    if (BHD_APPS.some((app) => app.origin.replace(/\/$/, "") === url.origin)) return url.toString();
+    if (getCachedCatalogApps().some((app) => app.origin.replace(/\/$/, "") === url.origin)) return url.toString();
     if (url.hostname === "bhd-om.com" || url.hostname.endsWith(".bhd-om.com") || url.hostname.endsWith(".vercel.app")) return url.toString();
   } catch {
     /* ignore */

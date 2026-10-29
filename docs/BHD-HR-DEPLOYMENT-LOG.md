@@ -1623,3 +1623,19 @@
 **القاعدة:** بلا تغيير مخطط.
 
 **الخطوات:** `tsc`، الدفع إلى `main`.
+
+---
+
+## 89. كتالوج التطبيقات الحي من الهوية (2026-10-29)
+
+**المطلوب:** شاشة الأيقونات تُدار من `https://id.bhd-om.com/admin#apps` وتنعكس حيّاً عبر `/api/bhd/catalog` و`bhd-identity.js` — النسخة المحلية في `apps.ts` لا تتحدث وحدها.
+
+| # | ما نُفّذ |
+|---|---|
+| 1 | `useBhdCatalog` + `lib/bhd/catalog.ts`: قراءة الكتالوج وحدث `bhd-catalog` مع احتياط `BHD_APPS_FALLBACK` |
+| 2 | `BhdAppSwitcher` و`SiteFooter` يعرضان الأسماء/الترتيب/الشعار (`logoUrl`) من الكتالوج الحي |
+| 3 | توثيق `BHD-COPY-TO-PRODUCTS` §4 و`BHD-IDENTITY-RUNTIME` |
+
+**القاعدة:** بلا تغيير مخطط.
+
+**الخطوات:** `tsc`، الدفع إلى `main`.
