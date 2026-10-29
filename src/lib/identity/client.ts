@@ -19,7 +19,7 @@ export function identityApiUrl(path: string) {
 
 /**
  * Always hit the identity host directly (docs/BHD-ACCOUNT-SWITCHER.md §2).
- * Attaches this window's Bearer so multi-window accounts stay isolated (docs/BHD-COPY-TO-PRODUCTS.md §1).
+ * Attaches this window's Bearer so multi-window accounts stay isolated.
  */
 export async function identityFetch(path: string, init?: RequestInit) {
   const headers = windowFetchHeaders(init?.headers);
@@ -78,7 +78,16 @@ export function isAccountRebindPending() {
   const raw = sessionStorage.getItem(REBIND_LOCK);
   if (!raw) return false;
   const at = Number(raw);
-  return Number.isFinite(at) && Date.now() - at < 12_000;
+  return Number.isFinite(at) && Date.now() - at < 15_000;
+}
+
+function markIsolationPending() {
+  sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
+  try {
+    document.documentElement.dataset.bhdSwitching = "1";
+  } catch {
+    /* ignore */
+  }
 }
 
 function rebindWithWindowToken(token: string, returnTo: string) {
@@ -98,9 +107,8 @@ function rebindWithWindowToken(token: string, returnTo: string) {
 }
 
 /**
- * Switch the window identity account WITHOUT calling BhdIdentity.switchAccount
- * (that auto-isolate can leave the product on the previous hr_session via shared bhd_id).
- * Returns the new window token for product rebind.
+ * Switch window identity Bearer only (no BhdIdentity.switchAccount auto-isolate).
+ * Product isolation is always applyAccountIsolation afterward.
  */
 export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; token?: string; userId?: string }> {
   if (!sub) return { ok: false };
@@ -122,21 +130,36 @@ export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; t
 }
 
 /**
- * Bind this product tab to the window identity account only (privacy).
- * Prefer POST /api/auth/bhd/rebind with the window Bearer — that is the only path that
- * cannot accidentally keep the previous product cookie via shared bhd_id + start.
- * Deduped so refresh/switch cannot stack navigations.
+ * Bind this product tab to THIS window's identity account only.
+ * Official path (ONE-BHD): window-handoff → /auth/handoff → /api/auth/bhd/start → callback.
+ * Fallback: POST /api/auth/bhd/rebind with the window Bearer.
  */
-export function applyAccountIsolation(token?: string | null) {
+export async function applyAccountIsolation(token?: string | null) {
   if (typeof window === "undefined") return;
   if (isAccountRebindPending()) return;
   const here = currentReturnPath();
   if (isIdentityOrigin()) {
-    window.location.assign(here);
+    window.location.reload();
     return;
   }
-  sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
+  markIsolationPending();
   const windowToken = token || sessionStorage.getItem("bhd_window_token") || "";
+
+  try {
+    const response = await identityFetch("/api/auth/window-handoff", { method: "POST" });
+    const data = (await response.json().catch(() => ({}))) as { ticket?: string };
+    const start = new URL(productStartPath(here), window.location.origin).toString();
+    if (response.ok && data.ticket) {
+      const handoff = new URL("/auth/handoff", DEFAULT_IDENTITY_ISSUER);
+      handoff.searchParams.set("ticket", data.ticket);
+      handoff.searchParams.set("next", start);
+      window.location.assign(handoff.toString());
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+
   if (windowToken) {
     rebindWithWindowToken(windowToken, here);
     return;
@@ -148,7 +171,11 @@ export function applyAccountIsolation(token?: string | null) {
 export function clearAccountRebindLock() {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.removeItem(REBIND_LOCK);
-  sessionStorage.removeItem(`bhd-sso:${currentReturnPath()}`);
+  try {
+    delete document.documentElement.dataset.bhdSwitching;
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Identity account recovery when the identity returns ACCOUNT_SECURITY_HOLD. */

@@ -24,8 +24,8 @@ function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwit
 }
 
 /**
- * Header account menu. Roster from BhdIdentity.me — does NOT auto-rebind on load
- * (BhdSilentSso owns that) to avoid double navigation freezes.
+ * Header account menu. Product session is the source of truth for the active face/email
+ * (prevents flicker from the other window's cookie). BhdSilentSso owns auto-rebind.
  */
 export function BhdSessionMenu({
   user,
@@ -43,6 +43,7 @@ export function BhdSessionMenu({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // Always mirror the product session — never flash another account's email here.
     setActive(user);
     if (!identityLinked) setAccounts(user.id ? [user] : []);
   }, [identityLinked, user]);
@@ -60,14 +61,17 @@ export function BhdSessionMenu({
           .filter((item): item is BhdSwitcherUser => Boolean(item?.id));
         if (list.length) setAccounts(list);
         const identityUser = asSwitcher(body.user);
+        // Only enrich picture/name when the window identity matches this product session.
         if (identityUser?.id && user.id && identityUser.id === user.id) {
-          setActive({ ...user, ...identityUser, id: identityUser.id });
-          return;
-        }
-        // Identity window ≠ product session: never show the other account's face on this page.
-        setActive(user);
-        if (identityUser?.id && user.id && identityUser.id !== user.id && !isAccountRebindPending()) {
-          applyAccountIsolation(body.token);
+          setActive({
+            ...user,
+            name: identityUser.name || user.name,
+            picture: identityUser.picture ?? user.picture,
+            username: identityUser.username ?? user.username,
+            // email stays from product session to avoid cross-window flicker
+            email: user.email,
+            id: user.id,
+          });
         }
       } catch {
         /* keep product user */
@@ -76,7 +80,7 @@ export function BhdSessionMenu({
     return () => {
       cancelled = true;
     };
-  }, [identityLinked, user.id, user.email, user.name, user.picture]);
+  }, [identityLinked, user]);
 
   const signOutThis = useCallback(async () => {
     if (!identityLinked) {
@@ -93,7 +97,7 @@ export function BhdSessionMenu({
       setBusy(true);
       const { ok, body } = await identity.signOut(false);
       if (ok && body.user) {
-        applyAccountIsolation(body.token);
+        await applyAccountIsolation(body.token);
         return;
       }
     } catch {
@@ -119,12 +123,12 @@ export function BhdSessionMenu({
       if (!sub || sub === active.id || busy || isAccountRebindPending()) return;
       try {
         setBusy(true);
-        // Clear prior paint immediately — do not leave Abdul's face while identity is another account.
-        setActive({ id: "", name: "…", email: "", picture: null });
-        // Switch window Bearer only (no auto-isolate); then rebind product session from that token.
+        // Hide previous account data immediately (privacy) until handoff finishes.
+        setAccounts([]);
+        setActive({ id: "", name: "…", email: "…", picture: null });
         const switched = await switchWindowAccount(sub);
         if (switched.ok) {
-          applyAccountIsolation(switched.token);
+          await applyAccountIsolation(switched.token);
           return;
         }
       } catch {
@@ -132,6 +136,7 @@ export function BhdSessionMenu({
       }
       setBusy(false);
       setActive(user);
+      setAccounts(user.id ? [user] : []);
       window.location.assign(productStartPath(window.location.pathname || "/"));
     },
     [active.id, busy, user],
