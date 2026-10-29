@@ -43,8 +43,6 @@ export async function identityFetch(path: string, init?: RequestInit) {
     .then((data: { token?: unknown; user?: { id?: string } | null } | null) => {
       if (!data || typeof data.token !== "string") return;
       const sub = typeof data.user?.id === "string" ? data.user.id : readActiveAu();
-      // Only capture when we know which account the token belongs to — never thrash
-      // the window token with a different account after a Google-style switch.
       if (sub) captureAccountToken(sub, data.token);
       else captureWindowToken(data.token);
     })
@@ -57,10 +55,8 @@ export function currentReturnPath() {
   return `${window.location.pathname}${window.location.search || ""}` || "/";
 }
 
-/**
- * Google authuser-style return path: bind tab to `au=<sub>` and bust caches with `_bhd=`.
- */
-export function accountBoundReturnPath(returnTo = "/", sub?: string | null) {
+/** Stable path with ?au= only — no _bhd (avoids perpetual “refresh” flash). */
+export function accountBoundPath(returnTo = "/", sub?: string | null) {
   const path = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
   const au = (sub || readActiveAu() || "").trim();
   try {
@@ -68,17 +64,40 @@ export function accountBoundReturnPath(returnTo = "/", sub?: string | null) {
     url.searchParams.delete("_bhd");
     if (au) url.searchParams.set("au", au);
     else url.searchParams.delete("au");
-    url.searchParams.set("_bhd", String(Date.now()));
     return `${url.pathname}${url.search}`;
   } catch {
-    const base = path.includes("?") ? path : `${path}?`;
-    const join = base.endsWith("?") || base.endsWith("&") ? "" : "&";
-    const auPart = au ? `au=${encodeURIComponent(au)}&` : "";
-    return `${path.includes("?") ? path : `${path}?`}${join}${auPart}_bhd=${Date.now()}`.replace("?&", "?");
+    return path;
   }
 }
 
-/** Bust bfcache / soft RSC so the rebound session always remounts server UI. */
+/**
+ * Hard switch path only: au + one-shot _bhd cache buster.
+ */
+export function accountBoundReturnPath(returnTo = "/", sub?: string | null) {
+  const path = accountBoundPath(returnTo, sub);
+  try {
+    const url = new URL(path, "https://bhd.local");
+    url.searchParams.set("_bhd", String(Date.now()));
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return path.includes("?") ? `${path}&_bhd=${Date.now()}` : `${path}?_bhd=${Date.now()}`;
+  }
+}
+
+/** After a stable load, drop `_bhd` so F5 / in-app links do not look like a forced refresh. */
+export function scrubCacheBustFromUrl() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("_bhd")) return;
+    url.searchParams.delete("_bhd");
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(window.history.state, "", next || "/");
+  } catch {
+    /* ignore */
+  }
+}
+
 export function cacheBustReturnPath(returnTo = "/", sub?: string | null) {
   return accountBoundReturnPath(returnTo, sub);
 }
@@ -101,7 +120,6 @@ export function allowedBhdUrl(value: string) {
   return "";
 }
 
-/** Only path that may open /login?add=1 (docs/BHD-ACCOUNT-SWITCHER.md). */
 export function addAccountUrl() {
   const next = isIdentityOrigin()
     ? currentReturnPath()
@@ -111,17 +129,18 @@ export function addAccountUrl() {
 
 const REBIND_LOCK = "bhd_rebind_lock";
 
-/** True if a rebind/navigation is already in flight (prevents double submit / freeze). */
 export function isAccountRebindPending() {
   if (typeof sessionStorage === "undefined") return false;
   const raw = sessionStorage.getItem(REBIND_LOCK);
   if (!raw) return false;
   const at = Number(raw);
-  return Number.isFinite(at) && Date.now() - at < 15_000;
+  return Number.isFinite(at) && Date.now() - at < 12_000;
 }
 
-/** Full-viewport privacy veil — previous account pixels must never stay visible. */
-export function paintPrivacyVeil(message = "جاري عزل بيانات الحساب…") {
+/**
+ * Blank cover during user-initiated switch only — no text (Google-like, no notices).
+ */
+export function paintPrivacyVeil(_message?: string) {
   if (typeof document === "undefined") return;
   try {
     document.documentElement.dataset.bhdSwitching = "1";
@@ -129,12 +148,11 @@ export function paintPrivacyVeil(message = "جاري عزل بيانات الح�
     if (!veil) {
       veil = document.createElement("div");
       veil.id = "bhd-privacy-veil";
-      veil.setAttribute("role", "status");
+      veil.setAttribute("aria-hidden", "true");
       veil.style.cssText =
-        "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#092d24;color:#fff;font:600 1rem/1.5 system-ui,sans-serif;padding:1.5rem;text-align:center";
+        "position:fixed;inset:0;z-index:2147483647;background:var(--ink-900,#092d24);pointer-events:none";
       document.body.appendChild(veil);
     }
-    veil.textContent = message;
   } catch {
     /* ignore */
   }
@@ -162,12 +180,47 @@ function rebindWithWindowToken(token: string, returnTo: string, sub?: string | n
 }
 
 /**
- * Switch window identity Bearer only (no BhdIdentity.switchAccount auto-isolate).
- * Product isolation is always applyAccountIsolation afterward.
- *
- * Persists shared bhd_id (X-BHD-Persist-Cookie) so linked BHD apps open as this
- * account — Google-style cross-app follow — while ?au= keeps other tabs bound.
+ * Silent JSON rebind — no overlay, no redirect when already on the right account.
+ * Used on refresh / SoftSSO. Returns whether a hard navigation is still needed.
  */
+export async function silentRebind(
+  token?: string | null,
+  sub?: string | null,
+): Promise<{ ok: boolean; unchanged?: boolean; userId?: string }> {
+  if (typeof window === "undefined") return { ok: false };
+  const boundSub = (sub || readActiveAu() || "").trim();
+  if (boundSub) setActiveAu(boundSub);
+  const windowToken =
+    token || (boundSub ? tokenForAccount(boundSub) : "") || boundWindowToken() || "";
+  if (!windowToken) return { ok: false };
+
+  try {
+    const response = await fetch("/api/auth/bhd/rebind", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        token: windowToken,
+        returnTo: accountBoundPath(currentReturnPath(), boundSub),
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      unchanged?: boolean;
+      user?: { id?: string } | null;
+    };
+    if (!response.ok || !body.ok) return { ok: false };
+    if (body.user?.id) setActiveAu(body.user.id);
+    return { ok: true, unchanged: Boolean(body.unchanged), userId: body.user?.id };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; token?: string; userId?: string }> {
   if (!sub) return { ok: false };
   paintPrivacyVeil();
@@ -196,38 +249,50 @@ export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; t
 }
 
 /**
- * Bind this product tab to THIS window's identity account only.
- *
- * PRIMARY path: POST /api/auth/bhd/rebind with the window Bearer.
- * Why: Bearer switch alone is not enough — product cookies must rewrite too.
- *
- * Handoff→start is only for bootstrap when no window token exists.
+ * Bind product tab to this window's identity account.
+ * - silent: JSON cookie rewrite, soft reload only if account actually changed.
+ * - default (switch): blank cover + form POST hard navigation (full isolation).
  */
 export async function applyAccountIsolation(
   token?: string | null,
-  options?: { force?: boolean; sub?: string | null },
+  options?: { force?: boolean; sub?: string | null; silent?: boolean },
 ) {
   if (typeof window === "undefined") return;
   if (!options?.force && isAccountRebindPending()) return;
   const sub = (options?.sub || readActiveAu() || "").trim();
   if (sub) setActiveAu(sub);
   const here = currentReturnPath();
+
   if (isIdentityOrigin()) {
-    const next = accountBoundReturnPath(here, sub);
-    window.location.assign(next);
+    window.location.assign(accountBoundPath(here, sub));
     return;
   }
-  markIsolationPending();
+
   const windowToken =
     token || (sub ? tokenForAccount(sub) : "") || boundWindowToken() || sessionStorage.getItem("bhd_window_token") || "";
 
-  // Authoritative: rewrite hr_session from this window's Bearer (never shared bhd_id alone).
+  if (options?.silent) {
+    const result = await silentRebind(windowToken, sub);
+    if (result.ok && result.unchanged) {
+      clearAccountRebindLock();
+      scrubCacheBustFromUrl();
+      return;
+    }
+    if (result.ok && result.userId) {
+      // Account changed in background — one soft navigation, no notice.
+      sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
+      window.location.replace(accountBoundPath(here, result.userId));
+      return;
+    }
+    // Fall through to hard path only if silent failed.
+  }
+
+  markIsolationPending();
   if (windowToken) {
     rebindWithWindowToken(windowToken, here, sub);
     return;
   }
 
-  // Bootstrap only (no window token yet): official handoff → start.
   try {
     const response = await identityFetch("/api/auth/window-handoff", { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { ticket?: string };
@@ -246,13 +311,11 @@ export async function applyAccountIsolation(
     /* fall through */
   }
 
-  // Last resort: clear product session then OIDC start (still must not skip logout).
   window.location.assign(
     `/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(accountBoundReturnPath(here, sub)))}`,
   );
 }
 
-/** Call after a successful matched page load so the next switch can rebind again. */
 export function clearAccountRebindLock() {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.removeItem(REBIND_LOCK);
@@ -264,7 +327,6 @@ export function clearAccountRebindLock() {
   }
 }
 
-/** Identity account recovery when the identity returns ACCOUNT_SECURITY_HOLD. */
 export function identityRecoverUrl() {
   return `${DEFAULT_IDENTITY_ISSUER}/recover`;
 }

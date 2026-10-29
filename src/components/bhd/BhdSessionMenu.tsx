@@ -126,10 +126,10 @@ export function BhdSessionMenu({
       if (!sub || sub === active.id || busy || isAccountRebindPending()) return;
       try {
         setBusy(true);
-        paintPrivacyVeil("جاري التبديل وعزل بيانات الحساب السابق…");
-        // Hide previous account data immediately (privacy) until handoff finishes.
+        // Blank cover only — no text notice (Google-like). Hard remount clears prior data.
+        paintPrivacyVeil();
         setAccounts([]);
-        setActive({ id: "", name: "…", email: "…", picture: null });
+        setActive({ id: "", name: "", email: "", picture: null });
         const switched = await switchWindowAccount(sub);
         if (switched.ok) {
           await applyAccountIsolation(switched.token, {

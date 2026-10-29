@@ -5,7 +5,7 @@ import {
   clearAccountRebindLock,
   isAccountRebindPending,
   isIdentityOrigin,
-  paintPrivacyVeil,
+  scrubCacheBustFromUrl,
 } from "@/lib/identity/client";
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import {
@@ -17,8 +17,8 @@ import {
 import { useEffect } from "react";
 
 /**
- * Google authuser gate: never paint product data until identity Bearer (for ?au=)
- * matches the product session. On mismatch, full-page veil + hard rebind.
+ * Ensures identity ≡ product ≡ ?au= without any visible notice.
+ * Matched → scrub `_bhd` and continue. Mismatch → silent JSON rebind.
  */
 export function BhdPrivacyGate({
   productSub,
@@ -53,16 +53,29 @@ export function BhdPrivacyGate({
         const au = readActiveAu();
         if (au) setActiveAu(au);
 
-        // Product session already matches URL/window binding — lift veil.
-        if (productSub && au && productSub === au) {
+        // Fast path: product already bound to this tab's account — no network, no overlay.
+        if (productSub && (!au || productSub === au)) {
+          if (productSub) setActiveAu(productSub);
           clearAccountRebindLock();
+          scrubCacheBustFromUrl();
+          return;
+        }
+
+        if (isAccountRebindPending()) {
+          // Switch navigation in flight — do not paint notices on the landing page.
+          if (productSub && au && productSub === au) {
+            clearAccountRebindLock();
+            scrubCacheBustFromUrl();
+          }
           return;
         }
 
         const identity = await loadBhdIdentity();
         if (cancelled || !identity) {
-          // No identity script — still clear lock so the page is usable offline.
-          if (productSub) clearAccountRebindLock();
+          if (productSub) {
+            clearAccountRebindLock();
+            scrubCacheBustFromUrl();
+          }
           return;
         }
 
@@ -70,6 +83,7 @@ export function BhdPrivacyGate({
         if (cancelled) return;
         if (!ok || !body.user?.id) {
           clearAccountRebindLock();
+          scrubCacheBustFromUrl();
           return;
         }
 
@@ -77,8 +91,6 @@ export function BhdPrivacyGate({
         const identityEmail = (body.user.email || "").trim().toLowerCase();
         const localEmail = (productEmail || "").trim().toLowerCase();
         if (typeof body.token === "string") captureAccountToken(identityId, body.token);
-
-        // Bind URL au to the window if missing.
         if (!au) setActiveAu(identityId);
 
         const targetAu = readActiveAu() || identityId;
@@ -90,17 +102,13 @@ export function BhdPrivacyGate({
 
         if (matched) {
           clearAccountRebindLock();
+          scrubCacheBustFromUrl();
           return;
         }
 
-        if (isAccountRebindPending()) {
-          paintPrivacyVeil();
-          return;
-        }
-
-        paintPrivacyVeil("جاري ربط الجلسة بالحساب المحدد…");
+        // Silent repair — no message, no green splash.
         const token = boundWindowToken() || (typeof body.token === "string" ? body.token : "");
-        await applyAccountIsolation(token, { force: true, sub: targetAu || identityId });
+        await applyAccountIsolation(token, { force: true, sub: targetAu || identityId, silent: true });
       } catch {
         clearAccountRebindLock();
       }

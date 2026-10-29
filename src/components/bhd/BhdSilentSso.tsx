@@ -5,17 +5,16 @@ import {
   clearAccountRebindLock,
   isAccountRebindPending,
   isIdentityOrigin,
-  paintPrivacyVeil,
   productStartPath,
+  scrubCacheBustFromUrl,
 } from "@/lib/identity/client";
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import { boundWindowToken, readActiveAu, setActiveAu } from "@/lib/identity/window-session";
 import { useEffect } from "react";
 
 /**
- * Keep THIS tab bound to its ?au= / window Bearer (Google authuser model).
- * Product cookies (hr_session) are shared across tabs — when another tab switches,
- * restore this tab to its bound account instead of adopting the shared cookie.
+ * Keep THIS tab on its ?au= account. Drift from another tab's shared cookie is
+ * repaired silently (JSON rebind) — never a full-screen notice.
  */
 export function BhdSilentSso() {
   useEffect(() => {
@@ -39,10 +38,23 @@ export function BhdSilentSso() {
     let timer = 0;
 
     async function reconcile() {
-      if (cancelled || isAccountRebindPending()) return;
+      if (cancelled || isAccountRebindPending() || document.hidden) return;
       try {
         const au = readActiveAu();
         if (au) setActiveAu(au);
+
+        const localResponse = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
+        const local = (await localResponse.json().catch(() => ({}))) as {
+          user?: { id?: string; email?: string } | null;
+        };
+        if (cancelled) return;
+
+        // Already aligned with this tab's au — nothing to do (no flash on refresh).
+        if (local.user?.id && au && local.user.id === au) {
+          clearAccountRebindLock();
+          scrubCacheBustFromUrl();
+          return;
+        }
 
         const identity = await loadBhdIdentity();
         if (cancelled || !identity) return;
@@ -55,30 +67,15 @@ export function BhdSilentSso() {
         const identityId = body.user.id;
         const targetAu = au || identityId;
 
-        // Tab is bound to a different account than the current Bearer — rebind to bound token.
-        if (au && identityId !== au) {
-          const token = boundWindowToken();
-          if (token) {
-            paintPrivacyVeil();
-            await applyAccountIsolation(token, { force: true, sub: au });
-            return;
-          }
-        }
-
-        const localResponse = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
-        const local = (await localResponse.json().catch(() => ({}))) as {
-          user?: { id?: string; email?: string } | null;
-        };
-        if (cancelled) return;
-
         if (local.user?.id && local.user.id === identityId && local.user.id === targetAu) {
           clearAccountRebindLock();
+          scrubCacheBustFromUrl();
           return;
         }
 
         const guardKey = `bhd-sso:${targetAu || identityId}`;
         const last = Number(sessionStorage.getItem(guardKey) || "0");
-        if (last && Date.now() - last < 8_000) return;
+        if (last && Date.now() - last < 12_000) return;
         sessionStorage.setItem(guardKey, String(Date.now()));
 
         if (!local.user?.id) {
@@ -87,10 +84,12 @@ export function BhdSilentSso() {
           return;
         }
 
-        paintPrivacyVeil();
-        await applyAccountIsolation(boundWindowToken() || body.token, {
+        const token =
+          (au && identityId !== au ? boundWindowToken() : "") || boundWindowToken() || body.token;
+        await applyAccountIsolation(token, {
           force: true,
           sub: targetAu || identityId,
+          silent: true,
         });
       } catch {
         clearAccountRebindLock();
@@ -102,9 +101,10 @@ export function BhdSilentSso() {
       if (!document.hidden) void reconcile();
     };
     document.addEventListener("visibilitychange", onVis);
+    // Rare background check — not every few seconds (that caused blink).
     timer = window.setInterval(() => {
       if (!document.hidden) void reconcile();
-    }, 4_000);
+    }, 20_000);
 
     return () => {
       cancelled = true;
