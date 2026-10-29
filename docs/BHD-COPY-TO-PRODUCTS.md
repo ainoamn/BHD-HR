@@ -2,21 +2,22 @@
 
 ارفع هذه الملفات إلى كل مستودع منتج (وازن، حسابي، نَسَب، المتجر، المكتب، الموارد البشرية، …) ثم طبّق القسم الخاص بالجلسة والكتالوج.
 
-**المصدر الحي:** [ainoamn/ONE-BHD](https://github.com/ainoamn/ONE-BHD) — `BHD-Complete-Brand-and-Portal-v1.1.0/docs/`  
-**نُشر أيضاً على:** `https://id.bhd-om.com/docs/BHD-COPY-TO-PRODUCTS.md`
+**المصدر الحي:** [ainoamn/ONE-BHD](https://github.com/ainoamn/ONE-BHD) — `BHD-Complete-Brand-and-Portal-v1.1.0/docs/`
 
 | انسخ الملف | إلى |
 |---|---|
-| `docs/BHD-SESSION-POLICY.md` | سياسة الجلسة 400 يوم + نوافذ متعددة |
+| `docs/BHD-SESSION-POLICY.md` | سياسة الجلسة 40 يوماً ثم دخول جديد + نوافذ متعددة |
 | `docs/BHD-SECURITY-PROTECTION.md` | الاحتيال، حظر IP، قفل الحساب، `/recover` |
 | `docs/BHD-APP-SWITCHER.md` | المشغّل + الموارد البشرية |
 | `docs/BHD-ACCOUNT-SWITCHER.md` | بطاقة الحساب |
 | `docs/BHD-PRODUCT-SSO-ADMIN.md` | SSO صامت + أدمن محلي |
 | `docs/BHD-UNIFIED-LOGIN-AND-APPS.md` | الدليل المرجعي |
-| `app/lib/bhd/apps.ts` | احتياط محلي فقط — المصدر الحي `/api/bhd/catalog` (انظر §4) |
-| أيقونات `BhdAppIcon` | تدعم `logoUrl` من الكتالوج الحي |
+| `docs/BHD-IDENTITY-RUNTIME.md` | **الربط الحي:** API + `bhd-identity.js` بدل نسخ الجلسة في كل موقع |
+| `docs/BHD-CURSOR-PRODUCT-WIRE.md` | أمر جاهز للصقه في كورسر على مستودع المنتج |
+| `app/lib/bhd/apps.ts` | احتياطي إن لم يُقرأ الكتالوج من الهوية بعد |
+| أيقونات `BhdAppIcon` إن تغيّرت العلامات | نفس المسار في المنتج |
 
-الهوية: `https://id.bhd-om.com` — الإدارة: `https://id.bhd-om.com/admin`
+الهوية: `https://id.bhd-om.com` — الإدارة: [`https://id.bhd-om.com/admin#connect`](https://id.bhd-om.com/admin#connect) (تفاصيل الربط الحي) ثم [`#clients`](https://id.bhd-om.com/admin#clients) لتسجيل OAuth.
 
 ---
 
@@ -32,36 +33,27 @@
 - نافذة جديدة بلا رمز تتبنّى الكوكي الحالية (آخر دخول كامل، لا آخر تبديل).
 - خروج «هذا الحساب» في نافذة يضع `bhd_window_signed_out` ولا يمسح جلسات النوافذ الأخرى. خروج الكل يمر بـ `end-session?all=1`.
 
-### ماذا ينسخ المنتج؟
+### ماذا يفعل المنتج؟ (حي من الهوية)
 
-1. انسخ `app/lib/identity/window-session.ts` وحدّث `identityFetch` لإرفاق الترويسة.
-2. بعد `POST /api/auth/switch` و`/login` و`/google` احفظ `token` من JSON في `captureWindowToken`.
-3. لا تستخدم `BroadcastChannel` لمزامنة الحساب النشط بين النوافذ.
-4. اجعل طلبات `/api/account` وبيانات المستخدم تمر من `identityFetch` لا من `fetch` العاري حتى لا تُقرأ كوكي نافذة أخرى.
-
-### تطبيق BHD-HR (الربط الحي — المفضّل)
-
-انظر [`BHD-IDENTITY-RUNTIME.md`](BHD-IDENTITY-RUNTIME.md). المنتج يحمّل `bhd-identity.js` ويقرأ `runtime.session.maxAgeSec`؛ لا يعيد كتابة الجلسة أو النافذة محلياً.
-
-- سكربت: `https://id.bhd-om.com/bhd-identity.js` في `layout.tsx`
-- مدة الكوكي: `identitySessionMaxAgeSec()` من `/api/bhd/runtime`
-- الرأس: `BhdIdentity.me` / `switchAccount` / `signOut`
-- يبقى محلياً فقط: `start` / `callback` / `logout`
+1. حمّل `https://id.bhd-om.com/bhd-identity.js` — التفاصيل في [`BHD-IDENTITY-RUNTIME.md`](BHD-IDENTITY-RUNTIME.md).
+2. اقرأ مدة الجلسة من `GET https://id.bhd-om.com/api/bhd/runtime` لا من ثابت محلي.
+3. لا تنسخ منطق النوافذ. السكربت يرسل Bearer لكل نافذة.
+4. بعد التبديل يجب أن تختفي بيانات الحساب السابق فوراً. المسار الآمن: `POST /api/auth/bhd/rebind` بـ Bearer النافذة (انظر [`BHD-ACCOUNT-ISOLATION.md`](BHD-ACCOUNT-ISOLATION.md)). ممنوع فتح `/start` بعد تبديل Bearer بلا handoff. ممنوع `BroadcastChannel` لمزامنة الحساب بين النوافذ.
 
 ---
 
-## 2. مدة الدخول: حتى الخروج، سقف الكوكي 400 يوم
+## 2. مدة الدخول: 40 يوماً ثم تسجيل الدخول من جديد
 
-المستخدم يبقى داخل الحساب **حتى يضغط خروج**. ليست هناك مهلة 40 يوماً مقصودة.
+للحماية: بعد **40 يوماً** من إصدار الجلسة ينتهي JWT والكوكي ويُطلب الدخول على الهوية. الخمول لا يُسقط الجلسة قبل ذلك. «خروج» يمسحها فوراً.
 
 | البند | القيمة |
 |---|---|
-| JWT `exp` وكوكي `bhd_id` / `bhd_portal` / `bhd_id_roster` | 400 يوم (`expires` + `maxAge`) عبر تاريخ مطلق لا سلسلة ثوانٍ قد تُفسَّر خطأ |
-| Access token OIDC | 10 دقائق (يُجدَّد بالـ refresh) |
-| Refresh | 400 يوم |
-| خمول | لا يُسقط الجلسة |
+| JWT `exp` وكوكي `bhd_id` / `bhd_portal` / `bhd_id_roster` | 40 يوماً (`expires` + `maxAge`) بتاريخ مطلق |
+| Access token OIDC | 10 دقائق (يُجدَّد بالـ refresh طالما الجلسة لم تنتهِ) |
+| Refresh | 40 يوماً — لا يمدّد بعد انتهاء الجلسة |
+| خمول | لا يُسقط الجلسة قبل الـ 40 يوماً |
 
-ممنوع تجديد الكوكي في `GET /api/auth/me`.
+المنتجات تأخذ `maxAgeSec` من `/api/bhd/runtime`. ممنوع تجديد الكوكي في `GET /api/auth/me`.
 
 ---
 
@@ -69,30 +61,25 @@
 
 - سجل IP + دولة + حساب في `/admin` → الحماية والتدقيق.
 - 12 فشلاً من نفس IP / 15 د → حظر IP ساعة.
-- 8 فشل على حساب → قفل أمني حتى `/recover`.
-- المنتج لا يعيد بناء هذا المنطق. أحلِ المستخدم إلى الهوية: `https://id.bhd-om.com/recover`.
+- 8 فشل على حساب → قفل أمني حتى `/recover` (مدني، انتهاء، ميلاد، بريد، واتساب، آخر دخول، وصف نشاط، ثم رموز بريد وواتساب).
+- واتساب: جهّز المسار؛ فعّل لاحقاً بـ `WHATSAPP_TOKEN` و`WHATSAPP_FROM`.
+
+المنتج لا يعيد بناء هذا المنطق. أحلِ المستخدم إلى الهوية.
 
 ---
 
 ## 4. هل تتغيّر الأيقونات والروابط تلقائياً في كل المواقع؟
 
-**نعم — عبر الكتالوج الحي.** تُدار الشاشة من [`/admin#apps`](https://id.bhd-om.com/admin#apps) وتُقرأ من `https://id.bhd-om.com/api/bhd/catalog` (`spec: bhd-appswitcher.v1`, `live: true`, `autoPush: true`).
+**إن قرأ المنتج `/api/bhd/catalog` أو حمّل `bhd-identity.js`:** نعم. الشعار والمسمّى والرابط تُدار من [`/admin#apps`](https://id.bhd-om.com/admin#apps) وتنعكس خلال ثوانٍ.
 
-المنتج يحمّل `bhd-identity.js` (يستدعي `catalog()` ويُرسل حدث `bhd-catalog` كل ~20ث) أو يقرأ الكتالوج مباشرة. النسخة المحلية في `apps.ts` **احتياط** فقط إن تعذّر الاتصال — لن تتحدث وحدها.
-
-لوحة التحكم لكل موقع: المسمّى عربي/إنجليزي، الأصل + الرئيسية + مساحة العمل، الشعار، الترتيب، الإظهار/الإخفاء.
+**إن بقي الكتالوج منسوخاً في `apps.ts`:** لا. انقلوا المشغّل إلى قراءة `/api/bhd/catalog` أو حمّلوا `bhd-identity.js`.
 
 ---
 
-## 5. قائمة تحقق BHD-HR
+## 5. قائمة تحقق سريعة للمنتج
 
-- [x] `identityFetch` يرسل Bearer من `sessionStorage`
-- [x] حفظ `token` بعد التبديل و`/me`
-- [x] جلسة المنتج 400 يوم (`SESSION_MAX_AGE`) حتى خروج صريح
-- [x] `/api/auth/me` بلا `Set-Cookie`
-- [x] لا `BroadcastChannel` ولا `SessionKeepAlive`
-- [x] رابط الاستعادة `https://id.bhd-om.com/recover`
-- [x] كتالوج حي للرأس والفوتر والرئيسية (`useBhdCatalog` / `BhdProgramsGrid`)
-- [x] عزل التبديل عبر `BhdIdentity.isolate` (handoff) مع احتياط rebind
-- [x] CSP: `script-src` / `connect-src` / `img-src` لـ `https://id.bhd-om.com`
-- [x] دليل الوكيل [`BHD-CURSOR-PRODUCT-WIRE.md`](./BHD-CURSOR-PRODUCT-WIRE.md)
+- [ ] `<script src="https://id.bhd-om.com/bhd-identity.js">`
+- [ ] كوكي المنتج `maxAge` من `runtime.session.maxAgeSec`
+- [ ] الكتالوج من `/api/bhd/catalog` لا من نسخة محلية قديمة
+- [ ] hops إلى `workspacePath` مباشرة إن وُجدت جلسة المنتج
+- [ ] رابط الاستعادة `https://id.bhd-om.com/recover` عند `ACCOUNT_SECURITY_HOLD`
