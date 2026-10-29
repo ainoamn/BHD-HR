@@ -1,6 +1,7 @@
 "use client";
 
 import { identityFetch, isIdentityOrigin, productStartPath } from "@/lib/identity/client";
+import { captureWindowToken } from "@/lib/identity/window-session";
 import { useEffect } from "react";
 
 /**
@@ -32,8 +33,9 @@ export function BhdSilentSso() {
 
     identityFetch("/api/auth/me")
       .then((response) => response.json())
-      .then(async (identity: { user?: { id?: string } | null }) => {
+      .then(async (identity: { user?: { id?: string } | null; token?: string }) => {
         if (cancelled || !identity.user?.id) return;
+        captureWindowToken(identity.token);
         const localResponse = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
         const local = (await localResponse.json().catch(() => ({}))) as { user?: { id?: string } | null };
         if (cancelled) return;

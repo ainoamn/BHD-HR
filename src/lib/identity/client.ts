@@ -1,5 +1,6 @@
 import { BHD_APPS } from "@/lib/bhd/apps";
 import { DEFAULT_IDENTITY_ISSUER } from "@/lib/bhd/identity-public";
+import { captureWindowToken, windowFetchHeaders } from "@/lib/identity/window-session";
 
 export function pageOrigin() {
   return typeof window === "undefined" ? "" : window.location.origin.replace(/\/$/, "");
@@ -16,13 +17,26 @@ export function identityApiUrl(path: string) {
   return `${DEFAULT_IDENTITY_ISSUER}${normalized}`;
 }
 
-/** Always hit the identity host directly (docs/BHD-ACCOUNT-SWITCHER.md §2). */
-export function identityFetch(path: string, init?: RequestInit) {
-  return fetch(identityApiUrl(path), {
+/**
+ * Always hit the identity host directly (docs/BHD-ACCOUNT-SWITCHER.md §2).
+ * Attaches this window's Bearer so multi-window accounts stay isolated (docs/BHD-COPY-TO-PRODUCTS.md §1).
+ */
+export async function identityFetch(path: string, init?: RequestInit) {
+  const headers = windowFetchHeaders(init?.headers);
+  const response = await fetch(identityApiUrl(path), {
     cache: "no-store",
     credentials: "include",
     ...init,
+    headers,
   });
+  const clone = response.clone();
+  void clone
+    .json()
+    .then((data: { token?: unknown } | null) => {
+      if (data && typeof data.token === "string") captureWindowToken(data.token);
+    })
+    .catch(() => undefined);
+  return response;
 }
 
 export function currentReturnPath() {
@@ -68,4 +82,9 @@ export function applyAccountIsolation() {
     return;
   }
   window.location.assign(productStartPath(here));
+}
+
+/** Identity account recovery when the identity returns ACCOUNT_SECURITY_HOLD. */
+export function identityRecoverUrl() {
+  return `${DEFAULT_IDENTITY_ISSUER}/recover`;
 }

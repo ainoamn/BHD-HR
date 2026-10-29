@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { type UiLocale } from "@/lib/bhd/identity-public";
 import { addAccountUrl, applyAccountIsolation, identityFetch } from "@/lib/identity/client";
+import { captureWindowToken, signOutThisWindow } from "@/lib/identity/window-session";
 import { BhdAppSwitcher, type BhdSwitcherUser } from "./BhdAppSwitcher";
 
 type MeResponse = {
   user?: BhdSwitcherUser | null;
   accounts?: BhdSwitcherUser[];
+  token?: string;
 };
 
 /**
@@ -40,6 +42,7 @@ export function BhdSessionMenu({
       .then((response) => (response.ok ? response.json() : null))
       .then((data: MeResponse | null) => {
         if (cancelled || !data) return;
+        captureWindowToken(data.token);
         const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
         if (list.length) setAccounts(list);
         const current =
@@ -68,9 +71,11 @@ export function BhdSessionMenu({
       if (response.ok) {
         const data = (await response.json()) as MeResponse;
         if (data.user) {
+          captureWindowToken(data.token);
           applyAccountIsolation();
           return;
         }
+        signOutThisWindow();
         window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
         return;
       }
@@ -102,6 +107,8 @@ export function BhdSessionMenu({
           body: JSON.stringify({ sub }),
         });
         if (response.ok) {
+          const data = (await response.json()) as MeResponse;
+          captureWindowToken(data.token);
           // Full rebind: product session + page data must become the new account only.
           applyAccountIsolation();
           return;

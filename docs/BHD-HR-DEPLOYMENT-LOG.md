@@ -1558,3 +1558,19 @@
 **القاعدة:** `db push` (`PlatformGreeting`، `PlatformGreetingVersion`).
 
 **الخطوات:** `tsc`، الدفع إلى `main`.
+
+---
+
+## 85. نوافذ متعددة للهوية + وثائق الجلسة والحماية (2026-10-29)
+
+**المطلوب:** تطبيق [`BHD-COPY-TO-PRODUCTS.md`](https://id.bhd-om.com/docs/BHD-COPY-TO-PRODUCTS.md): `window-session.ts` و`identityFetch` بـ Bearer حتى يعمل حساب مختلف لكل نافذة على المنتج وليس الهوية فقط.
+
+| # | ما نُفّذ |
+|---|---|
+| 1 | `src/lib/identity/window-session.ts` + تحديث `identityFetch` لإرسال Bearer/`X-BHD-Window-*` وحفظ `token` |
+| 2 | `BhdSessionMenu` و`BhdSilentSso`: `captureWindowToken` بعد `/me` والتبديل؛ `signOutThisWindow` عند خروج بلا حساب متبقٍ |
+| 3 | نسخ/تحديث `docs/BHD-COPY-TO-PRODUCTS.md` و`BHD-SECURITY-PROTECTION.md` وقسم النوافذ في `BHD-SESSION-POLICY.md` |
+
+**القاعدة:** بلا تغيير مخطط.
+
+**الخطوات:** `tsc`، الدفع إلى `main`.
