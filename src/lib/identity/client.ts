@@ -71,17 +71,38 @@ export function addAccountUrl() {
 }
 
 /**
- * After switch/logout-this: reload this product bound to the new active identity sub.
- * Never opens /login?add=1.
+ * After switch/logout-this: bind product session to THIS window's identity token, then load the page.
+ * Never opens /login?add=1. Must not keep the previous product user's cookie/data (privacy).
  */
-export function applyAccountIsolation() {
+export function applyAccountIsolation(token?: string | null) {
   if (typeof window === "undefined") return;
   const here = currentReturnPath();
   if (isIdentityOrigin()) {
     window.location.assign(here);
     return;
   }
-  window.location.assign(productStartPath(here));
+  const windowToken =
+    token ||
+    (typeof sessionStorage !== "undefined" ? sessionStorage.getItem("bhd_window_token") : null) ||
+    "";
+  if (windowToken) {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/api/auth/bhd/rebind";
+    form.style.display = "none";
+    const tokenInput = document.createElement("input");
+    tokenInput.name = "token";
+    tokenInput.value = windowToken;
+    const returnInput = document.createElement("input");
+    returnInput.name = "returnTo";
+    returnInput.value = here;
+    form.append(tokenInput, returnInput);
+    document.body.appendChild(form);
+    form.submit();
+    return;
+  }
+  // No window token: clear product session then silent SSO (cookie-bound).
+  window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
 }
 
 /** Identity account recovery when the identity returns ACCOUNT_SECURITY_HOLD. */

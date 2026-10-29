@@ -2,7 +2,7 @@
 
 ملف الاستكمال من جهاز آخر: ما أُنجز بالتوقيت، والوضع الحالي، وتجهيز الجهاز الجديد، وما بقي، وقواعد العمل. لا يحتوي على أي سر؛ الأسرار في Vercel وNeon وملفات `.env` المحلية فقط.
 
-التفاصيل الكاملة لكل نشر في [`BHD-HR-DEPLOYMENT-LOG.md`](./BHD-HR-DEPLOYMENT-LOG.md) (آخرها §86)، والمرجع التقني في [`BHD-HR-TECHNICAL.md`](./BHD-HR-TECHNICAL.md)، وشرح الاستخدام في [`BHD-HR-USER-GUIDE.md`](./BHD-HR-USER-GUIDE.md).
+التفاصيل الكاملة لكل نشر في [`BHD-HR-DEPLOYMENT-LOG.md`](./BHD-HR-DEPLOYMENT-LOG.md) (آخرها §87)، والمرجع التقني في [`BHD-HR-TECHNICAL.md`](./BHD-HR-TECHNICAL.md)، وشرح الاستخدام في [`BHD-HR-USER-GUIDE.md`](./BHD-HR-USER-GUIDE.md).
 
 ---
 
@@ -10,7 +10,7 @@
 
 | البند | الحالة |
 |---|---|
-| آخر commit منشور | `e19775a` — `main` في GitHub؛ كل دفع ينشر على Vercel تلقائياً |
+| آخر commit منشور | *(بعد الدفع)* — `main` في GitHub؛ كل دفع ينشر على Vercel تلقائياً |
 | الإنتاج | https://bhd-hr.vercel.app و https://hr.bhd-om.com |
 | قاعدة البيانات | Neon **BHD HR** (`billowing-hat-97652194`)، الفرع `production`، القاعدة `neondb`. آخر: `PlatformGreeting` / `PlatformGreetingVersion` (§84)؛ قبله نقل الموظف (§83) |
 | النسخ الاحتياطي | يومي مشفّر 02:00 مسقط إلى حاوية Neon `backups` (30 يوماً)، دالة `backup` ومشغّل `daily-backup` |

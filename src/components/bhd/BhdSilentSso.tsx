@@ -1,12 +1,12 @@
 "use client";
 
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
-import { isIdentityOrigin, productStartPath } from "@/lib/identity/client";
+import { applyAccountIsolation, isIdentityOrigin, productStartPath } from "@/lib/identity/client";
 import { useEffect } from "react";
 
 /**
- * Direct URL entry: bind product session to the identity active account via live BhdIdentity.
- * Never /login?add=1 (docs/BHD-IDENTITY-RUNTIME.md).
+ * Direct URL entry: if identity window account ≠ product session, rebind from window Bearer.
+ * Never leave previous user's data on screen (docs/BHD-ACCOUNT-SWITCHER.md §2).
  */
 export function BhdSilentSso() {
   useEffect(() => {
@@ -41,6 +41,11 @@ export function BhdSilentSso() {
         if (cancelled) return;
         if (local.user?.id && local.user.id === body.user.id) return;
         sessionStorage.setItem(guardKey, "1");
+        // Prefer window-token rebind so we never SSO via the shared cookie of another account.
+        if (body.token || sessionStorage.getItem("bhd_window_token")) {
+          applyAccountIsolation(body.token);
+          return;
+        }
         window.location.replace(identity.productStart(here) || productStartPath(here));
       } catch {
         /* stay */

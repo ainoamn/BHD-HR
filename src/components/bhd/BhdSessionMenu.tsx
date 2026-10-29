@@ -18,8 +18,8 @@ function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwit
 }
 
 /**
- * Product header — uses live https://id.bhd-om.com/bhd-identity.js (docs/BHD-IDENTITY-RUNTIME.md).
- * Switch never opens /login?add=1; after switch the product rebinds via start.
+ * Product header — uses live https://id.bhd-om.com/bhd-identity.js.
+ * After switch, product session is rebound via /api/auth/bhd/rebind (window Bearer) so page data matches.
  */
 export function BhdSessionMenu({
   user,
@@ -34,6 +34,7 @@ export function BhdSessionMenu({
 }) {
   const [accounts, setAccounts] = useState<BhdSwitcherUser[]>(user.id ? [user] : []);
   const [active, setActive] = useState<BhdSwitcherUser>(user);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     setActive(user);
@@ -41,7 +42,7 @@ export function BhdSessionMenu({
   }, [identityLinked, user]);
 
   useEffect(() => {
-    if (!identityLinked) return;
+    if (!identityLinked || switching) return;
     let cancelled = false;
     void loadBhdIdentity().then(async (identity) => {
       if (cancelled || !identity) return;
@@ -52,11 +53,14 @@ export function BhdSessionMenu({
           .map((item) => asSwitcher(item))
           .filter((item): item is BhdSwitcherUser => Boolean(item?.id));
         if (list.length) setAccounts(list);
-        const current =
-          (user.id && list.find((item) => item.id === user.id)) ||
-          asSwitcher(body.user, user) ||
-          list.find((item) => item.email && item.email === user.email);
-        if (current) setActive({ ...user, ...current, id: current.id || user.id });
+        const identityUser = asSwitcher(body.user);
+        // Privacy: if identity window ≠ product session, rebind immediately — never show mixed data.
+        if (identityUser?.id && user.id && identityUser.id !== user.id) {
+          setSwitching(true);
+          applyAccountIsolation(body.token);
+          return;
+        }
+        if (identityUser) setActive({ ...user, ...identityUser, id: identityUser.id });
       } catch {
         /* keep product user */
       }
@@ -64,7 +68,7 @@ export function BhdSessionMenu({
     return () => {
       cancelled = true;
     };
-  }, [identityLinked, user]);
+  }, [identityLinked, switching, user]);
 
   const signOutThis = useCallback(async () => {
     if (!identityLinked) {
@@ -77,9 +81,10 @@ export function BhdSessionMenu({
       return;
     }
     try {
+      setSwitching(true);
       const { ok, body } = await identity.signOut(false);
       if (ok && body.user) {
-        applyAccountIsolation();
+        applyAccountIsolation(body.token);
         return;
       }
     } catch {
@@ -102,24 +107,27 @@ export function BhdSessionMenu({
 
   const switchAccount = useCallback(
     async (sub: string) => {
-      if (!sub || sub === active.id) return;
+      if (!sub || sub === active.id || switching) return;
       const identity = await loadBhdIdentity();
       if (!identity) {
         window.location.assign(productStartPath(window.location.pathname || "/"));
         return;
       }
       try {
-        const { ok } = await identity.switchAccount(sub);
+        setSwitching(true);
+        const { ok, body } = await identity.switchAccount(sub);
         if (ok) {
-          applyAccountIsolation();
+          // Bind product to the new window token — do not rely on OIDC cookie (still the previous account).
+          applyAccountIsolation(body.token);
           return;
         }
       } catch {
         /* cross-origin blocked */
       }
+      setSwitching(false);
       window.location.assign("https://id.bhd-om.com/account");
     },
-    [active.id],
+    [active.id, switching],
   );
 
   return (
@@ -130,7 +138,7 @@ export function BhdSessionMenu({
       locale={locale}
       onSignOut={() => void signOutThis()}
       onSignOutAll={identityLinked ? () => void signOutAll() : undefined}
-      onSwitchAccount={identityLinked ? (sub) => void switchAccount(sub) : undefined}
+      onSwitchAccount={identityLinked && !switching ? (sub) => void switchAccount(sub) : undefined}
       onAddAccount={identityLinked ? () => window.location.assign(addAccountUrl()) : undefined}
     />
   );
