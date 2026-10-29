@@ -7,16 +7,38 @@ import {
   isIdentityOrigin,
   productStartPath,
   scrubCacheBustFromUrl,
+  ensureAuInUrl,
+  SILENT_SSO_GUARD_MS,
+  tabMayClaimProductCookie,
 } from "@/lib/identity/client";
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import { boundWindowToken, readActiveAu, setActiveAu } from "@/lib/identity/window-session";
-import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useTransition } from "react";
 
 /**
  * Keep THIS tab on its ?au= account. Drift from another tab's shared cookie is
- * repaired silently (JSON rebind) — never a full-screen notice.
+ * repaired silently (JSON rebind) — never a full reload, and never from a
+ * background tab (that caused account flicker across windows).
  */
 export function BhdSilentSso() {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    const onRebound = () => {
+      startTransition(() => {
+        try {
+          router.refresh();
+        } catch {
+          /* ignore */
+        }
+      });
+    };
+    window.addEventListener("bhd:account-rebound", onRebound);
+    return () => window.removeEventListener("bhd:account-rebound", onRebound);
+  }, [router, startTransition]);
+
   useEffect(() => {
     const path = window.location.pathname;
     if (
@@ -53,8 +75,12 @@ export function BhdSilentSso() {
         if (local.user?.id && au && local.user.id === au) {
           clearAccountRebindLock();
           scrubCacheBustFromUrl();
+          ensureAuInUrl(au);
           return;
         }
+
+        // Background / unfocused tab: do not rewrite the shared cookie.
+        if (!tabMayClaimProductCookie()) return;
 
         const identity = await loadBhdIdentity();
         if (cancelled || !identity) return;
@@ -75,7 +101,7 @@ export function BhdSilentSso() {
 
         const guardKey = `bhd-sso:${targetAu || identityId}`;
         const last = Number(sessionStorage.getItem(guardKey) || "0");
-        if (last && Date.now() - last < 12_000) return;
+        if (last && Date.now() - last < SILENT_SSO_GUARD_MS) return;
         sessionStorage.setItem(guardKey, String(Date.now()));
 
         if (!local.user?.id) {
@@ -100,15 +126,20 @@ export function BhdSilentSso() {
     const onVis = () => {
       if (!document.hidden) void reconcile();
     };
+    const onFocus = () => {
+      void reconcile();
+    };
     document.addEventListener("visibilitychange", onVis);
-    // Rare background check — not every few seconds (that caused blink).
+    window.addEventListener("focus", onFocus);
+    // Rare check — only the focused tab claims the cookie.
     timer = window.setInterval(() => {
-      if (!document.hidden) void reconcile();
-    }, 20_000);
+      if (!document.hidden && tabMayClaimProductCookie()) void reconcile();
+    }, 60_000);
 
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
     };
   }, []);

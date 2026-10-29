@@ -6,6 +6,7 @@ import {
   isAccountRebindPending,
   isIdentityOrigin,
   scrubCacheBustFromUrl,
+  tabMayClaimProductCookie,
 } from "@/lib/identity/client";
 import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import {
@@ -106,7 +107,10 @@ export function BhdPrivacyGate({
           return;
         }
 
-        // Silent repair — no message, no green splash.
+        // Only the focused tab may rewrite the shared product cookie.
+        if (!tabMayClaimProductCookie()) return;
+
+        // Silent repair — JSON rebind only (no full reload / no splash).
         const token = boundWindowToken() || (typeof body.token === "string" ? body.token : "");
         await applyAccountIsolation(token, { force: true, sub: targetAu || identityId, silent: true });
       } catch {
