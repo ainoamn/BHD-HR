@@ -799,7 +799,8 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 |---|---|
 | `BHD-PRODUCT-SSO-ADMIN.md` | start / callback / logout / admin-entry، غلاف `/login`، `bhdSub`، رابط الإدارة في الفوتر |
 | `BHD-IDENTITY-SSO.md` | OIDC + PKCE S256، `state` و`nonce`، كوكيز Host-only، `email_verified`، لا مفاتيح في المتصفح |
-| `BHD-IDENTITY-RUNTIME.md` | سكربت حي `bhd-identity.js` + `/api/bhd/runtime`؛ مدة كوكي المنتج من `maxAgeSec`؛ الرأس عبر `BhdIdentity` (§86) |
+| `BHD-IDENTITY-RUNTIME.md` | سكربت حي `bhd-identity.js` + `/api/bhd/runtime`؛ مدة كوكي المنتج من `maxAgeSec` المخزَّن (بلا انتظار شبكة)؛ الرأس عبر `BhdIdentity` (§86–§88) |
+| إعادة الربط | `POST /api/auth/bhd/rebind` من رمز النافذة؛ قفل واحد على العميل؛ `BhdSilentSso` فقط يعيد الربط تلقائياً (§87–§88) |
 | `BHD-SESSION-POLICY.md` | بلا خمول ولا KeepAlive؛ المدة من الهوية الحيّة؛ نوافذ متعددة على الأم |
 | `BHD-COPY-TO-PRODUCTS.md` / `BHD-SECURITY-PROTECTION.md` | نسخ الوثائق؛ الحماية على الهوية و`/recover` |
 | `BHD-APP-SWITCHER.md` | كتالوج مجمد يشمل `hr` (§4.1)؛ `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher`/`BhdSessionMenu` |

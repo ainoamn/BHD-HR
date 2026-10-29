@@ -22,20 +22,31 @@ export type BhdIdentityRuntime = {
 };
 
 let cache: { at: number; maxAgeSec: number; runtime: BhdIdentityRuntime } | null = null;
-const CACHE_MS = 60_000;
+const CACHE_MS = 5 * 60_000;
 
-/** Live session length from identity — do not hardcode 400/40 in the product. */
+function acceptMaxAge(value: unknown) {
+  return typeof value === "number" && value > 0 ? Math.floor(value) : SESSION_MAX_AGE_FALLBACK;
+}
+
+/** Non-blocking: returns cache or fallback immediately; refreshes in the background. */
+export function identitySessionMaxAgeSecCached() {
+  if (cache) {
+    if (Date.now() - cache.at > CACHE_MS) void identitySessionMaxAgeSec().catch(() => undefined);
+    return cache.maxAgeSec;
+  }
+  void identitySessionMaxAgeSec().catch(() => undefined);
+  return SESSION_MAX_AGE_FALLBACK;
+}
+
+/** Live session length from identity — do not hardcode in the product. */
 export async function identitySessionMaxAgeSec(): Promise<number> {
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) return cache.maxAgeSec;
   try {
-    const response = await fetch(IDENTITY_RUNTIME_URL, { cache: "no-store", next: { revalidate: 60 } });
+    const response = await fetch(IDENTITY_RUNTIME_URL, { cache: "no-store", next: { revalidate: 300 } });
     if (!response.ok) throw new Error(`runtime ${response.status}`);
     const runtime = (await response.json()) as BhdIdentityRuntime;
-    const maxAgeSec =
-      typeof runtime.session?.maxAgeSec === "number" && runtime.session.maxAgeSec > 0
-        ? Math.floor(runtime.session.maxAgeSec)
-        : SESSION_MAX_AGE_FALLBACK;
+    const maxAgeSec = acceptMaxAge(runtime.session?.maxAgeSec);
     cache = { at: now, maxAgeSec, runtime };
     return maxAgeSec;
   } catch {

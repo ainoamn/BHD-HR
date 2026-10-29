@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { type UiLocale } from "@/lib/bhd/identity-public";
 import { loadBhdIdentity, type BhdIdentityUser } from "@/lib/identity/bhd-browser";
-import { addAccountUrl, applyAccountIsolation, productStartPath } from "@/lib/identity/client";
+import { addAccountUrl, applyAccountIsolation, isAccountRebindPending, productStartPath } from "@/lib/identity/client";
 import { BhdAppSwitcher, type BhdSwitcherUser } from "./BhdAppSwitcher";
 
 function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwitcherUser): BhdSwitcherUser | null {
@@ -18,8 +18,8 @@ function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwit
 }
 
 /**
- * Product header — uses live https://id.bhd-om.com/bhd-identity.js.
- * After switch, product session is rebound via /api/auth/bhd/rebind (window Bearer) so page data matches.
+ * Header account menu. Roster from BhdIdentity.me — does NOT auto-rebind on load
+ * (BhdSilentSso owns that) to avoid double navigation freezes.
  */
 export function BhdSessionMenu({
   user,
@@ -34,7 +34,7 @@ export function BhdSessionMenu({
 }) {
   const [accounts, setAccounts] = useState<BhdSwitcherUser[]>(user.id ? [user] : []);
   const [active, setActive] = useState<BhdSwitcherUser>(user);
-  const [switching, setSwitching] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setActive(user);
@@ -42,7 +42,7 @@ export function BhdSessionMenu({
   }, [identityLinked, user]);
 
   useEffect(() => {
-    if (!identityLinked || switching) return;
+    if (!identityLinked) return;
     let cancelled = false;
     void loadBhdIdentity().then(async (identity) => {
       if (cancelled || !identity) return;
@@ -54,13 +54,10 @@ export function BhdSessionMenu({
           .filter((item): item is BhdSwitcherUser => Boolean(item?.id));
         if (list.length) setAccounts(list);
         const identityUser = asSwitcher(body.user);
-        // Privacy: if identity window ≠ product session, rebind immediately — never show mixed data.
-        if (identityUser?.id && user.id && identityUser.id !== user.id) {
-          setSwitching(true);
-          applyAccountIsolation(body.token);
-          return;
+        // Only paint the header when it matches the product session — SilentSso rebinds otherwise.
+        if (identityUser?.id && user.id && identityUser.id === user.id) {
+          setActive({ ...user, ...identityUser, id: identityUser.id });
         }
-        if (identityUser) setActive({ ...user, ...identityUser, id: identityUser.id });
       } catch {
         /* keep product user */
       }
@@ -68,20 +65,21 @@ export function BhdSessionMenu({
     return () => {
       cancelled = true;
     };
-  }, [identityLinked, switching, user]);
+  }, [identityLinked, user.id, user.email, user.name, user.picture]);
 
   const signOutThis = useCallback(async () => {
     if (!identityLinked) {
       window.location.assign("/api/auth/bhd/logout?local=1");
       return;
     }
+    if (busy || isAccountRebindPending()) return;
     const identity = await loadBhdIdentity();
     if (!identity) {
       window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
       return;
     }
     try {
-      setSwitching(true);
+      setBusy(true);
       const { ok, body } = await identity.signOut(false);
       if (ok && body.user) {
         applyAccountIsolation(body.token);
@@ -91,7 +89,7 @@ export function BhdSessionMenu({
       /* fall through */
     }
     window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
-  }, [identityLinked]);
+  }, [busy, identityLinked]);
 
   const signOutAll = useCallback(async () => {
     if (!identityLinked) {
@@ -107,27 +105,26 @@ export function BhdSessionMenu({
 
   const switchAccount = useCallback(
     async (sub: string) => {
-      if (!sub || sub === active.id || switching) return;
+      if (!sub || sub === active.id || busy || isAccountRebindPending()) return;
       const identity = await loadBhdIdentity();
       if (!identity) {
         window.location.assign(productStartPath(window.location.pathname || "/"));
         return;
       }
       try {
-        setSwitching(true);
+        setBusy(true);
         const { ok, body } = await identity.switchAccount(sub);
         if (ok) {
-          // Bind product to the new window token — do not rely on OIDC cookie (still the previous account).
           applyAccountIsolation(body.token);
           return;
         }
       } catch {
         /* cross-origin blocked */
       }
-      setSwitching(false);
+      setBusy(false);
       window.location.assign("https://id.bhd-om.com/account");
     },
-    [active.id, switching],
+    [active.id, busy],
   );
 
   return (
@@ -138,7 +135,7 @@ export function BhdSessionMenu({
       locale={locale}
       onSignOut={() => void signOutThis()}
       onSignOutAll={identityLinked ? () => void signOutAll() : undefined}
-      onSwitchAccount={identityLinked && !switching ? (sub) => void switchAccount(sub) : undefined}
+      onSwitchAccount={identityLinked && !busy ? (sub) => void switchAccount(sub) : undefined}
       onAddAccount={identityLinked ? () => window.location.assign(addAccountUrl()) : undefined}
     />
   );

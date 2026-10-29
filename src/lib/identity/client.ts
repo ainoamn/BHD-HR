@@ -70,21 +70,32 @@ export function addAccountUrl() {
   return `${identityApiUrl("/login")}?add=1&next=${encodeURIComponent(next)}`;
 }
 
+const REBIND_LOCK = "bhd_rebind_lock";
+
+/** True if a rebind/navigation is already in flight (prevents double submit / freeze). */
+export function isAccountRebindPending() {
+  if (typeof sessionStorage === "undefined") return false;
+  const raw = sessionStorage.getItem(REBIND_LOCK);
+  if (!raw) return false;
+  const at = Number(raw);
+  return Number.isFinite(at) && Date.now() - at < 12_000;
+}
+
 /**
  * After switch/logout-this: bind product session to THIS window's identity token, then load the page.
  * Never opens /login?add=1. Must not keep the previous product user's cookie/data (privacy).
+ * Deduped: only one rebind at a time so refresh/switch cannot stack navigations.
  */
 export function applyAccountIsolation(token?: string | null) {
   if (typeof window === "undefined") return;
+  if (isAccountRebindPending()) return;
   const here = currentReturnPath();
   if (isIdentityOrigin()) {
     window.location.assign(here);
     return;
   }
-  const windowToken =
-    token ||
-    (typeof sessionStorage !== "undefined" ? sessionStorage.getItem("bhd_window_token") : null) ||
-    "";
+  sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
+  const windowToken = token || sessionStorage.getItem("bhd_window_token") || "";
   if (windowToken) {
     const form = document.createElement("form");
     form.method = "POST";
@@ -101,8 +112,14 @@ export function applyAccountIsolation(token?: string | null) {
     form.submit();
     return;
   }
-  // No window token: clear product session then silent SSO (cookie-bound).
   window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
+}
+
+/** Call after a successful matched page load so the next switch can rebind again. */
+export function clearAccountRebindLock() {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(REBIND_LOCK);
+  sessionStorage.removeItem(`bhd-sso:${currentReturnPath()}`);
 }
 
 /** Identity account recovery when the identity returns ACCOUNT_SECURITY_HOLD. */

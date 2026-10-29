@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COMPANY_COOKIE, SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/auth";
+import { COMPANY_COOKIE, SESSION_COOKIE, getSessionUser, sessionCookieOptions, signSession } from "@/lib/auth";
 import { identityIssuer, isSsoConfigured, safeReturnPath, type IdentityProfile } from "@/lib/bhd/identity";
 import { requestMeta } from "@/lib/login-events";
 import { signInOrigin } from "@/lib/request-origin";
@@ -9,15 +9,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Rebind the product session to the identity account of this browser window's Bearer token.
- * Required after account switch: OIDC authorize still sees the shared cookie, but the window
- * token is the active account (privacy — must not keep the previous product user's data).
+ * Rebind the product session to this window's identity Bearer account.
+ * Fast path: if already bound to the same sub, redirect immediately (no DB / no identity round-trip beyond /me).
  */
 async function profileFromWindowToken(token: string): Promise<IdentityProfile> {
   const issuer = identityIssuer();
   const response = await fetch(`${issuer}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) throw new Error(`me_${response.status}`);
   const body = (await response.json()) as {
@@ -32,6 +32,13 @@ async function profileFromWindowToken(token: string): Promise<IdentityProfile> {
     name: typeof user.name === "string" && user.name.trim() ? user.name.trim() : email.split("@")[0],
     picture: typeof user.picture === "string" && user.picture.startsWith("https://") ? user.picture : null,
   };
+}
+
+function redirectHome(origin: string, returnTo: string, clearCompany = false) {
+  const response = NextResponse.redirect(new URL(returnTo, origin), 303);
+  if (clearCompany) response.cookies.delete(COMPANY_COOKIE);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }
 
 async function rebind(request: Request) {
@@ -52,7 +59,6 @@ async function rebind(request: Request) {
     token = String(form?.get("token") || "").trim();
     returnTo = safeReturnPath(String(form?.get("returnTo") || ""));
   } else {
-    // GET: Authorization header only — never put the window JWT in the query string (logs / Referer).
     returnTo = safeReturnPath(new URL(request.url).searchParams.get("returnTo"));
   }
 
@@ -64,14 +70,20 @@ async function rebind(request: Request) {
 
   try {
     const profile = await profileFromWindowToken(token);
+    const current = await getSessionUser();
+    if (current?.bhdSub && current.bhdSub === profile.sub) {
+      // Already on the correct account — do not rewrite cookies or hit the DB again.
+      return redirectHome(origin, returnTo);
+    }
     const user = await signInBhdUser(profile, requestMeta(request));
-    const response = NextResponse.redirect(new URL(returnTo, origin), 303);
-    response.cookies.delete(COMPANY_COOKIE);
-    response.cookies.set(SESSION_COOKIE, signSession(user), await sessionCookieOptions());
-    response.headers.set("Cache-Control", "no-store");
+    const response = redirectHome(origin, returnTo, true);
+    response.cookies.set(SESSION_COOKIE, signSession(user), sessionCookieOptions());
     return response;
   } catch {
-    const response = NextResponse.redirect(new URL(`/api/auth/bhd/logout?continue=${encodeURIComponent(`/api/auth/bhd/start?returnTo=${encodeURIComponent(returnTo)}`)}`, origin), 303);
+    const response = NextResponse.redirect(
+      new URL(`/api/auth/bhd/logout?continue=${encodeURIComponent(`/api/auth/bhd/start?returnTo=${encodeURIComponent(returnTo)}`)}`, origin),
+      303,
+    );
     response.cookies.delete(SESSION_COOKIE);
     response.cookies.delete(COMPANY_COOKIE);
     return response;

@@ -36,8 +36,8 @@ declare global {
   }
 }
 
-/** Wait briefly for the deferred identity script, then return the live API. */
-export function loadBhdIdentity(timeoutMs = 4000): Promise<BhdIdentityApi | null> {
+/** Wait briefly for the deferred identity script (short timeout — page must not hang). */
+export function loadBhdIdentity(timeoutMs = 1200): Promise<BhdIdentityApi | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
   if (window.BhdIdentity) return Promise.resolve(window.BhdIdentity);
   return new Promise((resolve) => {
@@ -51,7 +51,7 @@ export function loadBhdIdentity(timeoutMs = 4000): Promise<BhdIdentityApi | null
         resolve(null);
         return;
       }
-      window.setTimeout(tick, 50);
+      window.setTimeout(tick, 40);
     };
     tick();
   });
