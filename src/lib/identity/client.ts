@@ -1,6 +1,5 @@
 import { DEFAULT_IDENTITY_ISSUER } from "@/lib/bhd/identity-public";
 import { getCachedCatalogApps } from "@/lib/bhd/catalog";
-import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
 import { captureWindowToken, windowFetchHeaders } from "@/lib/identity/window-session";
 
 export function pageOrigin() {
@@ -99,8 +98,33 @@ function rebindWithWindowToken(token: string, returnTo: string) {
 }
 
 /**
+ * Switch the window identity account WITHOUT calling BhdIdentity.switchAccount
+ * (that auto-isolate can leave the product on the previous hr_session via shared bhd_id).
+ * Returns the new window token for product rebind.
+ */
+export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; token?: string; userId?: string }> {
+  if (!sub) return { ok: false };
+  const response = await identityFetch("/api/auth/switch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sub }),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    token?: string;
+    user?: { id?: string } | null;
+  };
+  if (typeof body.token === "string") captureWindowToken(body.token);
+  return {
+    ok: response.ok,
+    token: typeof body.token === "string" ? body.token : undefined,
+    userId: body.user?.id,
+  };
+}
+
+/**
  * Bind this product tab to the window identity account only (privacy).
- * Prefers BhdIdentity.isolate (window-handoff → start). Falls back to /api/auth/bhd/rebind.
+ * Prefer POST /api/auth/bhd/rebind with the window Bearer — that is the only path that
+ * cannot accidentally keep the previous product cookie via shared bhd_id + start.
  * Deduped so refresh/switch cannot stack navigations.
  */
 export function applyAccountIsolation(token?: string | null) {
@@ -113,21 +137,11 @@ export function applyAccountIsolation(token?: string | null) {
   }
   sessionStorage.setItem(REBIND_LOCK, String(Date.now()));
   const windowToken = token || sessionStorage.getItem("bhd_window_token") || "";
-
-  void loadBhdIdentity(800).then((identity) => {
-    if (identity?.isolate) {
-      void identity.isolate().catch(() => {
-        if (windowToken) rebindWithWindowToken(windowToken, here);
-        else window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
-      });
-      return;
-    }
-    if (windowToken) {
-      rebindWithWindowToken(windowToken, here);
-      return;
-    }
-    window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
-  });
+  if (windowToken) {
+    rebindWithWindowToken(windowToken, here);
+    return;
+  }
+  window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
 }
 
 /** Call after a successful matched page load so the next switch can rebind again. */

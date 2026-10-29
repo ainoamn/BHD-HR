@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { type UiLocale } from "@/lib/bhd/identity-public";
 import { loadBhdIdentity, type BhdIdentityUser } from "@/lib/identity/bhd-browser";
-import { addAccountUrl, applyAccountIsolation, isAccountRebindPending, productStartPath } from "@/lib/identity/client";
+import {
+  addAccountUrl,
+  applyAccountIsolation,
+  isAccountRebindPending,
+  productStartPath,
+  switchWindowAccount,
+} from "@/lib/identity/client";
 import { BhdAppSwitcher, type BhdSwitcherUser } from "./BhdAppSwitcher";
 
 function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwitcherUser): BhdSwitcherUser | null {
@@ -54,9 +60,14 @@ export function BhdSessionMenu({
           .filter((item): item is BhdSwitcherUser => Boolean(item?.id));
         if (list.length) setAccounts(list);
         const identityUser = asSwitcher(body.user);
-        // Only paint the header when it matches the product session — SilentSso rebinds otherwise.
         if (identityUser?.id && user.id && identityUser.id === user.id) {
           setActive({ ...user, ...identityUser, id: identityUser.id });
+          return;
+        }
+        // Identity window ≠ product session: never show the other account's face on this page.
+        setActive(user);
+        if (identityUser?.id && user.id && identityUser.id !== user.id && !isAccountRebindPending()) {
+          applyAccountIsolation(body.token);
         }
       } catch {
         /* keep product user */
@@ -106,29 +117,24 @@ export function BhdSessionMenu({
   const switchAccount = useCallback(
     async (sub: string) => {
       if (!sub || sub === active.id || busy || isAccountRebindPending()) return;
-      const identity = await loadBhdIdentity();
-      if (!identity) {
-        window.location.assign(productStartPath(window.location.pathname || "/"));
-        return;
-      }
       try {
         setBusy(true);
-        // Drop prior account paint immediately — isolate (inside switchAccount) rebinds the product.
-        setActive({ id: "", name: "", email: "", picture: null });
-        setAccounts([]);
-        const { ok, body } = await identity.switchAccount(sub);
-        if (ok) {
-          // Live script already called isolate(); only fall back if navigation did not start.
-          if (!identity.isolate) applyAccountIsolation(body.token);
+        // Clear prior paint immediately — do not leave Abdul's face while identity is another account.
+        setActive({ id: "", name: "…", email: "", picture: null });
+        // Switch window Bearer only (no auto-isolate); then rebind product session from that token.
+        const switched = await switchWindowAccount(sub);
+        if (switched.ok) {
+          applyAccountIsolation(switched.token);
           return;
         }
       } catch {
         /* cross-origin blocked */
       }
       setBusy(false);
-      window.location.assign("https://id.bhd-om.com/account");
+      setActive(user);
+      window.location.assign(productStartPath(window.location.pathname || "/"));
     },
-    [active.id, busy],
+    [active.id, busy, user],
   );
 
   return (

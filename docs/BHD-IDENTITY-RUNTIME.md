@@ -26,8 +26,8 @@
 | مدة كوكي المنتج | `sessionCookieOptions()` ← `identitySessionMaxAgeSec()` من `/api/bhd/runtime` |
 | الرأس / التبديل / الخروج | `BhdSessionMenu` عبر `BhdIdentity.me` / `switchAccount` / `signOut` |
 | مشغّل / فوتر / رئيسية | `useBhdCatalog` + `BhdProgramsGrid` من `/api/bhd/catalog`؛ الإدارة [`/admin#apps`](https://id.bhd-om.com/admin#apps) |
-| عزل التبديل | `BhdIdentity.switchAccount` → `isolate` (window-handoff→start)؛ احتياط `rebind` |
-| SSO صامت | `BhdSilentSso` عند اختلاف `/api/auth/me` عن الهوية → `isolate` |
+| عزل التبديل | `switchWindowAccount` (Bearer) ثم دائماً `POST /rebind` — لا تعتمد على isolate/`bhd_id` وحدها (§91) |
+| SSO صامت | `BhdSilentSso` عند اختلاف `/api/auth/me` عن الهوية → `rebind` |
 | ما يبقى محلياً | `start` / `callback` / `logout` (+ `rebind` احتياط) + احتياط `apps.ts` للكتالوج |
 | أمر الوكيل | [`BHD-CURSOR-PRODUCT-WIRE.md`](./BHD-CURSOR-PRODUCT-WIRE.md) |
 
