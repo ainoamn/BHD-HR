@@ -2,19 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { type UiLocale } from "@/lib/bhd/identity-public";
-import { addAccountUrl, applyAccountIsolation, identityFetch } from "@/lib/identity/client";
-import { captureWindowToken, signOutThisWindow } from "@/lib/identity/window-session";
+import { loadBhdIdentity, type BhdIdentityUser } from "@/lib/identity/bhd-browser";
+import { addAccountUrl, applyAccountIsolation, productStartPath } from "@/lib/identity/client";
 import { BhdAppSwitcher, type BhdSwitcherUser } from "./BhdAppSwitcher";
 
-type MeResponse = {
-  user?: BhdSwitcherUser | null;
-  accounts?: BhdSwitcherUser[];
-  token?: string;
-};
+function asSwitcher(user: BhdIdentityUser | null | undefined, fallback?: BhdSwitcherUser): BhdSwitcherUser | null {
+  if (!user?.id && !fallback?.id) return null;
+  return {
+    id: user?.id || fallback?.id || "",
+    email: user?.email || fallback?.email || "",
+    name: user?.name || fallback?.name || user?.email || fallback?.email || "",
+    picture: user?.picture ?? fallback?.picture ?? null,
+    username: user?.username ?? fallback?.username ?? null,
+  };
+}
 
 /**
- * Product header — Google-style isolation (docs/BHD-ACCOUNT-SWITCHER.md).
- * Switch never opens /login?add=1; after switch the product rebinds via start so data matches the active sub.
+ * Product header — uses live https://id.bhd-om.com/bhd-identity.js (docs/BHD-IDENTITY-RUNTIME.md).
+ * Switch never opens /login?add=1; after switch the product rebinds via start.
  */
 export function BhdSessionMenu({
   user,
@@ -38,20 +43,24 @@ export function BhdSessionMenu({
   useEffect(() => {
     if (!identityLinked) return;
     let cancelled = false;
-    identityFetch("/api/auth/me")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: MeResponse | null) => {
-        if (cancelled || !data) return;
-        captureWindowToken(data.token);
-        const list = data.accounts?.length ? data.accounts : data.user ? [data.user] : [];
+    void loadBhdIdentity().then(async (identity) => {
+      if (cancelled || !identity) return;
+      try {
+        const { ok, body } = await identity.me();
+        if (cancelled || !ok) return;
+        const list = (body.accounts?.length ? body.accounts : body.user ? [body.user] : [])
+          .map((item) => asSwitcher(item))
+          .filter((item): item is BhdSwitcherUser => Boolean(item?.id));
         if (list.length) setAccounts(list);
         const current =
           (user.id && list.find((item) => item.id === user.id)) ||
-          data.user ||
+          asSwitcher(body.user, user) ||
           list.find((item) => item.email && item.email === user.email);
         if (current) setActive({ ...user, ...current, id: current.id || user.id });
-      })
-      .catch(() => undefined);
+      } catch {
+        /* keep product user */
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -62,21 +71,15 @@ export function BhdSessionMenu({
       window.location.assign("/api/auth/bhd/logout?local=1");
       return;
     }
+    const identity = await loadBhdIdentity();
+    if (!identity) {
+      window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
+      return;
+    }
     try {
-      const response = await identityFetch("/api/auth/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: false }),
-      });
-      if (response.ok) {
-        const data = (await response.json()) as MeResponse;
-        if (data.user) {
-          captureWindowToken(data.token);
-          applyAccountIsolation();
-          return;
-        }
-        signOutThisWindow();
-        window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent("https://id.bhd-om.com/login")}`);
+      const { ok, body } = await identity.signOut(false);
+      if (ok && body.user) {
+        applyAccountIsolation();
         return;
       }
     } catch {
@@ -100,23 +103,20 @@ export function BhdSessionMenu({
   const switchAccount = useCallback(
     async (sub: string) => {
       if (!sub || sub === active.id) return;
+      const identity = await loadBhdIdentity();
+      if (!identity) {
+        window.location.assign(productStartPath(window.location.pathname || "/"));
+        return;
+      }
       try {
-        const response = await identityFetch("/api/auth/switch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sub }),
-        });
-        if (response.ok) {
-          const data = (await response.json()) as MeResponse;
-          captureWindowToken(data.token);
-          // Full rebind: product session + page data must become the new account only.
+        const { ok } = await identity.switchAccount(sub);
+        if (ok) {
           applyAccountIsolation();
           return;
         }
       } catch {
         /* cross-origin blocked */
       }
-      // Never /login?add=1 on switch failure — identity account page has the roster.
       window.location.assign("https://id.bhd-om.com/account");
     },
     [active.id],

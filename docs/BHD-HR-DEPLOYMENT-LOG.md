@@ -1574,3 +1574,20 @@
 **القاعدة:** بلا تغيير مخطط.
 
 **الخطوات:** `tsc`، الدفع إلى `main`.
+
+---
+
+## 86. الربط الحي للهوية (runtime + bhd-identity.js) (2026-10-29)
+
+**المطلوب:** البرمجة على الأم؛ المنتج يقرأ عبر API/السكربت ولا يعيد كتابة الجلسة أو النافذة. مدة كوكي المنتج من `runtime.session.maxAgeSec`.
+
+| # | ما نُفّذ |
+|---|---|
+| 1 | تحميل `https://id.bhd-om.com/bhd-identity.js` في `layout.tsx` |
+| 2 | `identitySessionMaxAgeSec()` من `/api/bhd/runtime` → `sessionCookieOptions()` (callback/دخول محلي) |
+| 3 | `BhdSessionMenu` / `BhdSilentSso` عبر `BhdIdentity.me` / `switchAccount` / `signOut` |
+| 4 | وثيقة `docs/BHD-IDENTITY-RUNTIME.md` + تحديث سياسة الجلسة |
+
+**القاعدة:** بلا تغيير مخطط.
+
+**الخطوات:** `tsc`، الدفع إلى `main`.

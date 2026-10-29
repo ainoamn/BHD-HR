@@ -55,6 +55,6 @@ export async function GET(request: Request) {
   const response = NextResponse.redirect(new URL(oauth.returnTo, origin));
   response.cookies.delete(OAUTH_STATE_COOKIE);
   response.cookies.delete(COMPANY_COOKIE);
-  response.cookies.set(SESSION_COOKIE, signSession(user), sessionCookieOptions());
+  response.cookies.set(SESSION_COOKIE, signSession(user), await sessionCookieOptions());
   return response;
 }

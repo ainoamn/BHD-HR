@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { identitySessionMaxAgeSec, SESSION_MAX_AGE_FALLBACK } from "@/lib/bhd/runtime";
 import { type Permission, type TeamPermission, isTeamRole, permissionsFor, teamPermissionsFor } from "./permissions";
 import { isPlatformAdmin } from "./platform-admin";
 import { prisma } from "./prisma";
@@ -34,16 +35,18 @@ export function homePath(user: { role: string }) {
   return user.role === "EMPLOYEE" ? "/me" : "/team";
 }
 
-/** BHD session policy: stay signed in until an explicit sign-out (no idle timeout, no sliding refresh). */
-export const SESSION_MAX_AGE = 400 * 24 * 60 * 60;
+/** @deprecated Prefer identitySessionMaxAgeSec() — live value comes from id.bhd-om.com/api/bhd/runtime. */
+export const SESSION_MAX_AGE = SESSION_MAX_AGE_FALLBACK;
 
-export function sessionCookieOptions() {
+/** Product cookie options; maxAge is read from the identity runtime (not a local constant). */
+export async function sessionCookieOptions() {
+  const maxAge = await identitySessionMaxAgeSec();
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
-    maxAge: SESSION_MAX_AGE,
+    maxAge,
   };
 }
 

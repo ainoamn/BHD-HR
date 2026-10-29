@@ -39,11 +39,14 @@
 3. لا تستخدم `BroadcastChannel` لمزامنة الحساب النشط بين النوافذ.
 4. اجعل طلبات `/api/account` وبيانات المستخدم تمر من `identityFetch` لا من `fetch` العاري حتى لا تُقرأ كوكي نافذة أخرى.
 
-### تطبيق BHD-HR
+### تطبيق BHD-HR (الربط الحي — المفضّل)
 
-- `src/lib/identity/window-session.ts`
-- `identityFetch` في `src/lib/identity/client.ts` يرفق Bearer ويحفظ `token` من الردود
-- `BhdSessionMenu` / `BhdSilentSso` يستدعيان `captureWindowToken` بعد `/me` والتبديل
+انظر [`BHD-IDENTITY-RUNTIME.md`](BHD-IDENTITY-RUNTIME.md). المنتج يحمّل `bhd-identity.js` ويقرأ `runtime.session.maxAgeSec`؛ لا يعيد كتابة الجلسة أو النافذة محلياً.
+
+- سكربت: `https://id.bhd-om.com/bhd-identity.js` في `layout.tsx`
+- مدة الكوكي: `identitySessionMaxAgeSec()` من `/api/bhd/runtime`
+- الرأس: `BhdIdentity.me` / `switchAccount` / `signOut`
+- يبقى محلياً فقط: `start` / `callback` / `logout`
 
 ---
 

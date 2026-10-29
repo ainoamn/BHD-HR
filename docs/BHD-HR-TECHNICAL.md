@@ -799,8 +799,9 @@ npm run test:e2e     # على قاعدة محلية مبذورة (انظر «ا�
 |---|---|
 | `BHD-PRODUCT-SSO-ADMIN.md` | start / callback / logout / admin-entry، غلاف `/login`، `bhdSub`، رابط الإدارة في الفوتر |
 | `BHD-IDENTITY-SSO.md` | OIDC + PKCE S256، `state` و`nonce`، كوكيز Host-only، `email_verified`، لا مفاتيح في المتصفح |
-| `BHD-SESSION-POLICY.md` | 400 يوم، بلا خمول ولا KeepAlive ولا جوجل محلي، لا `Set-Cookie` عند القراءة؛ نوافذ متعددة عبر `bhd_window_token` + Bearer في `identityFetch` (§85، `BHD-COPY-TO-PRODUCTS`) |
-| `BHD-COPY-TO-PRODUCTS.md` / `BHD-SECURITY-PROTECTION.md` | نسخ الوثائق من الهوية؛ الحماية على الهوية فقط و`/recover` |
+| `BHD-IDENTITY-RUNTIME.md` | سكربت حي `bhd-identity.js` + `/api/bhd/runtime`؛ مدة كوكي المنتج من `maxAgeSec`؛ الرأس عبر `BhdIdentity` (§86) |
+| `BHD-SESSION-POLICY.md` | بلا خمول ولا KeepAlive؛ المدة من الهوية الحيّة؛ نوافذ متعددة على الأم |
+| `BHD-COPY-TO-PRODUCTS.md` / `BHD-SECURITY-PROTECTION.md` | نسخ الوثائق؛ الحماية على الهوية و`/recover` |
 | `BHD-APP-SWITCHER.md` | كتالوج مجمد يشمل `hr` (§4.1)؛ `apps.ts` و`BhdAppIcon` و`BhdAppSwitcher`/`BhdSessionMenu` |
 | `BHD-ACCOUNT-SWITCHER.md` | شكل البطاقة + §5 سرعة بلا وميض: تبديل من JSON، `workspacePath` مباشرة، ميدلوير→`start` بلا جلسة فقط |
 | `BHD-UNIFIED-LOGIN-AND-APPS.md` §0.1 و§0.2 و§0.5 | الألوان؛ حسابات متعددة من الرأس؛ فوتر «برامجنا» |

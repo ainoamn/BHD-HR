@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
 import { cookies } from "next/headers";
+import Script from "next/script";
 import { TranslateProvider } from "@/components/ai-translate";
 import { BhdSilentSso } from "@/components/bhd/BhdSilentSso";
 import { ErrorReporter } from "@/components/error-reporter";
 import { LangProvider } from "@/components/lang-provider";
+import { IDENTITY_SCRIPT_URL } from "@/lib/bhd/runtime";
 import { getI18n } from "@/lib/lang";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/utils";
 import "./globals.css";
@@ -51,6 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-dvh antialiased">
+        <Script src={IDENTITY_SCRIPT_URL} strategy="afterInteractive" />
         <ErrorReporter />
         <BhdSilentSso />
         <LangProvider lang={lang}>

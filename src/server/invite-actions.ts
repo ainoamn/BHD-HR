@@ -32,6 +32,6 @@ export async function acceptInvite(formData: FormData) {
     });
   }
   const jar = await cookies();
-  jar.set(COMPANY_COOKIE, invite!.companyId, sessionCookieOptions());
+  jar.set(COMPANY_COOKIE, invite!.companyId, await sessionCookieOptions());
   redirect("/");
 }

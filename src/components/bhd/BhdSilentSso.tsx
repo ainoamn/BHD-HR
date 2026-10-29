@@ -1,12 +1,12 @@
 "use client";
 
-import { identityFetch, isIdentityOrigin, productStartPath } from "@/lib/identity/client";
-import { captureWindowToken } from "@/lib/identity/window-session";
+import { loadBhdIdentity } from "@/lib/identity/bhd-browser";
+import { isIdentityOrigin, productStartPath } from "@/lib/identity/client";
 import { useEffect } from "react";
 
 /**
- * Direct URL entry: bind product session to the identity active account silently.
- * Never /login?add=1 (docs/BHD-ACCOUNT-SWITCHER.md §3).
+ * Direct URL entry: bind product session to the identity active account via live BhdIdentity.
+ * Never /login?add=1 (docs/BHD-IDENTITY-RUNTIME.md).
  */
 export function BhdSilentSso() {
   useEffect(() => {
@@ -31,19 +31,21 @@ export function BhdSilentSso() {
     const guardKey = `bhd-sso:${here}`;
     if (sessionStorage.getItem(guardKey) === "1") return;
 
-    identityFetch("/api/auth/me")
-      .then((response) => response.json())
-      .then(async (identity: { user?: { id?: string } | null; token?: string }) => {
-        if (cancelled || !identity.user?.id) return;
-        captureWindowToken(identity.token);
+    void loadBhdIdentity().then(async (identity) => {
+      if (cancelled || !identity) return;
+      try {
+        const { ok, body } = await identity.me();
+        if (cancelled || !ok || !body.user?.id) return;
         const localResponse = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
         const local = (await localResponse.json().catch(() => ({}))) as { user?: { id?: string } | null };
         if (cancelled) return;
-        if (local.user?.id && local.user.id === identity.user.id) return;
+        if (local.user?.id && local.user.id === body.user.id) return;
         sessionStorage.setItem(guardKey, "1");
-        window.location.replace(productStartPath(here));
-      })
-      .catch(() => undefined);
+        window.location.replace(identity.productStart(here) || productStartPath(here));
+      } catch {
+        /* stay */
+      }
+    });
 
     return () => {
       cancelled = true;
