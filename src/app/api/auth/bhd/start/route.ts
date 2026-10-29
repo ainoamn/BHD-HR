@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { COMPANY_COOKIE, SESSION_COOKIE } from "@/lib/auth";
 import {
   OAUTH_STATE_COOKIE,
   authorizeUrl,
@@ -14,6 +15,10 @@ import { signInOrigin } from "@/lib/request-origin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Begin OIDC. Always drop the prior product session first so a mid-flight back-button
+ * cannot keep showing the previous account's dashboard while identity has moved on.
+ */
 export async function GET(request: Request) {
   const origin = signInOrigin(request);
   const url = new URL(request.url);
@@ -24,5 +29,8 @@ export async function GET(request: Request) {
   const oauth = { state: randomUrlToken(24), nonce: randomUrlToken(24), verifier: randomUrlToken(48), returnTo };
   const response = NextResponse.redirect(authorizeUrl(identityConfig(origin), oauth), 302);
   response.cookies.set(OAUTH_STATE_COOKIE, encodeOAuthState(oauth), oauthStateCookieOptions());
+  response.cookies.delete(SESSION_COOKIE);
+  response.cookies.delete(COMPANY_COOKIE);
+  response.headers.set("Cache-Control", "no-store");
   return response;
 }

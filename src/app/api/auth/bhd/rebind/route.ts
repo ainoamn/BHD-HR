@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Rebind the product session to this window's identity Bearer account.
- * Fast path: if already bound to the same sub, redirect immediately (no DB / no identity round-trip beyond /me).
+ * This is the privacy-critical path: shared `bhd_id` must never decide the product user
+ * after a Bearer window switch (see docs/BHD-ACCOUNT-ISOLATION.md).
  */
 async function profileFromWindowToken(token: string): Promise<IdentityProfile> {
   const issuer = identityIssuer();
@@ -34,10 +35,10 @@ async function profileFromWindowToken(token: string): Promise<IdentityProfile> {
   };
 }
 
-function redirectHome(origin: string, returnTo: string, clearCompany = false) {
+function redirectHome(origin: string, returnTo: string) {
   const response = NextResponse.redirect(new URL(returnTo, origin), 303);
-  if (clearCompany) response.cookies.delete(COMPANY_COOKIE);
-  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  response.headers.set("Pragma", "no-cache");
   return response;
 }
 
@@ -71,12 +72,17 @@ async function rebind(request: Request) {
   try {
     const profile = await profileFromWindowToken(token);
     const current = await getSessionUser();
+    // Always clear company scope so the rebound user cannot inherit the prior workspace cookie.
     if (current?.bhdSub && current.bhdSub === profile.sub) {
-      // Already on the correct account — do not rewrite cookies or hit the DB again.
-      return redirectHome(origin, returnTo);
+      const response = redirectHome(origin, returnTo);
+      response.cookies.delete(COMPANY_COOKIE);
+      // Re-stamp the session so browsers do not keep a stale document for the same URL.
+      response.cookies.set(SESSION_COOKIE, signSession(current), sessionCookieOptions());
+      return response;
     }
     const user = await signInBhdUser(profile, requestMeta(request));
-    const response = redirectHome(origin, returnTo, true);
+    const response = redirectHome(origin, returnTo);
+    response.cookies.delete(COMPANY_COOKIE);
     response.cookies.set(SESSION_COOKIE, signSession(user), sessionCookieOptions());
     return response;
   } catch {

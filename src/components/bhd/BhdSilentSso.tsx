@@ -59,7 +59,7 @@ export function BhdSilentSso() {
           return;
         }
 
-        await applyAccountIsolation(body.token);
+        await applyAccountIsolation(body.token, { force: true });
       } catch {
         clearAccountRebindLock();
       }

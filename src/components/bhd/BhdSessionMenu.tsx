@@ -128,7 +128,8 @@ export function BhdSessionMenu({
         setActive({ id: "", name: "…", email: "…", picture: null });
         const switched = await switchWindowAccount(sub);
         if (switched.ok) {
-          await applyAccountIsolation(switched.token);
+          // force: ignore a stale rebind lock so the new Bearer always rewrites hr_session
+          await applyAccountIsolation(switched.token, { force: true });
           return;
         }
       } catch {

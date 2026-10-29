@@ -44,6 +44,19 @@ export function currentReturnPath() {
   return `${window.location.pathname}${window.location.search || ""}` || "/";
 }
 
+/** Bust bfcache / soft RSC so the rebound session always remounts server UI. */
+export function cacheBustReturnPath(returnTo = "/") {
+  const path = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
+  try {
+    const url = new URL(path, "https://bhd.local");
+    url.searchParams.delete("_bhd");
+    url.searchParams.set("_bhd", String(Date.now()));
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return path.includes("?") ? `${path}&_bhd=${Date.now()}` : `${path}?_bhd=${Date.now()}`;
+  }
+}
+
 export function productStartPath(returnTo = "/") {
   const path = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
   return `/api/auth/bhd/start?returnTo=${encodeURIComponent(path)}`;
@@ -100,7 +113,7 @@ function rebindWithWindowToken(token: string, returnTo: string) {
   tokenInput.value = token;
   const returnInput = document.createElement("input");
   returnInput.name = "returnTo";
-  returnInput.value = returnTo;
+  returnInput.value = cacheBustReturnPath(returnTo);
   form.append(tokenInput, returnInput);
   document.body.appendChild(form);
   form.submit();
@@ -131,12 +144,17 @@ export async function switchWindowAccount(sub: string): Promise<{ ok: boolean; t
 
 /**
  * Bind this product tab to THIS window's identity account only.
- * Official path (ONE-BHD): window-handoff → /auth/handoff → /api/auth/bhd/start → callback.
- * Fallback: POST /api/auth/bhd/rebind with the window Bearer.
+ *
+ * PRIMARY path: POST /api/auth/bhd/rebind with the window Bearer.
+ * Why: Bearer switch does NOT rewrite shared `bhd_id`. OAuth `/start` without a handoff
+ * ticket therefore issues a code for the *previous* shared cookie — product data stays,
+ * while the window identity already shows the new account (privacy leak).
+ *
+ * Handoff→start is only for bootstrap when no window token exists.
  */
-export async function applyAccountIsolation(token?: string | null) {
+export async function applyAccountIsolation(token?: string | null, options?: { force?: boolean }) {
   if (typeof window === "undefined") return;
-  if (isAccountRebindPending()) return;
+  if (!options?.force && isAccountRebindPending()) return;
   const here = currentReturnPath();
   if (isIdentityOrigin()) {
     window.location.reload();
@@ -145,10 +163,17 @@ export async function applyAccountIsolation(token?: string | null) {
   markIsolationPending();
   const windowToken = token || sessionStorage.getItem("bhd_window_token") || "";
 
+  // Authoritative: rewrite hr_session from this window's Bearer (never shared bhd_id).
+  if (windowToken) {
+    rebindWithWindowToken(windowToken, here);
+    return;
+  }
+
+  // Bootstrap only (no window token yet): official handoff → start.
   try {
     const response = await identityFetch("/api/auth/window-handoff", { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { ticket?: string };
-    const start = new URL(productStartPath(here), window.location.origin).toString();
+    const start = new URL(productStartPath(cacheBustReturnPath(here)), window.location.origin).toString();
     if (response.ok && data.ticket) {
       const handoff = new URL("/auth/handoff", DEFAULT_IDENTITY_ISSUER);
       handoff.searchParams.set("ticket", data.ticket);
@@ -160,11 +185,8 @@ export async function applyAccountIsolation(token?: string | null) {
     /* fall through */
   }
 
-  if (windowToken) {
-    rebindWithWindowToken(windowToken, here);
-    return;
-  }
-  window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(here))}`);
+  // Last resort: clear product session then OIDC start (still must not skip logout).
+  window.location.assign(`/api/auth/bhd/logout?continue=${encodeURIComponent(productStartPath(cacheBustReturnPath(here)))}`);
 }
 
 /** Call after a successful matched page load so the next switch can rebind again. */
