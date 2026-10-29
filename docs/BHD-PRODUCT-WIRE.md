@@ -20,7 +20,7 @@
 
 ## وثائق إلزامية في هذا المجلد
 
-- `BHD-ACCOUNT-ISOLATION.md` — جذر تسرّب البيانات بعد التبديل
+- `BHD-ACCOUNT-ISOLATION.md` — جذر تسرّب البيانات بعد التبديل (**§93** في `BHD-HR-DEPLOYMENT-LOG.md`)
 - `BHD-CURSOR-PRODUCT-WIRE.md` — أمر الوكيل
 - `BHD-IDENTITY-RUNTIME.md` — API + سكربت
 - `BHD-PRODUCTS-WIRE-STATUS.md` — حالة كل المواقع
